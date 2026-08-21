@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/**
+ * SISTEM DESAIN APLIKASI TANGGUH
+ *
+ * Seluruh warna, ukuran huruf, dan jarak diambil dari token di bawah.
+ * Jangan menuliskan nilai heksadesimal langsung di komponen.
+ *
+ * Arah desain, dan alasannya:
+ *
+ * - Warna utama biru-hijau laut, diambil dari perairan Olele dan Torosiaje.
+ *   Dipilih bukan karena selera, melainkan karena hijau, kuning, dan merah
+ *   sudah terpakai untuk makna status gizi. Warna merek tidak boleh mengambil
+ *   dari ketiganya, atau kader akan mengasosiasikan warna tombol dengan status.
+ *
+ * - Aksen kuning emas, merujuk sulaman Karawo dan warna adat Gorontalo.
+ *   Dipakai hemat: hanya untuk penanda aktif dan sorotan.
+ *
+ * - Latar putih kabut, bukan putih murni. Putih murni memantul menyilaukan di
+ *   bawah matahari, dan kader bekerja di luar ruangan.
+ *
+ * - Huruf tajuk Plus Jakarta Sans, dirancang di Indonesia, ramah tanpa terasa
+ *   kekanak-kanakan. Angka pengukuran memakai huruf monospasi bertabular agar
+ *   deretan angka di tabel sejajar dan mudah dibandingkan.
+ */
+
+@theme {
+  /* ---- Warna utama: laut ---- */
+  --color-laut-50: #ECFDFE;
+  --color-laut-100: #C7F6F9;
+  --color-laut-200: #97EDF3;
+  --color-laut-300: #5FDCE3;
+  --color-laut-400: #2AC5CF;
+  --color-laut-500: #12B5C0;   /* warna merek */
+  --color-laut-600: #0E96A1;
+  --color-laut-700: #0B7681;   /* aman untuk teks di latar terang */
+  --color-laut-800: #095F68;
+  --color-laut-900: #06454B;
+
+  /* ---- Aksen: karawo ---- */
+  --color-karawo-100: #FFF3D1;
+  --color-karawo-300: #FFD873;
+  --color-karawo-400: #FFC53D;
+  --color-karawo-500: #F5A524;
+  --color-karawo-700: #8A5300;   /* untuk teks di atas latar kuning */
+
+  /* ---- Netral: kabut dan tinta ---- */
+  --color-kabut-50: #F6FAFB;    /* latar halaman */
+  --color-kabut-100: #EDF3F5;
+  --color-kabut-200: #DCE9EB;   /* garis pembatas */
+  --color-tinta-400: #7A959B;   /* teks bantu */
+  --color-tinta-600: #4A6B72;   /* teks sekunder */
+  --color-tinta-900: #0F2B31;   /* teks utama, bukan hitam murni */
+
+  /* ---- Status klinis: hanya untuk makna medis ---- */
+  --color-aman-bg: #E8F8EF;
+  --color-aman-garis: #21A366;
+  --color-aman-teks: #0E6B41;
+  --color-waspada-bg: #FFF6E0;
+  --color-waspada-garis: #E08700;
+  --color-waspada-teks: #7A4A00;
+  --color-bahaya-bg: #FEECEC;
+  --color-bahaya-garis: #D93A43;
+  --color-bahaya-teks: #97161D;
+  --color-netral-bg: #EDF3F5;
+  --color-netral-garis: #A8BFC4;
+  --color-netral-teks: #4A6B72;
+
+  /* ---- Tipografi ---- */
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-angka: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* ---- Sudut, bayangan, ukuran sentuh ---- */
+  --radius-kartu: 1rem;
+  --radius-pil: 9999px;
+  --shadow-kartu: 0 1px 2px rgb(15 43 49 / 0.05), 0 8px 24px -12px rgb(15 43 49 / 0.12);
+  --spacing-sentuh: 3rem;      /* 48 px, ukuran sasaran sentuh minimum */
+  --spacing-input: 3.5rem;     /* 56 px, tinggi kolom input */
+}
+
+/* Ukuran huruf dasar lebih besar di ponsel, tempat aplikasi ini dipakai. */
+html {
+  font-size: 17px;
+}
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  background: var(--color-kabut-50);
+  color: var(--color-tinta-900);
+  font-family: var(--font-body);
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+/* Angka pengukuran selalu sejajar kolom. */
+.angka {
+  font-family: var(--font-angka);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fokus papan ketik harus terlihat jelas, termasuk di bawah matahari. */
+:focus-visible {
+  outline: 3px solid var(--color-laut-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Menghormati pengaturan sistem pengguna. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Yang tidak perlu ikut tercetak. */
+@media print {
+  .tanpa-cetak {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}

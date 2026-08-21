@@ -1,0 +1,276 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pratinjau Sistem Desain — Aplikasi TANGGUH</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--laut-50:#ECFDFE;--laut-100:#C7F6F9;--laut-300:#5FDCE3;--laut-500:#12B5C0;--laut-600:#0E96A1;--laut-700:#0B7681;--laut-900:#06454B;
+--karawo-100:#FFF3D1;--karawo-400:#FFC53D;--karawo-500:#F5A524;--karawo-700:#8A5300;
+--kabut-50:#F6FAFB;--kabut-100:#EDF3F5;--kabut-200:#DCE9EB;--tinta-400:#7A959B;--tinta-600:#4A6B72;--tinta-900:#0F2B31;
+--aman-bg:#E8F8EF;--aman-garis:#21A366;--aman-teks:#0E6B41;
+--waspada-bg:#FFF6E0;--waspada-garis:#E08700;--waspada-teks:#7A4A00;
+--bahaya-bg:#FEECEC;--bahaya-garis:#D93A43;--bahaya-teks:#97161D;
+--netral-bg:#EDF3F5;--netral-garis:#A8BFC4;--netral-teks:#4A6B72;
+--kartu:0 1px 2px rgb(15 43 49/.05),0 8px 24px -12px rgb(15 43 49/.12);
+}
+*{box-sizing:border-box}
+html{font-size:17px}@media(min-width:768px){html{font-size:16px}}
+body{margin:0;background:var(--kabut-50);color:var(--tinta-900);font-family:Inter,system-ui,sans-serif;line-height:1.55;-webkit-text-size-adjust:100%}
+h1,h2,h3,h4{font-family:'Plus Jakarta Sans',system-ui,sans-serif;letter-spacing:-.015em;margin:0}
+.angka{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+.topbar{background:linear-gradient(135deg,var(--laut-700),var(--laut-500));color:#fff;padding:26px 20px}
+.topbar .in{max-width:1180px;margin:0 auto}
+.topbar h1{font-size:1.65rem}
+.topbar p{margin:.4rem 0 0;opacity:.92;max-width:62ch}
+section.blok{margin-top:44px}
+section.blok>h2{font-size:1.25rem;padding-bottom:10px;border-bottom:2px solid var(--kabut-200)}
+section.blok>p.ket{color:var(--tinta-600);max-width:70ch;margin:.6rem 0 1.2rem}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+/* swatch */
+.sws{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}
+.sw{background:#fff;border-radius:12px;padding:10px;box-shadow:var(--kartu)}
+.sw span{display:block;height:44px;border-radius:8px;border:1px solid rgb(15 43 49/.08)}
+.sw code{display:block;margin-top:7px;font-size:.74rem;font-weight:700}
+.sw small{color:var(--tinta-400);font-size:.68rem;font-family:'IBM Plex Mono',monospace}
+/* lencana */
+.lencana{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:8px 14px;font-weight:600;font-size:1rem;box-shadow:inset 0 0 0 1px currentColor}
+.lencana.kecil{padding:5px 11px;font-size:.86rem}
+.lencana b{font-family:'IBM Plex Mono',monospace;font-size:.85em;opacity:.85}
+.lencana.aman{background:var(--aman-bg);color:var(--aman-teks)}
+.lencana.waspada{background:var(--waspada-bg);color:var(--waspada-teks)}
+.lencana.bahaya{background:var(--bahaya-bg);color:var(--bahaya-teks)}
+.lencana.netral{background:var(--netral-bg);color:var(--netral-teks)}
+/* tombol */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:12px;padding:0 22px;font-size:1rem;font-weight:600;border:0;cursor:pointer;font-family:inherit}
+.btn.utama{background:var(--laut-600);color:#fff}
+.btn.sekunder{background:#fff;color:var(--laut-700);box-shadow:inset 0 0 0 1px var(--kabut-200)}
+.btn.halus{background:transparent;color:var(--laut-700)}
+.btn.bahaya{background:var(--bahaya-teks);color:#fff}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+/* input */
+.field{margin-bottom:16px}
+.field label{display:block;font-weight:600;margin-bottom:6px}
+.field .req{color:var(--bahaya-teks)}
+.inputwrap{display:flex;align-items:center;background:#fff;border-radius:12px;box-shadow:inset 0 0 0 1px var(--kabut-200)}
+.inputwrap.err{box-shadow:inset 0 0 0 2px var(--bahaya-garis)}
+.inputwrap input{height:56px;width:100%;border:0;background:transparent;padding:0 16px;font-size:1.45rem;font-weight:700;color:var(--tinta-900);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;outline:0}
+.inputwrap .satuan{padding-right:16px;color:var(--tinta-400);font-size:1.05rem;font-weight:500}
+.field .bantu{font-size:.83rem;color:var(--tinta-400);margin:6px 0 0}
+.field .galat{font-size:.83rem;color:var(--bahaya-teks);font-weight:600;margin:6px 0 0}
+/* kartu hasil */
+.kartu{background:#fff;border-radius:16px;padding:20px;box-shadow:var(--kartu)}
+.kartu header h2{font-size:1.2rem}
+.kartu .sub{color:var(--tinta-600);font-size:.85rem;margin:.2rem 0 0}
+.banner{border-radius:12px;padding:14px;margin:16px 0}
+.banner b{display:block;margin-bottom:4px}
+.banner ul{margin:4px 0 0;padding-left:20px;font-size:.87rem}
+.banner p{margin:0;font-size:.87rem}
+.banner.bahaya{background:var(--bahaya-bg);color:var(--bahaya-teks);box-shadow:inset 0 0 0 1px var(--bahaya-garis)}
+.banner.netral{background:var(--netral-bg);color:var(--netral-teks);box-shadow:inset 0 0 0 1px var(--netral-garis)}
+.ind{margin-top:18px}
+.indhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.kode{font-weight:700;color:var(--tinta-600);font-size:.85rem}
+.zval{font-size:1.15rem;font-weight:700}
+.sd{color:var(--tinta-400);font-size:.8rem}
+/* pita */
+.pita{margin:0}
+.jalur{position:relative;height:44px}
+.segmen{position:absolute;inset-inline:0;top:12px;height:20px;display:flex;overflow:hidden;border-radius:999px;box-shadow:inset 0 0 0 1px var(--kabut-200)}
+.ticks{position:absolute;inset-inline:0;top:12px;height:20px;pointer-events:none}
+.tick{position:absolute;top:0;width:1px;transform:translateX(-50%);background:var(--tinta-900);height:6px;opacity:.2}
+.tick.besar{height:10px;opacity:.4}
+.penanda{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+.penanda .nilai{background:var(--tinta-900);color:#fff;border-radius:6px;padding:2px 7px;font-size:.7rem;font-weight:700;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.penanda .batang{width:2px;height:24px;background:var(--tinta-900)}
+.skalabar{position:relative;height:16px}
+.skala{position:absolute;transform:translateX(-50%);font-size:.7rem;color:var(--tinta-400);font-family:'IBM Plex Mono',monospace}
+/* gizi */
+.gizi{background:var(--kabut-50);border-radius:12px;padding:14px;margin-top:20px}
+.gizi h3{font-size:1rem;margin-bottom:8px}
+.gizi dl{margin:0}
+.baris{display:flex;justify-content:space-between;gap:12px;font-size:.88rem;padding:3px 0}
+.baris dt{color:var(--tinta-600);margin:0}
+.baris dd{margin:0;font-weight:600}
+.baris.tebal{border-top:1px solid var(--kabut-200);padding-top:8px;margin-top:4px}
+.baris.tebal dt{color:var(--tinta-900);font-weight:600}
+.baris.tebal dd{font-weight:700}
+.peringatan{font-size:.76rem;color:var(--waspada-teks);margin:8px 0 0}
+.kartu footer{border-top:1px solid var(--kabut-200);margin-top:18px;padding-top:12px}
+.sangkal{font-size:.74rem;color:var(--tinta-400);margin:0;line-height:1.5}
+.ver{font-size:.63rem;color:var(--tinta-400);margin:4px 0 0}
+/* tabel */
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--kartu);font-size:.88rem}
+th,td{padding:11px 13px;text-align:left;border-bottom:1px solid var(--kabut-100);vertical-align:top}
+th{background:var(--kabut-100);font-weight:700;font-size:.8rem}
+td.metode{color:var(--tinta-400);font-size:.76rem;max-width:270px}
+/* nav bawah */
+.navdemo{display:flex;background:#fff;border-radius:16px;box-shadow:var(--kartu);overflow:hidden;max-width:420px}
+.navdemo a{flex:1;text-align:center;padding:11px 4px;text-decoration:none;color:var(--tinta-400);font-size:.72rem;font-weight:600;min-height:60px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center}
+.navdemo a.aktif{color:var(--laut-700);box-shadow:inset 0 -3px 0 var(--karawo-400);background:var(--laut-50)}
+.navdemo .ic{font-size:1.25rem;line-height:1}
+.catatan{background:var(--karawo-100);border-radius:12px;padding:14px 16px;font-size:.86rem;color:var(--karawo-700);box-shadow:inset 0 0 0 1px var(--karawo-400)}
+</style></head><body>
+<div class="topbar"><div class="in">
+<h1>Pratinjau Sistem Desain — Aplikasi TANGGUH</h1>
+<p>Seluruh angka pada halaman ini dihitung oleh engine <code>zscore-2.0.0</code>, bukan ditulis manual. Dokumen dibuat 19 Agustus 2026.</p>
+</div></div>
+<div class="wrap">
+
+<section class="blok"><h2>1. Palet warna</h2>
+<p class="ket">Warna utama biru-hijau laut sengaja tidak mengambil dari hijau, kuning, atau merah, karena ketiganya sudah dipakai untuk makna status gizi. Latar putih kabut mengurangi pantulan di bawah matahari.</p>
+<h3 style="font-size:.95rem;margin:14px 0 8px">Warna utama dan aksen</h3>
+<div class="sws"><div class="sw"><span style="background:#12B5C0"></span><code>laut-500</code><small>#12B5C0</small></div><div class="sw"><span style="background:#0E96A1"></span><code>laut-600</code><small>#0E96A1</small></div><div class="sw"><span style="background:#0B7681"></span><code>laut-700</code><small>#0B7681</small></div><div class="sw"><span style="background:#06454B"></span><code>laut-900</code><small>#06454B</small></div><div class="sw"><span style="background:#FFC53D"></span><code>karawo-400</code><small>#FFC53D</small></div><div class="sw"><span style="background:#F5A524"></span><code>karawo-500</code><small>#F5A524</small></div></div>
+<h3 style="font-size:.95rem;margin:20px 0 8px">Netral</h3>
+<div class="sws"><div class="sw"><span style="background:#F6FAFB"></span><code>kabut-50</code><small>#F6FAFB</small></div><div class="sw"><span style="background:#DCE9EB"></span><code>kabut-200</code><small>#DCE9EB</small></div><div class="sw"><span style="background:#7A959B"></span><code>tinta-400</code><small>#7A959B</small></div><div class="sw"><span style="background:#4A6B72"></span><code>tinta-600</code><small>#4A6B72</small></div><div class="sw"><span style="background:#0F2B31"></span><code>tinta-900</code><small>#0F2B31</small></div></div>
+<h3 style="font-size:.95rem;margin:20px 0 8px">Status klinis — hanya untuk makna medis</h3>
+<div class="sws"><div class="sw"><span style="background:#E8F8EF"></span><code>aman-bg</code><small>#E8F8EF</small></div><div class="sw"><span style="background:#0E6B41"></span><code>aman-teks</code><small>#0E6B41</small></div><div class="sw"><span style="background:#FFF6E0"></span><code>waspada-bg</code><small>#FFF6E0</small></div><div class="sw"><span style="background:#7A4A00"></span><code>waspada-teks</code><small>#7A4A00</small></div><div class="sw"><span style="background:#FEECEC"></span><code>bahaya-bg</code><small>#FEECEC</small></div><div class="sw"><span style="background:#97161D"></span><code>bahaya-teks</code><small>#97161D</small></div></div>
+<p class="catatan" style="margin-top:16px">Warna status tidak boleh dipakai untuk tombol biasa. Tombol hijau untuk “Simpan” akan membuat kader mengasosiasikan hijau dengan tindakan, bukan dengan status gizi baik.</p>
+</section>
+
+<section class="blok"><h2>2. Lencana status</h2>
+<p class="ket">Setiap lencana memuat tiga hal sekaligus: warna, ikon, dan teks. Sekitar delapan persen laki-laki mengalami gangguan penglihatan warna, dan layar di bawah matahari mengurangi perbedaan warna.</p>
+<div style="display:flex;flex-wrap:wrap;gap:10px">
+<span class="lencana bahaya "><b>!!</b>Gizi buruk</span><span class="lencana waspada "><b>!</b>Gizi kurang</span><span class="lencana aman "><b>✓</b>Gizi baik</span><span class="lencana bahaya "><b>!!</b>Sangat pendek</span><span class="lencana waspada "><b>!</b>Pendek</span><span class="lencana aman "><b>✓</b>Berat badan normal</span><span class="lencana netral "><b>?</b>Tidak dapat dinilai</span>
+</div></section>
+
+<section class="blok"><h2>3. Tombol dan kolom masukan</h2>
+<p class="ket">Tinggi tombol minimum 48 piksel dan tinggi kolom masukan 56 piksel, agar nyaman ditekan sambil menggendong anak. Kolom angka memakai papan ketik desimal dan menerima koma.</p>
+<div class="grid">
+<div>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">
+<button class="btn utama">Simpan hasil pengukuran</button>
+<button class="btn sekunder">Batal</button>
+<button class="btn halus">Lewati</button>
+<button class="btn utama" disabled>Menyimpan…</button>
+</div>
+<div class="navdemo">
+<a href="#" class="aktif"><span class="ic">▦</span>Dasbor</a>
+<a href="#"><span class="ic">☺</span>Balita</a>
+<a href="#"><span class="ic">⊕</span>Ukur</a>
+<a href="#"><span class="ic">▤</span>Rekap</a>
+</div>
+</div>
+<div>
+<div class="field"><label>Berat badan <span class="req">*</span></label>
+<div class="inputwrap"><input value="8,0" inputmode="decimal"><span class="satuan">kg</span></div>
+<p class="bantu">Boleh memakai koma, contoh 8,4</p></div>
+<div class="field"><label>Panjang badan <span class="req">*</span></label>
+<div class="inputwrap err"><input value="550" inputmode="decimal"><span class="satuan">cm</span></div>
+<p class="galat">Panjang badan maksimal 140 cm. Periksa kembali angka di alat ukur.</p></div>
+</div>
+</div></section>
+
+<section class="blok"><h2>4. Kartu hasil dan Pita Z-Score</h2>
+<p class="ket">Pita Z-Score adalah elemen penanda aplikasi: pita horizontal bergaya garis ukur meteran antropometri, dengan penanda posisi anak di antara -4 dan +4 SD. Motifnya diambil dari alat ukur yang dipakai kader sendiri.</p>
+<div class="grid">
+<article class="kartu">
+    <header><h2>Ahmad Fadel</h2><p class="sub angka">Laki-laki · 2 tahun · 8,0 kg · 78,0 cm · 21 Agustus 2026</p></header>
+    <div class="banner bahaya"><b>Perlu segera dirujuk</b><ul><li>Gizi buruk (BB/TB di bawah -3 SD)</li><li>Berat badan sangat kurang (BB/U di bawah -3 SD)</li></ul></div>
+    <section class="ind">
+      <div class="indhead"><div><span class="kode">BB/U</span> <span class="angka zval">-3,61</span> <span class="sd">SD</span></div><span class="lencana bahaya kecil"><b>!!</b>Berat badan sangat kurang</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Berat badan sangat kurang"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Berat badan kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Berat badan normal"></div><div style="width:37.5%;background:var(--waspada-bg)" title="Risiko berat badan lebih"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:4.8375%"><span class="nilai">-3,61</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">TB/U</span> <span class="angka zval">-3,00</span> <span class="sd">SD</span></div><span class="lencana waspada kecil"><b>!</b>Pendek</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Sangat pendek"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Pendek"></div><div style="width:62.5%;background:var(--aman-bg)" title="Normal"></div><div style="width:12.5%;background:var(--netral-bg)" title="Tinggi"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:12.562499999999998%"><span class="nilai">-3,00</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">BB/TB</span> <span class="angka zval">-3,06</span> <span class="sd">SD</span></div><span class="lencana bahaya kecil"><b>!!</b>Gizi buruk</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Gizi buruk"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Gizi kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Gizi baik"></div><div style="width:25%;background:var(--waspada-bg)" title="Risiko gizi lebih sampai gizi lebih"></div><div style="width:12.5%;background:var(--bahaya-bg)" title="Obesitas"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:11.75%"><span class="nilai">-3,06</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section>
+    <section class="gizi"><h3>Kebutuhan gizi harian</h3><dl>
+      <div class="baris"><dt>Kebutuhan pemeliharaan</dt><dd class="angka">800 kkal</dd></div>
+      <div class="baris"><dt>Protein pemeliharaan</dt><dd class="angka">9,6 sampai 12,0 g</dd></div>
+      
+      <div class="baris tebal"><dt>Target tumbuh kejar</dt><dd class="angka">1.021 kkal</dd></div>
+      <div class="baris"><dt>Protein tumbuh kejar</dt><dd class="angka">15,3 sampai 20,4 g</dd></div>
+      <p class="peringatan">Target tumbuh kejar adalah usulan perhitungan yang harus diverifikasi dietisien atau dokter sebelum dijadikan dasar terapi.</p>
+    </dl></section>
+    <footer><p class="sangkal">Hasil ini adalah alat bantu skrining, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.</p><p class="ver angka">zscore-2.0.0</p></footer>
+  </article>
+<article class="kartu">
+    <header><h2>Rizky Pratama</h2><p class="sub angka">Laki-laki · 2 tahun · 12,2 kg · 87,1 cm · 21 Agustus 2026</p></header>
+    
+    <section class="ind">
+      <div class="indhead"><div><span class="kode">BB/U</span> <span class="angka zval">+0,03</span> <span class="sd">SD</span></div><span class="lencana aman kecil"><b>✓</b>Berat badan normal</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Berat badan sangat kurang"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Berat badan kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Berat badan normal"></div><div style="width:37.5%;background:var(--waspada-bg)" title="Risiko berat badan lebih"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:50.349999999999994%"><span class="nilai">+0,03</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">TB/U</span> <span class="angka zval">-0,02</span> <span class="sd">SD</span></div><span class="lencana aman kecil"><b>✓</b>Normal</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Sangat pendek"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Pendek"></div><div style="width:62.5%;background:var(--aman-bg)" title="Normal"></div><div style="width:12.5%;background:var(--netral-bg)" title="Tinggi"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:49.762499999999996%"><span class="nilai">-0,02</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">BB/TB</span> <span class="angka zval">+0,01</span> <span class="sd">SD</span></div><span class="lencana aman kecil"><b>✓</b>Gizi baik</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Gizi buruk"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Gizi kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Gizi baik"></div><div style="width:25%;background:var(--waspada-bg)" title="Risiko gizi lebih sampai gizi lebih"></div><div style="width:12.5%;background:var(--bahaya-bg)" title="Obesitas"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:50.1375%"><span class="nilai">+0,01</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section>
+    <section class="gizi"><h3>Kebutuhan gizi harian</h3><dl>
+      <div class="baris"><dt>Kebutuhan pemeliharaan</dt><dd class="angka">1.220 kkal</dd></div>
+      <div class="baris"><dt>Protein pemeliharaan</dt><dd class="angka">14,6 sampai 18,3 g</dd></div>
+      
+    </dl></section>
+    <footer><p class="sangkal">Hasil ini adalah alat bantu skrining, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.</p><p class="ver angka">zscore-2.0.0</p></footer>
+  </article>
+<article class="kartu">
+    <header><h2>Siti Nur Aisyah</h2><p class="sub angka">Perempuan · 1 tahun · 6,5 kg · 70,0 cm · 21 Agustus 2026</p></header>
+    
+    <section class="ind">
+      <div class="indhead"><div><span class="kode">BB/U</span> <span class="angka zval">-2,70</span> <span class="sd">SD</span></div><span class="lencana waspada kecil"><b>!</b>Berat badan kurang</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Berat badan sangat kurang"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Berat badan kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Berat badan normal"></div><div style="width:37.5%;background:var(--waspada-bg)" title="Risiko berat badan lebih"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:16.2%"><span class="nilai">-2,70</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">TB/U</span> <span class="angka zval">-1,58</span> <span class="sd">SD</span></div><span class="lencana aman kecil"><b>✓</b>Normal</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Sangat pendek"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Pendek"></div><div style="width:62.5%;background:var(--aman-bg)" title="Normal"></div><div style="width:12.5%;background:var(--netral-bg)" title="Tinggi"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:30.2%"><span class="nilai">-1,58</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">BB/TB</span> <span class="angka zval">-2,63</span> <span class="sd">SD</span></div><span class="lencana waspada kecil"><b>!</b>Gizi kurang</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Gizi buruk"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Gizi kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Gizi baik"></div><div style="width:25%;background:var(--waspada-bg)" title="Risiko gizi lebih sampai gizi lebih"></div><div style="width:12.5%;background:var(--bahaya-bg)" title="Obesitas"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div><div class="penanda" style="left:17.1875%"><span class="nilai">-2,63</span><span class="batang"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section>
+    <section class="gizi"><h3>Kebutuhan gizi harian</h3><dl>
+      <div class="baris"><dt>Kebutuhan pemeliharaan</dt><dd class="angka">650 kkal</dd></div>
+      <div class="baris"><dt>Protein pemeliharaan</dt><dd class="angka">7,8 sampai 9,8 g</dd></div>
+      
+      <div class="baris tebal"><dt>Target tumbuh kejar</dt><dd class="angka">898 kkal</dd></div>
+      <div class="baris"><dt>Protein tumbuh kejar</dt><dd class="angka">12,2 sampai 16,3 g</dd></div>
+      <p class="peringatan">Target tumbuh kejar adalah usulan perhitungan yang harus diverifikasi dietisien atau dokter sebelum dijadikan dasar terapi.</p>
+    </dl></section>
+    <footer><p class="sangkal">Hasil ini adalah alat bantu skrining, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.</p><p class="ver angka">zscore-2.0.0</p></footer>
+  </article>
+<article class="kartu">
+    <header><h2>Yusuf Hamzah</h2><p class="sub angka">Laki-laki · 5 tahun 7 bulan · 18,0 kg · 108,0 cm · 21 Agustus 2026</p></header>
+    <div class="banner netral"><b>Sebagian indikator tidak dapat dinilai</b><p>Umur 67.6 bulan berada di luar cakupan standar WHO 0-60 bulan yang dipakai aplikasi ini. Untuk anak di atas 5 tahun berlaku rujukan WHO 5-19 tahun yang belum tersedia di aplikasi.</p></div>
+    <section class="ind">
+      <div class="indhead"><div><span class="kode">BB/U</span> <span class="angka zval">tidak dinilai</span> <span class="sd">SD</span></div><span class="lencana netral kecil"><b>?</b>Tidak dapat dinilai</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Berat badan sangat kurang"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Berat badan kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Berat badan normal"></div><div style="width:37.5%;background:var(--waspada-bg)" title="Risiko berat badan lebih"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">TB/U</span> <span class="angka zval">tidak dinilai</span> <span class="sd">SD</span></div><span class="lencana netral kecil"><b>?</b>Tidak dapat dinilai</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Sangat pendek"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Pendek"></div><div style="width:62.5%;background:var(--aman-bg)" title="Normal"></div><div style="width:12.5%;background:var(--netral-bg)" title="Tinggi"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section><section class="ind">
+      <div class="indhead"><div><span class="kode">BB/TB</span> <span class="angka zval">tidak dinilai</span> <span class="sd">SD</span></div><span class="lencana netral kecil"><b>?</b>Tidak dapat dinilai</span></div>
+      <figure class="pita"><div class="jalur"><div class="segmen"><div style="width:12.5%;background:var(--bahaya-bg)" title="Gizi buruk"></div><div style="width:12.5%;background:var(--waspada-bg)" title="Gizi kurang"></div><div style="width:37.5%;background:var(--aman-bg)" title="Gizi baik"></div><div style="width:25%;background:var(--waspada-bg)" title="Risiko gizi lebih sampai gizi lebih"></div><div style="width:12.5%;background:var(--bahaya-bg)" title="Obesitas"></div></div><div class="ticks"><span class="tick besar" style="left:0%"></span><span class="tick " style="left:6.25%"></span><span class="tick besar" style="left:12.5%"></span><span class="tick " style="left:18.75%"></span><span class="tick besar" style="left:25%"></span><span class="tick " style="left:31.25%"></span><span class="tick besar" style="left:37.5%"></span><span class="tick " style="left:43.75%"></span><span class="tick besar" style="left:50%"></span><span class="tick " style="left:56.25%"></span><span class="tick besar" style="left:62.5%"></span><span class="tick " style="left:68.75%"></span><span class="tick besar" style="left:75%"></span><span class="tick " style="left:81.25%"></span><span class="tick besar" style="left:87.5%"></span><span class="tick " style="left:93.75%"></span><span class="tick besar" style="left:100%"></span></div></div><div class="skalabar"><span class="skala" style="left:12.5%">-3</span><span class="skala" style="left:25%">-2</span><span class="skala" style="left:50%">0</span><span class="skala" style="left:75%">+2</span><span class="skala" style="left:87.5%">+3</span></div></figure>
+    </section>
+    <section class="gizi"><h3>Kebutuhan gizi harian</h3><dl>
+      <div class="baris"><dt>Kebutuhan pemeliharaan</dt><dd class="angka">1.620 kkal</dd></div>
+      <div class="baris"><dt>Protein pemeliharaan</dt><dd class="angka">21,6 sampai 27,0 g</dd></div>
+      
+    </dl></section>
+    <footer><p class="sangkal">Hasil ini adalah alat bantu skrining, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.</p><p class="ver angka">zscore-2.0.0</p></footer>
+  </article>
+</div></section>
+
+<section class="blok"><h2>5. Evaluasi kenaikan berat badan</h2>
+<p class="ket">Ambang di kolom ketiga sudah memakai koreksi delta WHO. Kolom metode wajib ditampilkan kepada pengguna, agar penilaian berbasis standar WHO dapat dibedakan dari penilaian berbasis jalur cadangan yang masih perkiraan.</p>
+<table><thead><tr><th>Kasus</th><th>Kenaikan</th><th>Batas minimal</th><th>Status</th><th>Metode</th></tr></thead><tbody>
+<tr><td>Laki-laki 11 bulan, 30 hari</td><td class="angka">100 g</td><td class="angka">-105 g</td><td><span class="lencana aman kecil"><b>✓</b>Naik sesuai standar</span></td><td class="metode">WHO weight velocity interval 1bln, persentil 5, delta 400 g dikurangkan</td></tr>
+<tr><td>Laki-laki 1 bulan, 30 hari</td><td class="angka">100 g</td><td class="angka">454 g</td><td><span class="lencana waspada kecil"><b>!</b>Kenaikan kurang</span></td><td class="metode">WHO weight velocity interval 1bln, persentil 5, delta 400 g dikurangkan</td></tr>
+<tr><td>Perempuan 12 bulan, 200 hari</td><td class="angka">1.000 g</td><td class="angka">-</td><td><span class="lencana netral kecil"><b>?</b>Tidak dapat dinilai</span></td><td class="metode">-<br><i>Jarak penimbangan 200 hari melebihi batas 110 hari. Lakukan penimbangan baru sebagai titik awal.</i></td></tr>
+</tbody></table>
+<p class="catatan" style="margin-top:16px">Perhatikan baris pertama: batas minimal menurut WHO bernilai negatif pada umur mendekati satu tahun. Lima persen bayi sehat memang kehilangan sedikit berat pada bulan itu. Aplikasi versi Firebase menuntut kenaikan 290 gram pada kasus yang sama, lalu menyatakan gagal tumbuh.</p>
+</section>
+
+<section class="blok"><h2>6. Yang perlu Bapak nilai</h2>
+<p class="ket">Empat pertanyaan yang jawabannya menentukan arah tampilan seluruh aplikasi:</p>
+<ol style="max-width:70ch;color:var(--tinta-600);line-height:1.75">
+<li>Apakah warna biru-hijau laut terasa tepat untuk konteks layanan kesehatan Gorontalo, atau lebih baik memakai warna lain di luar hijau, kuning, dan merah?</li>
+<li>Apakah Pita Z-Score membantu kader memahami posisi anak, atau justru menambah beban baca dibanding sekadar angka dan lencana?</li>
+<li>Apakah menampilkan dua angka kebutuhan gizi berdampingan sudah cukup jelas, atau berpotensi membingungkan di lapangan?</li>
+<li>Apakah ukuran huruf dan tombol sudah nyaman saat dibuka di ponsel Bapak sendiri?</li>
+</ol>
+</section>
+
+</div></body></html>
