@@ -7,7 +7,7 @@ import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanBBU, tampilanTBU, tampilanVelocity } from '@/lib/tampilan/status'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
-import { hitungVelocity } from '@/lib/zscore'
+import { hitungVelocity, apakahPerluPKMK } from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
 
@@ -45,6 +45,16 @@ export default async function HalamanDetailBalita({
     tanggalAkhir: skriningTerakhir.tanggal,
     beratAkhirKg: skriningTerakhir.beratKg,
   }) : null
+
+  const perluPKMKBalita = skriningTerakhir
+    ? apakahPerluPKMK({
+        statusBBTB: skriningTerakhir.statusBBTB,
+        statusTBU: skriningTerakhir.statusTBU,
+        statusBBU: skriningTerakhir.statusBBU,
+        statusVelocity: evaluasiVelocity?.status,
+        edema: skriningTerakhir.edema,
+      })
+    : false
 
   const statusVelocityTerkini = evaluasiVelocity ? tampilanVelocity(evaluasiVelocity.status) : null
 
@@ -102,13 +112,15 @@ export default async function HalamanDetailBalita({
             <Plus className="size-4" />
             Catat Pengukuran Baru
           </Link>
-          <Link
-            href="/dietisien"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-karawo-100 px-4 text-sm font-semibold text-karawo-700 ring-1 ring-karawo-400 hover:bg-karawo-200"
-          >
-            <Utensils className="size-4 text-karawo-500" />
-            Formulasi PKMK
-          </Link>
+          {perluPKMKBalita && (
+            <Link
+              href="/dietisien"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-karawo-100 px-4 text-sm font-semibold text-karawo-700 ring-1 ring-karawo-400 hover:bg-karawo-200"
+            >
+              <Utensils className="size-4 text-karawo-500" />
+              Formulasi PKMK
+            </Link>
+          )}
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import {
   hitungSkrining,
   hitungUsiaKoreksi,
   hitungVelocity,
+  apakahPerluPKMK,
   type HasilSkrining,
   type HasilVelocity,
   type PosisiUkur,
@@ -218,6 +219,16 @@ export default function HalamanSkriningTamu() {
   const statusBB = hasil ? tampilanBBTB(hasil.statusBBTB) : null
   const statusBBU = hasil ? tampilanBBU(hasil.statusBBU) : null
 
+  const perluPKMK = hasil
+    ? apakahPerluPKMK({
+        statusBBTB: hasil.statusBBTB,
+        statusTBU: hasil.statusTBU,
+        statusBBU: hasil.statusBBU,
+        statusVelocity: hasilVelocity?.status,
+        edema,
+      })
+    : false
+
   return (
     <div className="min-h-screen bg-kabut-50 pb-16 text-tinta-900">
       {/* Navbar */}
@@ -249,8 +260,8 @@ export default function HalamanSkriningTamu() {
               <Sparkles className="size-5 text-white" />
             </div>
             <div>
-              <h1 className="font-display text-lg font-bold sm:text-xl">Kalkulator Skrining Antropometri &amp; Formulasi PKMK</h1>
-              <p className="text-xs text-white/90">Akses publik gratis standar baku WHO 2006 dan Kemenkes RI untuk deteksi dini stunting, wasting, serta formulasi terapi nutrisi.</p>
+              <h1 className="font-display text-lg font-bold sm:text-xl">Kalkulator Skrining Antropometri &amp; Analisis Pertumbuhan</h1>
+              <p className="text-xs text-white/90">Akses publik gratis standar baku WHO 2006 dan Kemenkes RI untuk deteksi dini stunting, wasting, dan evaluasi nutrisi klinis.</p>
             </div>
           </div>
         </div>
@@ -268,7 +279,7 @@ export default function HalamanSkriningTamu() {
           {[
             { id: 1 as const, label: 'Identitas Balita' },
             { id: 2 as const, label: 'Pengukuran' },
-            { id: 3 as const, label: 'Hasil & PKMK' },
+            { id: 3 as const, label: 'Hasil & Analisis' },
           ].map((step, idx) => (
             <div key={step.id} className="flex flex-1 items-center">
               <button
@@ -576,7 +587,7 @@ export default function HalamanSkriningTamu() {
               </Button>
               <Button type="button" onClick={handleHitung} varian="utama">
                 <Calculator className="size-4" />
-                Hitung Status Gizi &amp; Formulasi PKMK
+                Hitung Status Gizi &amp; Analisis Pertumbuhan
               </Button>
             </div>
           </div>
@@ -587,7 +598,7 @@ export default function HalamanSkriningTamu() {
           <div className="rounded-2xl bg-white p-8 shadow-[var(--shadow-kartu)] text-center space-y-4">
             <p className="text-lg">⚠️</p>
             <p className="font-bold text-tinta-900">Data belum dihitung</p>
-            <p className="text-sm text-tinta-600">Silakan isi data pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi &amp; Formulasi PKMK".</p>
+            <p className="text-sm text-tinta-600">Silakan isi data pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi &amp; Analisis Pertumbuhan".</p>
             <Button type="button" onClick={() => pindahLangkah(2)} varian="utama">
               Ke Form Pengukuran
             </Button>
@@ -765,13 +776,39 @@ export default function HalamanSkriningTamu() {
               <PanelKurva riwayat={riwayat} jenisKelaminAwal={jenisKelamin} peran="dokter" />
             </div>
 
-            {/* Formulasi PKMK */}
-            <FormulasiPKMKSection
-              namaBalita={nama || 'Balita'}
-              umurBulan={hasil.umurBulan}
-              beratKg={parseFloat(beratKg) || 8}
-              targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal || 770}
-            />
+            {/* Formulasi PKMK atau Edukasi Gizi Seimbang */}
+            {perluPKMK ? (
+              <FormulasiPKMKSection
+                namaBalita={nama || 'Balita'}
+                umurBulan={hasil.umurBulan}
+                beratKg={parseFloat(beratKg) || 8}
+                targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal || 770}
+              />
+            ) : (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 shadow-sm">
+                <div className="flex items-start gap-3.5">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                    <CheckCircle2 className="size-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-base font-bold text-emerald-950">
+                      Status Pertumbuhan Baik — Tidak Memerlukan Tata Laksana PKMK
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-800">
+                      Berdasarkan panduan klinis Kemenkes RI dan standar IDAI, balita dengan status pertumbuhan ini <strong>tidak memerlukan intervensi Pangan Olahan untuk Keperluan Medis Khusus (PKMK)</strong>.
+                    </p>
+                    <div className="mt-3 rounded-xl bg-white/80 p-3.5 ring-1 ring-emerald-200/80 text-xs text-tinta-700 space-y-1.5">
+                      <p className="font-bold text-emerald-900">Rekomendasi Pemeliharaan Gizi &amp; Pola Asuh:</p>
+                      <ul className="list-disc pl-4 space-y-1 text-tinta-600">
+                        <li>Cukupi kebutuhan kalori dan mikronutrien harian melalui makanan keluarga bergizi seimbang yang kaya protein hewani (telur, ikan, daging, ayam).</li>
+                        <li>Lanjutkan pemberian ASI optimal hingga usia 2 tahun atau lebih sesuai usia balita.</li>
+                        <li>Pantau penimbangan dan pengukuran panjang/tinggi badan rutin setiap bulan di Posyandu untuk memastikan grafik pertumbuhan terus naik (N).</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* CTA Registrasi */}
             <div className="rounded-2xl border border-kabut-200 bg-white p-6 text-center shadow-sm">

@@ -19,21 +19,22 @@ import { SAMPLE_BALITA_DATABASE, type BalitaDetail } from '@/lib/db/balita-mock'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
+import { apakahPerluPKMK } from '@/lib/zscore'
 
 export default function HalamanDietisien() {
   const [balitaTerpilih, setBalitaTerpilih] = useState<BalitaDetail | null>(null)
   const [panelTerbuka, setPanelTerbuka] = useState<boolean>(false)
 
-  // Prioritas: balita gizi_buruk, gizi_kurang, sangat_pendek, pendek
+  // Prioritas klinis: Hanya balita dengan indikasi tata laksana PKMK
   const daftarPrioritas = SAMPLE_BALITA_DATABASE.filter((b) => {
     const s = b.riwayat[b.riwayat.length - 1]
     if (!s) return false
-    return (
-      s.statusBBTB === 'gizi_buruk' ||
-      s.statusBBTB === 'gizi_kurang' ||
-      s.statusTBU === 'sangat_pendek' ||
-      s.statusTBU === 'pendek'
-    )
+    return apakahPerluPKMK({
+      statusBBTB: s.statusBBTB,
+      statusTBU: s.statusTBU,
+      statusBBU: s.statusBBU,
+      edema: s.edema,
+    })
   }).sort((a, b) => {
     const sA = a.riwayat[a.riwayat.length - 1]
     const sB = b.riwayat[b.riwayat.length - 1]

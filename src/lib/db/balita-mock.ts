@@ -10,6 +10,7 @@ export type SkriningRiwayatItem = KunjunganRiwayat & {
   statusBBU: StatusBBU | null
   statusTBU: StatusTBU | null
   statusBBTB: StatusBBTB | null
+  edema?: boolean
   diLuarRentang: boolean
 }
 
