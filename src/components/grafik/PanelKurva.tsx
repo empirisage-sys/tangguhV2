@@ -8,16 +8,14 @@ import {
   seriBBTB,
   seriTrenZ,
   type JenisKelamin,
-  type IndikatorPanjang,
 } from '@/lib/grafik/seri'
 import { LABEL_TAB, tabKurvaUntuk, type Peran, type TabKurva } from '@/lib/tampilan/akses'
 import { KurvaWHO } from './KurvaWHO'
 import { TrenZScore } from './TrenZScore'
-import { Baby, Calendar, Check, SlidersHorizontal, Sparkles } from 'lucide-react'
 
 /**
- * Panel Kurva Pertumbuhan WHO yang otomatis menyesuaikan jenis kelamin anak
- * (Laki-laki atau Perempuan) serta pilihan rentang skala umur.
+ * Panel Kurva Pertumbuhan Standar WHO 0–5 Tahun (0–60 Bulan).
+ * Otomatis menampilkan kurva lengkap tanpa pembatasan skala.
  */
 
 type Props = {
@@ -45,46 +43,27 @@ export function PanelKurva({
   // Jenis kelamin otomatis terkunci sesuai data balita
   const seks: JenisKelamin = initialBbu?.seks ?? jenisKelaminAwal
 
-  const [modeRentang, setModeRentang] = useState<'otomatis' | '0-24' | '0-60'>(
-    'otomatis',
-  )
-  const [basisBBTB, setBasisBBTB] = useState<IndikatorPanjang | 'otomatis'>('otomatis')
-
-  // Hitung rentang kustom jika dipilih
-  const rentangUmur = useMemo<[number, number] | undefined>(() => {
-    if (modeRentang === '0-24') return [0, 24]
-    if (modeRentang === '0-60') return [0, 60]
-    return undefined
-  }, [modeRentang])
-
-  const rentangPanjang = useMemo<[number, number] | undefined>(() => {
-    if (modeRentang === '0-24') return [45, 110]
-    if (modeRentang === '0-60') return [65, 120]
-    return undefined
-  }, [modeRentang])
-
-  // Bangun ulang seri jika opsi rentang/basis berubah
+  // Bangun kurva standar WHO 0–60 bulan (0–5 tahun)
   const kurvaBBU = useMemo(() => {
     if (riwayat.length > 0) {
-      return seriBBU(riwayat, seks, rentangUmur)
+      return seriBBU(riwayat, seks, [0, 60])
     }
     return initialBbu
-  }, [riwayat, seks, rentangUmur, initialBbu])
+  }, [riwayat, seks, initialBbu])
 
   const kurvaTBU = useMemo(() => {
     if (riwayat.length > 0) {
-      return seriTBU(riwayat, seks, rentangUmur)
+      return seriTBU(riwayat, seks, [0, 60])
     }
     return initialTbu
-  }, [riwayat, seks, rentangUmur, initialTbu])
+  }, [riwayat, seks, initialTbu])
 
   const kurvaBBTB = useMemo(() => {
     if (riwayat.length > 0) {
-      const basis = basisBBTB === 'otomatis' ? undefined : basisBBTB
-      return seriBBTB(riwayat, seks, basis, rentangPanjang)
+      return seriBBTB(riwayat, seks)
     }
     return initialBbtb
-  }, [riwayat, seks, basisBBTB, rentangPanjang, initialBbtb])
+  }, [riwayat, seks, initialBbtb])
 
   const kurvaTrenZ = useMemo(() => {
     if (riwayat.length > 0) {
@@ -121,7 +100,7 @@ export function PanelKurva({
           ))}
         </div>
 
-        {/* Lencana Otomatis Jenis Kelamin Balita (Tanpa Switcher Ganda) */}
+        {/* Lencana Otomatis Jenis Kelamin Balita */}
         <div className="flex items-center self-start sm:self-auto">
           <span
             className={[
@@ -136,82 +115,7 @@ export function PanelKurva({
         </div>
       </div>
 
-      {/* Rentang Umur / Standard Selector Toolbar */}
-      {aktif !== 'trenZ' && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-tinta-400">Rentang Skala:</span>
-            <button
-              type="button"
-              onClick={() => setModeRentang('otomatis')}
-              className={[
-                'rounded-lg px-2.5 py-1 font-semibold transition-colors',
-                modeRentang === 'otomatis'
-                  ? 'bg-tinta-900 text-white'
-                  : 'bg-kabut-100 text-tinta-600 hover:bg-kabut-200',
-              ].join(' ')}
-            >
-              Fokus Kunjungan
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeRentang('0-24')}
-              className={[
-                'rounded-lg px-2.5 py-1 font-semibold transition-colors',
-                modeRentang === '0-24'
-                  ? 'bg-tinta-900 text-white'
-                  : 'bg-kabut-100 text-tinta-600 hover:bg-kabut-200',
-              ].join(' ')}
-            >
-              Usia 0–24 Bulan
-            </button>
-            <button
-              type="button"
-              onClick={() => setModeRentang('0-60')}
-              className={[
-                'rounded-lg px-2.5 py-1 font-semibold transition-colors',
-                modeRentang === '0-60'
-                  ? 'bg-tinta-900 text-white'
-                  : 'bg-kabut-100 text-tinta-600 hover:bg-kabut-200',
-              ].join(' ')}
-            >
-              0–60 Bulan (Standar Lengkap)
-            </button>
-          </div>
-
-          {aktif === 'bbtb' && (
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-tinta-400">Standar BB/TB:</span>
-              <button
-                type="button"
-                onClick={() => setBasisBBTB('bbpb')}
-                className={[
-                  'rounded-lg px-2.5 py-1 font-semibold transition-colors',
-                  basisBBTB === 'bbpb'
-                    ? 'bg-laut-700 text-white'
-                    : 'bg-kabut-100 text-tinta-600 hover:bg-kabut-200',
-                ].join(' ')}
-              >
-                45–110 cm (PB Terlentang)
-              </button>
-              <button
-                type="button"
-                onClick={() => setBasisBBTB('bbtb')}
-                className={[
-                  'rounded-lg px-2.5 py-1 font-semibold transition-colors',
-                  basisBBTB === 'bbtb'
-                    ? 'bg-laut-700 text-white'
-                    : 'bg-kabut-100 text-tinta-600 hover:bg-kabut-200',
-                ].join(' ')}
-              >
-                65–120 cm (TB Berdiri)
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Render Kurva Sesuai Pilihan */}
+      {/* Render Kurva Standar WHO 0–5 Tahun */}
       {aktif === 'bbu' && kurvaBBU && <KurvaWHO seri={kurvaBBU} tinggi={380} />}
       {aktif === 'tbu' && kurvaTBU && <KurvaWHO seri={kurvaTBU} tinggi={380} />}
       {aktif === 'bbtb' && kurvaBBTB && <KurvaWHO seri={kurvaBBTB} tinggi={380} />}

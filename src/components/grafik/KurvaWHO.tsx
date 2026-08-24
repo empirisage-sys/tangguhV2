@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import {
-  Area,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -13,15 +11,15 @@ import {
 } from 'recharts'
 import type { SeriKurva, TitikRujukan } from '@/lib/grafik/seri'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
-import { Baby, Info, Layers } from 'lucide-react'
+import { Baby, Info } from 'lucide-react'
 
 /**
- * Kurva pertumbuhan WHO autentik untuk Laki-laki dan Perempuan (BB/TB, TB/U, BB/U).
+ * Kurva pertumbuhan WHO Child Growth Standards 0–5 Tahun (0–60 Bulan).
  *
- * Mengikuti palet resmi WHO Child Growth Standards:
+ * Mengikuti palet resmi WHO:
  * - Laki-laki: Tema Biru Standar WHO (#0284C7)
  * - Perempuan: Tema Merah Muda/Pink Standar WHO (#E11D48)
- * - Garis Median (0 SD): Hijau (#15803D)
+ * - Garis Median (0 SD): Hijau Tebal (#15803D)
  * - Garis ±2 SD: Kuning / Amber (#F59E0B)
  * - Garis ±3 SD: Merah (#DC2626)
  */
@@ -29,7 +27,6 @@ import { Baby, Info, Layers } from 'lucide-react'
 type Props = {
   seri: SeriKurva
   tinggi?: number
-  tampilkanKMSBands?: boolean
 }
 
 function interpolasiRujukan(
@@ -53,8 +50,7 @@ function interpolasiRujukan(
   }
 }
 
-export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props) {
-  const [showBands, setShowBands] = useState<boolean>(tampilkanKMSBands)
+export function KurvaWHO({ seri, tinggi = 360 }: Props) {
   const isLaki = seri.seks === 'lk'
 
   const warnaAnak = isLaki ? '#0284C7' : '#E11D48'
@@ -65,18 +61,15 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
     const titikAnak = seri.anak.find((a) => Math.abs(a.x - r.x) < 1e-4)
     return {
       ...r,
-      base_min: seri.domainY[0],
       anak: titikAnak?.tidakDinilai ? null : titikAnak?.y ?? null,
       tanggal: titikAnak?.tanggal ?? null,
       z: titikAnak?.z ?? null,
     }
   })
 
-  // Sisipkan titik anak yang x-nya tidak persis sama dengan grid rujukan,
-  // dengan menginterpolasi nilai rujukan WHO agar garis kurva TIDAK TERPUTUS.
+  // Sisipkan titik anak yang x-nya tidak persis sama dengan grid rujukan
   for (const a of seri.anak) {
     if (!data.some((d) => Math.abs(d.x - a.x) < 1e-4)) {
-      // Cari rPrev dan rNext dari seri.rujukan
       let rPrev: TitikRujukan | undefined
       let rNext: TitikRujukan | undefined
 
@@ -122,7 +115,6 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
 
       data.push({
         x: a.x,
-        base_min: seri.domainY[0],
         ...rujukanNilai,
         anak: a.tidakDinilai ? null : a.y,
         tanggal: a.tanggal,
@@ -158,26 +150,9 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
               </figcaption>
             </div>
             <p className="text-xs text-white/85">
-              Standar Pertumbuhan Anak WHO 2006 • {isLaki ? 'Laki-laki' : 'Perempuan'}
+              Standar Pertumbuhan Anak WHO 2006 (Usia 0–5 Tahun) • {isLaki ? 'Laki-laki' : 'Perempuan'}
             </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowBands(!showBands)}
-            className={[
-              'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-              showBands
-                ? 'bg-white text-tinta-900 shadow-md ring-2 ring-white/50'
-                : 'bg-white/20 text-white hover:bg-white/30',
-            ].join(' ')}
-            title="Klik untuk mengaktifkan atau menonaktifkan arsiran pita warna zona KMS"
-          >
-            <Layers className="size-3.5" />
-            {showBands ? 'Zona KMS: Aktif' : 'Zona KMS: Nonaktif'}
-          </button>
         </div>
       </div>
 
@@ -215,138 +190,91 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
               }}
             />
 
-            {/* Arsiran Warna Pita Zona KMS (Ditampilkan bila showBands aktif) */}
-            {showBands && (
-              <>
-                {/* Zona Merah Atas (+2 SD hingga +3 SD / Risiko Obesitas atau Makrosomia) */}
-                <Area
-                  type="monotone"
-                  dataKey="sd_p3"
-                  fill="#fee2e2"
-                  fillOpacity={0.65}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-                {/* Zona Kuning Atas (+1 SD hingga +2 SD / Risiko Lebih) */}
-                <Area
-                  type="monotone"
-                  dataKey="sd_p2"
-                  fill="#fef3c7"
-                  fillOpacity={0.7}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-                {/* Zona Hijau KMS (-2 SD hingga +1 SD / Rentang Pertumbuhan Normal) */}
-                <Area
-                  type="monotone"
-                  dataKey="sd_p1"
-                  fill="#dcfce7"
-                  fillOpacity={0.85}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-                {/* Zona Kuning Bawah (-3 SD hingga -2 SD / Waspada Gizi Kurang) */}
-                <Area
-                  type="monotone"
-                  dataKey="sd_n2"
-                  fill="#fef3c7"
-                  fillOpacity={0.7}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-                {/* Zona Merah Bawah (< -3 SD / Bawah Garis Merah - BGM) */}
-                <Area
-                  type="monotone"
-                  dataKey="sd_n3"
-                  fill="#fee2e2"
-                  fillOpacity={0.8}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-                {/* Masking Dasar di bawah batas skala Y minimum */}
-                <Area
-                  type="monotone"
-                  dataKey="base_min"
-                  fill="#ffffff"
-                  fillOpacity={1}
-                  stroke="none"
-                  isAnimationActive={false}
-                />
-              </>
-            )}
-
             {/* Garis-Garis Standar WHO Child Growth Standards */}
             <Line
               dataKey="sd_p3"
               stroke="#DC2626"
+              strokeDasharray="4 4"
               strokeWidth={1.5}
-              strokeDasharray="4 3"
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="+3 SD"
             />
             <Line
               dataKey="sd_p2"
               stroke="#F59E0B"
-              strokeWidth={1.4}
-              strokeDasharray="3 3"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="+2 SD"
             />
             <Line
               dataKey="sd_p1"
-              stroke="#94A3B8"
-              strokeWidth={1}
+              stroke="#3B82F6"
               strokeDasharray="2 2"
+              strokeWidth={0.8}
+              strokeOpacity={0.6}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="+1 SD"
             />
             <Line
               dataKey="sd_0"
               stroke="#15803D"
-              strokeWidth={2.4}
+              strokeWidth={2.5}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="Median (0 SD)"
             />
             <Line
               dataKey="sd_n1"
-              stroke="#94A3B8"
-              strokeWidth={1}
+              stroke="#3B82F6"
               strokeDasharray="2 2"
+              strokeWidth={0.8}
+              strokeOpacity={0.6}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="-1 SD"
             />
             <Line
               dataKey="sd_n2"
               stroke="#F59E0B"
-              strokeWidth={1.4}
-              strokeDasharray="3 3"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="-2 SD"
             />
             <Line
               dataKey="sd_n3"
               stroke="#DC2626"
-              strokeWidth={1.8}
-              strokeDasharray="5 3"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
               name="-3 SD"
             />
 
-            {/* Titik & Garis Riwayat Pertumbuhan Anak */}
+            {/* Garis & Titik Pengukuran Anak */}
             <Line
               dataKey="anak"
               stroke={warnaAnak}
-              strokeWidth={3}
+              strokeWidth={2.5}
+              dot={{
+                r: 4.5,
+                fill: warnaTitik,
+                stroke: '#FFFFFF',
+                strokeWidth: 2,
+              }}
+              activeDot={{
+                r: 6.5,
+                fill: warnaTitik,
+                stroke: '#FFFFFF',
+                strokeWidth: 2.5,
+              }}
               connectNulls
-              dot={{ r: 5, fill: warnaTitik, stroke: '#FFFFFF', strokeWidth: 2.5 }}
-              activeDot={{ r: 8, fill: warnaTitik, stroke: '#FFFFFF', strokeWidth: 3 }}
+              isAnimationActive={false}
               name="Pengukuran Anak"
             />
 
@@ -365,7 +293,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
                     </p>
 
                     <div className="mt-2 space-y-1.5 min-w-[170px]">
-                      {/* Nilai Median WHO (Selalu Ditampilkan Saat Kursor Menyorot) */}
+                      {/* Nilai Median WHO */}
                       <div className="flex items-center justify-between gap-4 rounded-lg bg-emerald-950/70 px-2.5 py-1.5 ring-1 ring-emerald-500/50">
                         <span className="font-bold text-emerald-300">Median (0 SD):</span>
                         <span className="angka font-black text-emerald-200 text-sm">
@@ -413,7 +341,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
         </ResponsiveContainer>
       </div>
 
-      {/* Legenda Standar Garis WHO & Zona KMS */}
+      {/* Legenda Standar Garis WHO */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-kabut-50 p-3 text-xs text-tinta-700 ring-1 ring-kabut-200">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -437,25 +365,10 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
               Hasil Ukur Anak
             </span>
           </div>
-
-          {showBands && (
-            <div className="flex flex-wrap items-center gap-1.5 border-l border-kabut-300 pl-3">
-              <span className="text-[11px] font-semibold text-tinta-500">Pita KMS:</span>
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                Hijau (Normal)
-              </span>
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                Kuning (Waspada)
-              </span>
-              <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
-                Merah (BGM / Bahaya)
-              </span>
-            </div>
-          )}
         </div>
 
         <span className="text-[11px] font-semibold text-tinta-400">
-          Standar WHO 2006
+          Standar Baku WHO Child Growth Standards 2006
         </span>
       </div>
 
