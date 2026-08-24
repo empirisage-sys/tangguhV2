@@ -8,13 +8,13 @@ Berlaku setelah migrasi `20260819160000_wilayah_dan_faskes.sql` dijalankan
 
 ## 1. Keputusan
 
-**1. Seluruh peran wajib melalui persetujuan admin Dinas Kesehatan sebelum dapat memakai aplikasi.** Tidak ada pengecualian, termasuk untuk kader posyandu.
+**1. Seluruh peran wajib melalui persetujuan admin sebelum dapat memakai aplikasi.** Tidak ada pengecualian, termasuk untuk kader posyandu.
 **2. Alur pendaftaran bertingkat:** Provinsi (38 provinsi) ➔ Kabupaten/Kota ➔ Jenis Faskes (Puskesmas | Rumah Sakit) ➔ Nama Faskes (Master / Usulan) ➔ Posyandu (Khusus kader).
 **3. Cakupan Data Balita (Keputusan D-9):**
 - Kader: balita di posyandu tempat bertugas.
 - Dokter/Dietisien Puskesmas: balita di puskesmas tempat bertugas.
 - Spesialis/Nakes Rumah Sakit: HANYA balita yang ia input sendiri (dan balita rujukan aktif).
-- Admin Dinkes: seluruh provinsi.
+- Admin: seluruh provinsi.
 
 ```
 Pengguna mendaftar

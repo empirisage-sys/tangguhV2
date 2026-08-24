@@ -11,6 +11,7 @@ import {
   Hospital,
   LogOut,
   User,
+  TrendingUp,
 } from 'lucide-react'
 import type { Peran } from '@/lib/tampilan/akses'
 
@@ -35,6 +36,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Data Balita',
     href: '/balita',
     icon: Baby,
+    peranBoleh: ['kader', 'dokter', 'dietisien', 'admin'],
+  },
+  {
+    id: 'velocity',
+    label: 'Weight Increment',
+    href: '/velocity',
+    icon: TrendingUp,
     peranBoleh: ['kader', 'dokter', 'dietisien', 'admin'],
   },
   {
@@ -71,7 +79,7 @@ const LABEL_PERAN_BADGE: Record<Peran, { label: string; kelas: string }> = {
   kader: { label: 'Kader Posyandu', kelas: 'bg-laut-100 text-laut-800' },
   dokter: { label: 'Dokter Puskesmas', kelas: 'bg-aman-bg text-aman-teks' },
   dietisien: { label: 'Dietisien / Nutrisionis', kelas: 'bg-karawo-100 text-karawo-700' },
-  admin: { label: 'Admin Dinkes', kelas: 'bg-tinta-900 text-white' },
+  admin: { label: 'Admin', kelas: 'bg-tinta-900 text-white' },
 }
 
 type Props = {

@@ -3,7 +3,7 @@
  *
  * Seluruh angka memakai gaya Indonesia: koma sebagai pemisah desimal dan titik
  * sebagai pemisah ribuan. Ini bukan soal selera, melainkan agar angka yang
- * dibaca kader dan yang tercetak di laporan dinas seragam.
+ * dibaca kader dan yang tercetak di laporan resmi seragam.
  */
 
 const ID = 'id-ID'

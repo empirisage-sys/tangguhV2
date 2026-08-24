@@ -300,7 +300,7 @@ export default function HalamanDaftar() {
                     required
                   />
                   <p className="text-[11px] text-tinta-500">
-                    Fasilitas usulan akan dinormalkan oleh admin Dinas Kesehatan saat verifikasi akun.
+                    Fasilitas usulan akan dinormalkan oleh admin saat verifikasi akun.
                   </p>
                 </div>
               )}
@@ -384,7 +384,7 @@ export default function HalamanDaftar() {
                     required
                   />
                   <p className="mt-1 text-[11px] text-tinta-500">
-                    Admin Dinas Kesehatan akan memverifikasi nomor STR sebelum akun diaktifkan.
+                    Admin akan memverifikasi nomor STR sebelum akun diaktifkan.
                   </p>
                 </div>
               )}

@@ -9,14 +9,25 @@ import {
   Printer,
   RotateCcw,
   Sparkles,
+  TrendingUp,
+  AlertTriangle,
+  Scale,
+  CheckCircle2,
 } from 'lucide-react'
-import { hitungSkrining, hitungUsiaKoreksi, type HasilSkrining, type PosisiUkur } from '@/lib/zscore'
-import { tampilanBBTB, tampilanBBU, tampilanTBU } from '@/lib/tampilan/status'
+import {
+  hitungSkrining,
+  hitungUsiaKoreksi,
+  hitungVelocity,
+  type HasilSkrining,
+  type HasilVelocity,
+  type PosisiUkur,
+} from '@/lib/zscore'
+import { tampilanBBTB, tampilanBBU, tampilanTBU, tampilanVelocity } from '@/lib/tampilan/status'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { PitaZScore } from '@/components/skrining/PitaZScore'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
-import { formatZ } from '@/lib/tampilan/format'
+import { formatTanggal, formatZ } from '@/lib/tampilan/format'
 import { Button } from '@/components/ui/Button'
 import type { KunjunganRiwayat } from '@/lib/grafik/seri'
 
@@ -87,6 +98,12 @@ export default function HalamanSkriningTamu() {
   const [hasil, setHasil] = useState<HasilSkrining | null>(null)
   const [riwayat, setRiwayat] = useState<KunjunganRiwayat[]>([])
 
+  // Evaluasi Weight Increment (Opsional untuk Tamu)
+  const [sertakanVelocity, setSertakanVelocity] = useState(false)
+  const [tanggalSebelumnya, setTanggalSebelumnya] = useState('')
+  const [beratSebelumnyaKg, setBeratSebelumnyaKg] = useState('')
+  const [hasilVelocity, setHasilVelocity] = useState<HasilVelocity | null>(null)
+
   // Kalkulasi prematur realtime (hanya untuk tampilan info)
   const defisitMinggu = isPrematur ? Math.max(0, 40 - usiaGestasiMinggu) : 0
   const defisitHari = defisitMinggu * 7
@@ -152,6 +169,26 @@ export default function HalamanSkriningTamu() {
         zBbtb: res.bbtb.z,
       }])
 
+      // Hitung velocity jika diaktifkan
+      if (sertakanVelocity && tanggalSebelumnya && beratSebelumnyaKg) {
+        const bPrev = parseFloat(beratSebelumnyaKg.replace(',', '.'))
+        if (!isNaN(bPrev) && bPrev > 0) {
+          const vel = hitungVelocity({
+            tanggalLahir: tglLahirEfektif,
+            jenisKelamin,
+            tanggalAwal: tanggalSebelumnya,
+            beratAwalKg: bPrev,
+            tanggalAkhir: tanggalPeriksa,
+            beratAkhirKg: bb,
+          })
+          setHasilVelocity(vel)
+        } else {
+          setHasilVelocity(null)
+        }
+      } else {
+        setHasilVelocity(null)
+      }
+
       pindahLangkah(3)
     } catch (err) {
       setError(
@@ -160,7 +197,22 @@ export default function HalamanSkriningTamu() {
           : 'Gagal menghitung status gizi. Periksa kembali data yang dimasukkan.',
       )
     }
-  }, [tanggalLahir, tanggalPeriksa, jenisKelamin, beratKg, panjangCm, posisiUkur, lilaCm, edema, isPrematur, defisitHari, pindahLangkah])
+  }, [
+    tanggalLahir,
+    tanggalPeriksa,
+    jenisKelamin,
+    beratKg,
+    panjangCm,
+    posisiUkur,
+    lilaCm,
+    edema,
+    isPrematur,
+    defisitHari,
+    sertakanVelocity,
+    tanggalSebelumnya,
+    beratSebelumnyaKg,
+    pindahLangkah,
+  ])
 
   const statusTB = hasil ? tampilanTBU(hasil.statusTBU) : null
   const statusBB = hasil ? tampilanBBTB(hasil.statusBBTB) : null
@@ -448,6 +500,73 @@ export default function HalamanSkriningTamu() {
                   </label>
                 </div>
               </div>
+
+              {/* Evaluasi Weight Increment Opsional */}
+              <div className="sm:col-span-2 rounded-2xl border-2 border-dashed border-laut-200 bg-gradient-to-r from-laut-50/60 to-cyan-50/60 p-4 sm:p-5 transition-all">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-laut-600 text-white shadow-sm">
+                      <TrendingUp className="size-5" />
+                    </div>
+                    <div>
+                      <label htmlFor="velocityCheckbox" className="flex items-center gap-2 text-sm font-bold text-tinta-900 cursor-pointer">
+                        <input
+                          id="velocityCheckbox"
+                          type="checkbox"
+                          checked={sertakanVelocity}
+                          onChange={(e) => setSertakanVelocity(e.target.checked)}
+                          className="size-4 rounded text-laut-600 focus:ring-laut-500"
+                        />
+                        Evaluasi Kenaikan Berat Badan (Weight Increment WHO)?
+                      </label>
+                      <p className="text-xs text-tinta-600 mt-0.5">
+                        Centang jika balita memiliki catatan berat badan sebelumnya untuk mendeteksi <em>Growth Faltering</em> (N/T).
+                      </p>
+                    </div>
+                  </div>
+
+                  {sertakanVelocity && (
+                    <span className="self-start rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 ring-1 ring-emerald-300">
+                      ✓ Fitur Aktif
+                    </span>
+                  )}
+                </div>
+
+                {sertakanVelocity && (
+                  <div className="mt-4 border-t border-laut-200/80 pt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
+                        Tanggal Penimbangan Sebelumnya <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={tanggalSebelumnya}
+                        onChange={(e) => setTanggalSebelumnya(e.target.value)}
+                        max={tanggalPeriksa}
+                        className="mt-1 h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
+                        Berat Badan Sebelumnya (kg) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.5"
+                          max="40"
+                          value={beratSebelumnyaKg}
+                          onChange={(e) => setBeratSebelumnyaKg(e.target.value)}
+                          placeholder="Contoh: 6.8"
+                          className="angka h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 pr-10 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
+                        />
+                        <span className="pointer-events-none absolute right-3.5 top-3.5 text-xs font-bold text-tinta-400">kg</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-between pt-2">
@@ -540,6 +659,104 @@ export default function HalamanSkriningTamu() {
                 <div><p className="text-laut-700">Target Tumbuh Kejar</p><p className="angka text-base font-bold text-amber-800">{hasil.gizi?.kaloriCatchUpKkal ?? '—'} kkal/hari</p></div>
               </div>
             </div>
+
+            {/* Kartu Evaluasi Weight Increment (Mode Tamu) */}
+            {hasilVelocity && (
+              <div
+                className={[
+                  'rounded-2xl p-6 shadow-sm ring-1 transition-all',
+                  hasilVelocity.status === 'naik'
+                    ? 'bg-emerald-50/70 ring-emerald-300'
+                    : hasilVelocity.status === 'growth_faltering'
+                      ? 'bg-amber-50/80 ring-amber-300'
+                      : 'bg-rose-50/80 ring-rose-300',
+                ].join(' ')}
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={[
+                        'flex size-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
+                        hasilVelocity.status === 'naik'
+                          ? 'bg-emerald-600'
+                          : hasilVelocity.status === 'growth_faltering'
+                            ? 'bg-amber-500'
+                            : 'bg-rose-600',
+                      ].join(' ')}
+                    >
+                      <TrendingUp className="size-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display text-base font-bold text-tinta-900">
+                          Evaluasi Weight Increment &amp; Growth Faltering (WHO)
+                        </h3>
+                        <span
+                          className={[
+                            'rounded-full px-2.5 py-0.5 text-[11px] font-black uppercase',
+                            hasilVelocity.status === 'naik'
+                              ? 'bg-emerald-200 text-emerald-900'
+                              : hasilVelocity.status === 'growth_faltering'
+                                ? 'bg-amber-200 text-amber-900'
+                                : 'bg-rose-200 text-rose-900',
+                          ].join(' ')}
+                        >
+                          {hasilVelocity.status === 'naik'
+                            ? 'Naik (N)'
+                            : hasilVelocity.status === 'growth_faltering'
+                              ? 'Growth Faltering (T)'
+                              : 'Tidak Naik (T)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-tinta-600 mt-0.5">
+                        Membandingkan penimbangan {formatTanggal(tanggalSebelumnya)} ({beratSebelumnyaKg} kg) ➔ {formatTanggal(tanggalPeriksa)} ({beratKg} kg)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="rounded-xl bg-white/90 px-3.5 py-2 ring-1 ring-black/5 text-center">
+                      <span className="text-[11px] text-tinta-500 block">Kenaikan Riil</span>
+                      <span
+                        className={[
+                          'angka text-sm font-black',
+                          hasilVelocity.kenaikanAktualGram > 0
+                            ? 'text-emerald-700'
+                            : hasilVelocity.kenaikanAktualGram === 0
+                              ? 'text-tinta-800'
+                              : 'text-rose-700',
+                        ].join(' ')}
+                      >
+                        {hasilVelocity.kenaikanAktualGram > 0 ? `+${hasilVelocity.kenaikanAktualGram}` : hasilVelocity.kenaikanAktualGram} g
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white/90 px-3.5 py-2 ring-1 ring-black/5 text-center">
+                      <span className="text-[11px] text-tinta-500 block">Target Min (P5)</span>
+                      <span className="angka text-sm font-black text-laut-700">
+                        {hasilVelocity.kenaikanMinimalGram !== null ? `+${hasilVelocity.kenaikanMinimalGram} g` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white/90 px-3.5 py-2 ring-1 ring-black/5 text-center">
+                      <span className="text-[11px] text-tinta-500 block">Jarak Waktu</span>
+                      <span className="angka text-sm font-black text-tinta-900">
+                        {hasilVelocity.selisihHari} hari
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {hasilVelocity.status === 'growth_faltering' && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-100/90 p-2.5 text-xs text-amber-900">
+                    <AlertTriangle className="size-4 shrink-0 text-amber-700 mt-0.5" />
+                    <span>
+                      <strong>Peringatan Dini:</strong> Kenaikan berat badan (+{hasilVelocity.kenaikanAktualGram} g) masih di bawah batas minimal baku WHO (+{hasilVelocity.kenaikanMinimalGram} g). Waspadai tanda awal gagal tumbuh sebelum berlanjut ke wasting atau stunting.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Kurva WHO */}
             <div className="rounded-2xl bg-white p-6 shadow-[var(--shadow-kartu)] sm:p-8">

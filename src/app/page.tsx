@@ -127,7 +127,7 @@ export default function LandingPage() {
               Dirancang Khusus untuk Alur Kerja Lapangan
             </h2>
             <p className="mx-auto mt-2 max-w-2xl text-sm text-tinta-600">
-              Menghubungkan Kader Posyandu, Dokter Puskesmas, Dietisien, hingga Pimpinan Dinas Kesehatan dalam satu rantai penanganan yang cepat dan akurat.
+              Menghubungkan Kader Posyandu, Dokter Puskesmas, Dietisien, hingga Administrator Sistem dalam satu rantai penanganan yang cepat dan akurat.
             </p>
           </div>
 
@@ -206,7 +206,7 @@ export default function LandingPage() {
                 Verifikasi Admin & UU PDP
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-tinta-600">
-                Seluruh pendaftaran diverifikasi oleh admin dinas untuk mencegah kebocoran data rekam medis anak antar faskes.
+                Seluruh pendaftaran diverifikasi oleh admin untuk mencegah kebocoran data rekam medis anak antar faskes.
               </p>
             </div>
           </div>

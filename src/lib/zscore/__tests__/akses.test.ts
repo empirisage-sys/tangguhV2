@@ -160,7 +160,7 @@ describe('cakupan data balita per peran dan fasilitas (Keputusan D-9)', () => {
     expect(cakupanData('dietisien', 'rumah_sakit')).toBe('input_sendiri')
   })
 
-  it('admin dinkes mencakup seluruh provinsi', () => {
+  it('admin mencakup seluruh provinsi', () => {
     expect(cakupanData('admin')).toBe('provinsi')
     expect(cakupanData('admin', 'puskesmas')).toBe('provinsi')
     expect(cakupanData('admin', 'rumah_sakit')).toBe('provinsi')

@@ -6,7 +6,7 @@ import { AlertCircle, Check, CheckCircle2, Link2, PlusCircle, ShieldAlert, X } f
 import { cariFaskesMiripLokal, type FaskesData } from '@/lib/db/wilayah'
 
 /**
- * Komponen Verifikasi Pendaftaran oleh Admin Dinkes.
+ * Komponen Verifikasi Pendaftaran oleh Admin.
  *
  * Mendukung normalisasi fasilitas usulan:
  * 1. Tautkan ke fasilitas master yang sudah ada

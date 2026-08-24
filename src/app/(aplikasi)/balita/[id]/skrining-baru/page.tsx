@@ -3,9 +3,9 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, ChevronRight, Sparkles, AlertCircle, WifiOff } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ChevronRight, Sparkles, AlertCircle, WifiOff, TrendingUp, AlertTriangle } from 'lucide-react'
 import { cariBalitaById, SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
-import { hitungSkrining, hitungUmurKalender } from '@/lib/zscore'
+import { hitungSkrining, hitungUmurKalender, hitungVelocity } from '@/lib/zscore'
 import type { HasilSkrining, PosisiUkur } from '@/lib/zscore/tipe'
 import { InputAngka } from '@/components/ui/InputAngka'
 import { Button } from '@/components/ui/Button'
@@ -444,6 +444,112 @@ export default function HalamanSkriningBaru({
       {langkah === 3 && hasilInstan && (
         <div className="space-y-6">
           <KartuHasil hasil={hasilInstan} namaBalita={balita.nama} />
+
+          {/* Evaluasi Weight Increment jika ada penimbangan sebelumnya */}
+          {(() => {
+            const prev = balita.riwayat.length > 0 ? balita.riwayat[balita.riwayat.length - 1] : null
+            const b = Number(beratKg.replace(',', '.'))
+            if (!prev || isNaN(b) || b <= 0) return null
+
+            const vel = hitungVelocity({
+              tanggalLahir: balita.tanggalLahir,
+              jenisKelamin: balita.jenisKelamin === 'L' ? 'lk' : 'pr',
+              tanggalAwal: prev.tanggal,
+              beratAwalKg: prev.beratKg,
+              tanggalAkhir: tanggalPeriksa,
+              beratAkhirKg: b,
+            })
+
+            return (
+              <div
+                className={[
+                  'rounded-2xl p-5 shadow-sm ring-1 transition-all',
+                  vel.status === 'naik'
+                    ? 'bg-emerald-50/70 ring-emerald-200'
+                    : vel.status === 'growth_faltering'
+                      ? 'bg-amber-50/80 ring-amber-300'
+                      : 'bg-rose-50/80 ring-rose-300',
+                ].join(' ')}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={[
+                        'flex size-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm',
+                        vel.status === 'naik'
+                          ? 'bg-emerald-600'
+                          : vel.status === 'growth_faltering'
+                            ? 'bg-amber-500'
+                            : 'bg-rose-600',
+                      ].join(' ')}
+                    >
+                      <TrendingUp className="size-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display text-sm font-bold text-tinta-900">
+                          Weight Increment vs Penimbangan Sebelumnya
+                        </h3>
+                        <span
+                          className={[
+                            'rounded-full px-2 py-0.5 text-[10px] font-black uppercase',
+                            vel.status === 'naik'
+                              ? 'bg-emerald-200 text-emerald-900'
+                              : vel.status === 'growth_faltering'
+                                ? 'bg-amber-200 text-amber-900'
+                                : 'bg-rose-200 text-rose-900',
+                          ].join(' ')}
+                        >
+                          {vel.status === 'naik'
+                            ? 'Naik (N)'
+                            : vel.status === 'growth_faltering'
+                              ? 'Growth Faltering (T)'
+                              : 'Tidak Naik (T)'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-tinta-600">
+                        {formatTanggal(prev.tanggal)} ({prev.beratKg} kg) ➔ {formatTanggal(tanggalPeriksa)} ({b} kg)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="rounded-lg bg-white/90 px-3 py-1.5 ring-1 ring-black/5 text-center">
+                      <span className="text-[10px] text-tinta-500 block">Kenaikan Riil</span>
+                      <span
+                        className={[
+                          'angka font-black',
+                          vel.kenaikanAktualGram > 0
+                            ? 'text-emerald-700'
+                            : vel.kenaikanAktualGram === 0
+                              ? 'text-tinta-800'
+                              : 'text-rose-700',
+                        ].join(' ')}
+                      >
+                        {vel.kenaikanAktualGram > 0 ? `+${vel.kenaikanAktualGram}` : vel.kenaikanAktualGram} g
+                      </span>
+                    </div>
+
+                    <div className="rounded-lg bg-white/90 px-3 py-1.5 ring-1 ring-black/5 text-center">
+                      <span className="text-[10px] text-tinta-500 block">Target Min (P5)</span>
+                      <span className="angka font-black text-laut-700">
+                        {vel.kenaikanMinimalGram !== null ? `+${vel.kenaikanMinimalGram} g` : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {vel.status === 'growth_faltering' && (
+                  <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-amber-100/90 p-2 text-xs text-amber-900">
+                    <AlertTriangle className="size-4 shrink-0 text-amber-700 mt-0.5" />
+                    <span>
+                      <strong>Growth Faltering:</strong> Kenaikan berat (+{vel.kenaikanAktualGram} g) belum memenuhi standar minimal WHO (+{vel.kenaikanMinimalGram} g). Waspadai risiko gagal tumbuh.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <div className="rounded-2xl bg-white p-6 shadow-[var(--shadow-kartu)] space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold text-laut-700">

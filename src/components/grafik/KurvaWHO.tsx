@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import {
+  Area,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -64,6 +65,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
     const titikAnak = seri.anak.find((a) => Math.abs(a.x - r.x) < 1e-4)
     return {
       ...r,
+      base_min: seri.domainY[0],
       anak: titikAnak?.tidakDinilai ? null : titikAnak?.y ?? null,
       tanggal: titikAnak?.tanggal ?? null,
       z: titikAnak?.z ?? null,
@@ -120,6 +122,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
 
       data.push({
         x: a.x,
+        base_min: seri.domainY[0],
         ...rujukanNilai,
         anak: a.tidakDinilai ? null : a.y,
         tanggal: a.tanggal,
@@ -164,10 +167,16 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
           <button
             type="button"
             onClick={() => setShowBands(!showBands)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md transition-colors hover:bg-white/25"
+            className={[
+              'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+              showBands
+                ? 'bg-white text-tinta-900 shadow-md ring-2 ring-white/50'
+                : 'bg-white/20 text-white hover:bg-white/30',
+            ].join(' ')}
+            title="Klik untuk mengaktifkan atau menonaktifkan arsiran pita warna zona KMS"
           >
             <Layers className="size-3.5" />
-            {showBands ? 'Zona KMS: Aktif' : 'Zona KMS: Mati'}
+            {showBands ? 'Zona KMS: Aktif' : 'Zona KMS: Nonaktif'}
           </button>
         </div>
       </div>
@@ -206,6 +215,66 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
               }}
             />
 
+            {/* Arsiran Warna Pita Zona KMS (Ditampilkan bila showBands aktif) */}
+            {showBands && (
+              <>
+                {/* Zona Merah Atas (+2 SD hingga +3 SD / Risiko Obesitas atau Makrosomia) */}
+                <Area
+                  type="monotone"
+                  dataKey="sd_p3"
+                  fill="#fee2e2"
+                  fillOpacity={0.65}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+                {/* Zona Kuning Atas (+1 SD hingga +2 SD / Risiko Lebih) */}
+                <Area
+                  type="monotone"
+                  dataKey="sd_p2"
+                  fill="#fef3c7"
+                  fillOpacity={0.7}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+                {/* Zona Hijau KMS (-2 SD hingga +1 SD / Rentang Pertumbuhan Normal) */}
+                <Area
+                  type="monotone"
+                  dataKey="sd_p1"
+                  fill="#dcfce7"
+                  fillOpacity={0.85}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+                {/* Zona Kuning Bawah (-3 SD hingga -2 SD / Waspada Gizi Kurang) */}
+                <Area
+                  type="monotone"
+                  dataKey="sd_n2"
+                  fill="#fef3c7"
+                  fillOpacity={0.7}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+                {/* Zona Merah Bawah (< -3 SD / Bawah Garis Merah - BGM) */}
+                <Area
+                  type="monotone"
+                  dataKey="sd_n3"
+                  fill="#fee2e2"
+                  fillOpacity={0.8}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+                {/* Masking Dasar di bawah batas skala Y minimum */}
+                <Area
+                  type="monotone"
+                  dataKey="base_min"
+                  fill="#ffffff"
+                  fillOpacity={1}
+                  stroke="none"
+                  isAnimationActive={false}
+                />
+              </>
+            )}
+
             {/* Garis-Garis Standar WHO Child Growth Standards */}
             <Line
               dataKey="sd_p3"
@@ -227,7 +296,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
             />
             <Line
               dataKey="sd_p1"
-              stroke="#CBD5E1"
+              stroke="#94A3B8"
               strokeWidth={1}
               strokeDasharray="2 2"
               dot={false}
@@ -244,7 +313,7 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
             />
             <Line
               dataKey="sd_n1"
-              stroke="#CBD5E1"
+              stroke="#94A3B8"
               strokeWidth={1}
               strokeDasharray="2 2"
               dot={false}
@@ -344,19 +413,19 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
         </ResponsiveContainer>
       </div>
 
-      {/* Legenda Standar Garis WHO Sesuai Permintaan Pengguna */}
+      {/* Legenda Standar Garis WHO & Zona KMS */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-kabut-50 p-3 text-xs text-tinta-700 ring-1 ring-kabut-200">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-4 rounded-full bg-[#15803D]" />
+            <span className="h-2 w-4 rounded bg-[#15803D]" />
             <span className="font-bold text-[#15803D]">Median (0 SD)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-4 rounded-full bg-[#F59E0B]" />
+            <span className="h-1.5 w-4 rounded bg-[#F59E0B]" />
             <span className="font-bold text-amber-700">±2 SD</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-4 rounded-full bg-[#DC2626]" />
+            <span className="h-1.5 w-4 rounded bg-[#DC2626]" />
             <span className="font-bold text-red-700">±3 SD</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -368,6 +437,21 @@ export function KurvaWHO({ seri, tinggi = 360, tampilkanKMSBands = true }: Props
               Hasil Ukur Anak
             </span>
           </div>
+
+          {showBands && (
+            <div className="flex flex-wrap items-center gap-1.5 border-l border-kabut-300 pl-3">
+              <span className="text-[11px] font-semibold text-tinta-500">Pita KMS:</span>
+              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                Hijau (Normal)
+              </span>
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                Kuning (Waspada)
+              </span>
+              <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">
+                Merah (BGM / Bahaya)
+              </span>
+            </div>
+          )}
         </div>
 
         <span className="text-[11px] font-semibold text-tinta-400">

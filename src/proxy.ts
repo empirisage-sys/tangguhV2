@@ -12,7 +12,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const JALUR_PUBLIK = ['/', '/masuk', '/daftar', '/lupa-sandi', '/auth', '/api']
+const JALUR_PUBLIK = ['/', '/masuk', '/daftar', '/lupa-sandi', '/auth', '/api', '/skrining-tamu']
 
 /** Halaman yang boleh dibuka pengguna yang akunnya belum disetujui. */
 const JALUR_MENUNGGU = ['/menunggu-verifikasi', '/profil', '/keluar']

@@ -80,17 +80,17 @@ export function pesanStatusAkun(
       penjelasan:
         alasanTolak && alasanTolak.trim().length > 0
           ? alasanTolak
-          : 'Admin Dinas Kesehatan belum dapat menyetujui pendaftaran ini. ' +
+          : 'Admin belum dapat menyetujui pendaftaran ini. ' +
             'Hubungi admin untuk mengetahui alasannya.',
-      tindakan: 'Hubungi admin Dinas Kesehatan atau petugas puskesmas pembina.',
+      tindakan: 'Hubungi admin atau petugas puskesmas pembina.',
       nada: 'bahaya',
     }
   }
 
   const keterangan =
     peran === 'kader'
-      ? 'Admin Dinas Kesehatan perlu memastikan Anda benar bertugas di posyandu yang dipilih.'
-      : 'Admin Dinas Kesehatan perlu memeriksa nomor STR yang Anda cantumkan.'
+      ? 'Admin perlu memastikan Anda benar bertugas di posyandu yang dipilih.'
+      : 'Admin perlu memeriksa nomor STR yang Anda cantumkan.'
 
   return {
     judul: 'Menunggu verifikasi admin',
@@ -136,7 +136,7 @@ export type CakupanData = 'posyandu' | 'faskes' | 'input_sendiri' | 'provinsi'
  * - Kader: balita di posyandu tempat bertugas
  * - Dokter / Dietisien di Puskesmas: balita di puskesmas tempat bertugas
  * - Spesialis / Nakes di Rumah Sakit: HANYA balita yang diinput sendiri
- * - Admin Dinkes: seluruh provinsi
+ * - Admin: seluruh provinsi
  */
 export function cakupanData(
   peran: Peran,
