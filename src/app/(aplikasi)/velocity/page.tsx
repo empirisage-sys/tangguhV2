@@ -159,24 +159,40 @@ export default function HalamanWeightIncrement() {
 
             {mode === 'pilih_balita' ? (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-tinta-700">
-                    Pilih Balita
-                  </label>
-                  <select
-                    value={balitaTerpilihId}
-                    onChange={(e) => setBalitaTerpilihId(e.target.value)}
-                    className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                  >
-                    {SAMPLE_BALITA_DATABASE.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.nama} ({b.jenisKelamin === 'L' ? 'L' : 'P'}, {b.riwayat.length}x timbang) — {b.namaPosyandu}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {SAMPLE_BALITA_DATABASE.length === 0 ? (
+                  <div className="rounded-xl bg-kabut-50 p-6 text-center text-xs">
+                    <p className="font-bold text-tinta-800">Belum Ada Data Balita Terdaftar</p>
+                    <p className="mt-1 text-tinta-500">
+                      Gunakan <strong>Kalkulator Manual</strong> untuk menghitung kenaikan BB balita secara mandiri.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setMode('manual')}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
+                    >
+                      Beralih ke Input Manual
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-tinta-700">
+                        Pilih Balita
+                      </label>
+                      <select
+                        value={balitaTerpilihId}
+                        onChange={(e) => setBalitaTerpilihId(e.target.value)}
+                        className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
+                      >
+                        {SAMPLE_BALITA_DATABASE.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.nama} ({b.jenisKelamin === 'L' ? 'L' : 'P'}, {b.riwayat.length}x timbang) — {b.namaPosyandu}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {balita && (
+                    {balita && (
                   <div className="rounded-xl bg-kabut-50 p-4 space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-tinta-500">Tanggal Lahir:</span>
@@ -214,8 +230,10 @@ export default function HalamanWeightIncrement() {
                     )}
                   </div>
                 )}
-              </div>
-            ) : (
+              </>
+            )}
+          </div>
+        ) : (
               <div className="space-y-4 text-xs">
                 {/* Jenis Kelamin */}
                 <div>

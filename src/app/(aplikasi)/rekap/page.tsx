@@ -202,33 +202,23 @@ export default function HalamanRekapitulasi() {
               </tr>
             </thead>
             <tbody className="divide-y divide-kabut-100">
-              <tr className="hover:bg-kabut-50">
-                <td className="p-3 font-bold text-tinta-900">Posyandu Mawar Dulalowo</td>
-                <td className="p-3 text-tinta-600">Kota Gorontalo</td>
-                <td className="angka p-3 font-bold">24 balita</td>
-                <td className="angka p-3 text-waspada-teks font-bold">2 anak</td>
-                <td className="angka p-3 font-bold text-waspada-teks">8.3% (2/24)</td>
-                <td className="angka p-3 text-bahaya-teks font-bold">1 anak</td>
-                <td className="angka p-3 font-bold text-bahaya-teks">4.2% (1/24)</td>
-              </tr>
-              <tr className="hover:bg-kabut-50">
-                <td className="p-3 font-bold text-tinta-900">Posyandu Melati Pulubala</td>
-                <td className="p-3 text-tinta-600">Kota Gorontalo</td>
-                <td className="angka p-3 font-bold">18 balita</td>
-                <td className="angka p-3 text-aman-teks font-bold">0 anak</td>
-                <td className="angka p-3 font-bold text-aman-teks">0.0% (0/18)</td>
-                <td className="angka p-3 text-aman-teks font-bold">0 anak</td>
-                <td className="angka p-3 font-bold text-aman-teks">0.0% (0/18)</td>
-              </tr>
-              <tr className="hover:bg-kabut-50">
-                <td className="p-3 font-bold text-tinta-900">Posyandu Cempaka Kayubulan</td>
-                <td className="p-3 text-tinta-600">Kabupaten Gorontalo</td>
-                <td className="angka p-3 font-bold">6 balita</td>
-                <td className="angka p-3 text-waspada-teks font-bold">1 anak</td>
-                <td className="angka p-3 font-bold text-waspada-teks">16.7% (1/6)</td>
-                <td className="angka p-3 text-waspada-teks font-bold">1 anak</td>
-                <td className="angka p-3 font-bold text-waspada-teks">16.7% (1/6)</td>
-              </tr>
+              {totalBalita === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-xs text-tinta-500">
+                    Belum ada data penimbangan balita yang tercatat pada periode ini.
+                  </td>
+                </tr>
+              ) : (
+                <tr className="hover:bg-kabut-50">
+                  <td className="p-3 font-bold text-tinta-900">Rekapitulasi Wilayah</td>
+                  <td className="p-3 text-tinta-600">Gorontalo</td>
+                  <td className="angka p-3 font-bold">{totalBalita} balita</td>
+                  <td className="angka p-3 text-waspada-teks font-bold">{countStunting} anak</td>
+                  <td className="angka p-3 font-bold text-waspada-teks">{pStunting}% ({countStunting}/{totalBalita})</td>
+                  <td className="angka p-3 text-bahaya-teks font-bold">{countWasting} anak</td>
+                  <td className="angka p-3 font-bold text-bahaya-teks">{pWasting}% ({countWasting}/{totalBalita})</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

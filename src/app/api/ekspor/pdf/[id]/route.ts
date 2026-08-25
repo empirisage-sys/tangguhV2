@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const balita = cariBalitaById(id) || SAMPLE_BALITA_DATABASE[0]
+    const balita = cariBalitaById(id)
 
     if (!balita) {
       return NextResponse.json({ error: 'Balita tidak ditemukan' }, { status: 404 })

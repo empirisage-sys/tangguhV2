@@ -178,10 +178,12 @@ export default function HalamanPasienRujukan() {
           <div className="rounded-2xl bg-white p-12 text-center shadow-[var(--shadow-kartu)] space-y-2">
             <Hospital className="mx-auto size-10 text-tinta-300" />
             <p className="font-display text-base font-bold text-tinta-900">
-              Tidak ada data rujukan yang cocok
+              Belum Ada Pasien Rujukan
             </p>
             <p className="text-xs text-tinta-500">
-              Ubah kueri pencarian atau tab status rujukan untuk melihat data lainnya.
+              {kueriCari || filterStatus !== 'semua'
+                ? 'Ubah kueri pencarian atau tab status rujukan untuk melihat data lainnya.'
+                : 'Puskesmas dapat menerbitkan rujukan untuk balita berisiko tinggi (gizi buruk atau stunting) ke Rumah Sakit.'}
             </p>
           </div>
         ) : (

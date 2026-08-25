@@ -17,7 +17,7 @@ export default async function HalamanDetailBalita({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const balita = cariBalitaById(id) || SAMPLE_BALITA_DATABASE[0]
+  const balita = cariBalitaById(id)
 
   if (!balita) {
     notFound()

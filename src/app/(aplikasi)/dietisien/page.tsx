@@ -90,10 +90,10 @@ export default function HalamanDietisien() {
           </span>
         </div>
         <FormulasiPKMKSection
-          namaBalita={balitaTerpilih ? balitaTerpilih.nama : 'Rizky Pratama'}
-          umurBulan={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 24 : 24}
-          beratKg={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 8.0 : 8.0}
-          targetEnergiDefaultKkal={770}
+          namaBalita={balitaTerpilih ? balitaTerpilih.nama : 'Pasien Anak (Simulasi)'}
+          umurBulan={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 12 : 12}
+          beratKg={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 7.5 : 7.5}
+          targetEnergiDefaultKkal={750}
         />
       </div>
 

@@ -21,7 +21,7 @@ export default function HalamanSkriningBaru({
 }) {
   const { id } = use(params)
   const router = useRouter()
-  const balita = cariBalitaById(id) || SAMPLE_BALITA_DATABASE[0]
+  const balita = cariBalitaById(id)
 
   const [langkah, setLangkah] = useState<1 | 2 | 3>(1)
   const [tanggalPeriksa, setTanggalPeriksa] = useState<string>(
@@ -47,6 +47,18 @@ export default function HalamanSkriningBaru({
       setClientUuid(crypto.randomUUID())
     }
   }, [clientUuid])
+
+  if (!balita) {
+    return (
+      <div className="mx-auto max-w-lg rounded-2xl bg-white p-8 text-center shadow-[var(--shadow-kartu)] space-y-3">
+        <p className="text-base font-bold text-tinta-900">Data Balita Tidak Ditemukan</p>
+        <p className="text-xs text-tinta-600">Pastikan ID balita yang Anda akses sudah terdaftar di sistem.</p>
+        <Link href="/balita" className="inline-block rounded-xl bg-laut-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-laut-700 transition-colors">
+          Kembali ke Data Balita
+        </Link>
+      </div>
+    )
+  }
 
   const hitungHasilLokal = () => {
     const b = Number(beratKg.replace(',', '.'))

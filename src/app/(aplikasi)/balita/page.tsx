@@ -118,8 +118,23 @@ export default async function HalamanDaftarBalita({
       <div className="space-y-3">
         {balitaList.length === 0 ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow-[var(--shadow-kartu)]">
-            <p className="text-base font-bold text-tinta-900">Tidak ada balita yang sesuai pencarian</p>
-            <p className="mt-1 text-xs text-tinta-600">Periksa kembali ejaan nama atau ubah filter status.</p>
+            <p className="text-base font-bold text-tinta-900">Belum Ada Data Balita</p>
+            <p className="mt-1 text-xs text-tinta-600">
+              {kueri || status
+                ? 'Tidak ada balita yang sesuai kriteria pencarian atau filter.'
+                : 'Mulai catat pertumbuhan anak dengan menekan tombol Tambah Balita Baru.'}
+            </p>
+            {!kueri && !status && (
+              <div className="mt-4">
+                <Link
+                  href="/balita/baru"
+                  className="inline-flex items-center gap-2 rounded-xl bg-laut-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-laut-700 transition-colors"
+                >
+                  <UserPlus className="size-4" />
+                  Tambah Balita Pertama
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           balitaList.map((balita) => {
