@@ -9,10 +9,11 @@
  * policy Row Level Security di database.
  */
 import { createBrowserClient } from '@supabase/ssr'
+import { kunciAnonSupabase, urlSupabase } from './env'
 
 export function createClient() {
   return createBrowserClient<any>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-anon-key',
+    urlSupabase(),
+    kunciAnonSupabase(),
   )
 }

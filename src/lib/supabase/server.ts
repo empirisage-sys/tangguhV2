@@ -6,13 +6,14 @@
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { kunciAnonSupabase, urlSupabase } from './env'
 
 export async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient<any>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-anon-key',
+    urlSupabase(),
+    kunciAnonSupabase(),
     {
       cookies: {
         getAll() {
