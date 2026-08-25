@@ -12,6 +12,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { normalkanNoHp, skemaPendaftaran } from '@/lib/validasi/pendaftaran'
 import { PUSKESMAS_GORONTALO } from '@/lib/db/wilayah'
+import { urlSitus } from '@/lib/supabase/env'
 
 export type HasilTindakan = {
   ok: boolean
@@ -76,16 +77,45 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
   const d = hasil.data
   const supabase = await createClient()
 
-  // Resolusi ID wilayah ke DB UUID
+  // ---------------------------------------------------------------------
+  // Resolusi ID wilayah.
+  //
+  // Nilai pada peta UUID di atas hanya dipakai sebagai petunjuk awal. Setiap
+  // nilai diverifikasi keberadaannya di database sebelum dikirim, karena UUID
+  // pada tabel master dibuat dengan `gen_random_uuid()`: begitu database
+  // di-reset atau dimigrasikan ulang, UUID lama tidak lagi ada dan pemasukan
+  // profil gagal karena pelanggaran foreign key. Bila UUID tidak ditemukan,
+  // nilainya dicari ulang berdasarkan kode/nama, dan bila tetap tidak ketemu
+  // kolomnya dikosongkan agar pendaftaran tetap bisa berjalan dan dinormalkan
+  // admin saat verifikasi.
+  // ---------------------------------------------------------------------
+  async function idBerlaku(tabel: string, id: string | null | undefined): Promise<string | null> {
+    if (!id) return null
+    const { data } = await supabase.from(tabel).select('id').eq('id', id).maybeSingle()
+    return data?.id ?? null
+  }
+
   const provKode = d.provinsiId?.replace(/^prov-/, '') || '75'
-  let provinsiDbId = MAP_PROVINSI_UUID[provKode]
+  let provinsiDbId = await idBerlaku('provinsi', MAP_PROVINSI_UUID[provKode])
   if (!provinsiDbId) {
-    const { data: provData } = await supabase.from('provinsi').select('id').eq('kode', provKode).maybeSingle()
-    provinsiDbId = provData?.id || MAP_PROVINSI_UUID['75']
+    const { data: provData } = await supabase
+      .from('provinsi')
+      .select('id')
+      .eq('kode', provKode)
+      .maybeSingle()
+    provinsiDbId = provData?.id ?? null
   }
 
   const kabKode = d.kabupatenId?.replace(/^kab-/, '') || '7571'
-  let kabupatenDbId = MAP_KABUPATEN_UUID[kabKode] || MAP_KABUPATEN_UUID['7571']
+  let kabupatenDbId = await idBerlaku('kabupaten', MAP_KABUPATEN_UUID[kabKode])
+  if (!kabupatenDbId) {
+    const { data: kabData } = await supabase
+      .from('kabupaten')
+      .select('id')
+      .eq('kode', kabKode)
+      .maybeSingle()
+    kabupatenDbId = kabData?.id ?? null
+  }
 
   // Cari Puskesmas / Faskes yang sesuai di DB
   let puskesmasDbId: string | null = null
@@ -97,23 +127,41 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
         .from('puskesmas')
         .select('id')
         .ilike('nama', `%${pusObj.nama}%`)
+        .limit(1)
         .maybeSingle()
       puskesmasDbId = pkmData?.id ?? null
     }
   }
 
-  // Jika Rumah Sakit, faskes manual, atau fallback
+  // Rumah sakit, faskes usulan manual, atau pencarian di atas tidak menemukan apa pun.
   if (!puskesmasDbId) {
-    puskesmasDbId = MAP_KABUPATEN_DEFAULT_PUSKESMAS[kabKode] || DEFAULT_PUSKESMAS_UUID
+    puskesmasDbId = await idBerlaku('puskesmas', MAP_KABUPATEN_DEFAULT_PUSKESMAS[kabKode])
+  }
+  if (!puskesmasDbId) {
+    puskesmasDbId = await idBerlaku('puskesmas', DEFAULT_PUSKESMAS_UUID)
+  }
+  if (!puskesmasDbId) {
+    // Ambil puskesmas mana pun yang ada agar profil tetap punya rujukan yang sah.
+    const { data: pkmAda } = await supabase.from('puskesmas').select('id').limit(1).maybeSingle()
+    puskesmasDbId = pkmAda?.id ?? null
   }
 
   // Cari Posyandu yang sesuai di DB untuk kader
   let posyanduDbId: string | null = null
   if (d.peran === 'kader') {
-    posyanduDbId = DEFAULT_POSYANDU_UUID
+    posyanduDbId = await idBerlaku('posyandu', DEFAULT_POSYANDU_UUID)
+    if (!posyanduDbId) {
+      const { data: posAda } = await supabase
+        .from('posyandu')
+        .select('id')
+        .eq('puskesmas_id', puskesmasDbId ?? '')
+        .limit(1)
+        .maybeSingle()
+      posyanduDbId = posAda?.id ?? null
+    }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const siteUrl = urlSitus()
 
   const { error } = await supabase.auth.signUp({
     email: d.email,
@@ -139,7 +187,22 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
   })
 
   if (error) {
+    // Penyebab asli SELALU dicatat di log server (Vercel > Logs). Tanpa ini,
+    // setiap galat yang tidak dikenali menjadi tidak dapat didiagnosis.
+    console.error('[daftar] signUp gagal', {
+      pesan: error.message,
+      status: (error as { status?: number }).status,
+      kode: (error as { code?: string }).code,
+      peran: d.peran,
+      jenisFaskes: d.jenisFaskes,
+      provinsiDbId,
+      kabupatenDbId,
+      puskesmasDbId,
+      posyanduDbId,
+    })
+
     const pesan = error.message.toLowerCase()
+
     if (pesan.includes('already registered') || pesan.includes('already been registered')) {
       return {
         ok: false,
@@ -150,9 +213,45 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
     if (pesan.includes('rate limit') || pesan.includes('too many')) {
       return { ok: false, pesan: 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.' }
     }
+    if (pesan.includes('signups not allowed') || pesan.includes('signup is disabled')) {
+      return {
+        ok: false,
+        pesan:
+          'Pendaftaran mandiri sedang dinonaktifkan pada sistem. Hubungi admin untuk mengaktifkannya.',
+      }
+    }
+    if (pesan.includes('sending confirmation email') || pesan.includes('error sending')) {
+      return {
+        ok: false,
+        pesan:
+          'Akun tidak dapat dibuat karena surel konfirmasi gagal dikirim. Hubungi admin untuk memeriksa pengaturan surel.',
+      }
+    }
+    if (pesan.includes('database error') || pesan.includes('unexpected_failure')) {
+      return {
+        ok: false,
+        pesan:
+          'Data wilayah atau fasilitas Anda belum lengkap di basis data. Hubungi admin dan sebutkan Puskesmas serta kabupaten tempat Anda bertugas.',
+      }
+    }
+    if (pesan.includes('password')) {
+      return {
+        ok: false,
+        pesan: 'Kata sandi belum memenuhi syarat sistem.',
+        galatMedan: { sandi: error.message },
+      }
+    }
+    if (pesan.includes('invalid') && pesan.includes('email')) {
+      return {
+        ok: false,
+        pesan: 'Alamat email tidak diterima sistem.',
+        galatMedan: { email: 'Alamat email tidak valid' },
+      }
+    }
+
     return {
       ok: false,
-      pesan: 'Pendaftaran belum berhasil. Coba lagi beberapa saat, atau hubungi admin.',
+      pesan: `Pendaftaran belum berhasil: ${error.message}. Bila berulang, hubungi admin dengan menyebutkan pesan ini.`,
     }
   }
 
