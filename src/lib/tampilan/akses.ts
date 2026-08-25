@@ -129,13 +129,13 @@ export function posyanduWajib(peran: Peran): boolean {
   return peran === 'kader'
 }
 
-export type CakupanData = 'posyandu' | 'faskes' | 'input_sendiri' | 'provinsi'
+export type CakupanData = 'posyandu' | 'faskes' | 'input_sendiri_dan_rujukan' | 'provinsi'
 
 /**
- * Menentukan cakupan data balita yang boleh dilihat oleh pengguna (Keputusan D-9).
+ * Menentukan cakupan data balita yang boleh dilihat oleh pengguna:
  * - Kader: balita di posyandu tempat bertugas
- * - Dokter / Dietisien di Puskesmas: balita di puskesmas tempat bertugas
- * - Spesialis / Nakes di Rumah Sakit: HANYA balita yang diinput sendiri
+ * - Dietisien di Puskesmas: balita di puskesmas tempat bertugas
+ * - Dokter: HANYA pasien yang diinput sendiri + pasien rujukan Puskesmas/RS wilayahnya
  * - Admin: seluruh provinsi
  */
 export function cakupanData(
@@ -144,10 +144,93 @@ export function cakupanData(
 ): CakupanData {
   if (peran === 'admin') return 'provinsi'
   if (peran === 'kader') return 'posyandu'
-  if (peran === 'dokter' || peran === 'dietisien') {
-    if (jenisFaskes === 'rumah_sakit') return 'input_sendiri'
-    return 'faskes'
+  if (peran === 'dietisien') return 'faskes'
+  if (peran === 'dokter') return 'input_sendiri_dan_rujukan'
+  return 'input_sendiri_dan_rujukan'
+}
+
+export type BalitaAksesInput = {
+  id: string
+  createdBy?: string | null
+  posyanduId?: string | null
+  puskesmasId?: string | null
+  kabupatenId?: string | null
+}
+
+export type ProfilAksesInput = {
+  id: string
+  peran: Peran
+  jenisFaskes?: 'puskesmas' | 'rumah_sakit' | null
+  faskesId?: string | null
+  puskesmasId?: string | null
+  posyanduId?: string | null
+  kabupatenId?: string | null
+}
+
+export type RujukanAksesInput = {
+  balitaId: string
+  puskesmasId?: string | null
+  rsTujuanId?: string | null
+}
+
+/**
+ * Aturan Akses Klinis untuk DOKTER:
+ * 1. Data pasien yang di-input sendiri oleh dokter tersebut (createdBy === dokter.id)
+ * 2. Data pasien yang dirujuk ke Puskesmas di wilayah dokter
+ * 3. Data pasien yang dirujuk ke Rumah Sakit tempat dokter bertugas
+ */
+export function dokterBolehLihatBalita(
+  balita: BalitaAksesInput,
+  dokter: ProfilAksesInput,
+  daftarRujukan: RujukanAksesInput[] = [],
+): boolean {
+  if (dokter.peran !== 'dokter') return false
+
+  // 1. Data pasien yang di-input sendiri
+  if (balita.createdBy && balita.createdBy === dokter.id) {
+    return true
   }
-  return 'input_sendiri'
+
+  // 2. Data pasien yang dirujuk ke Puskesmas di wilayah dokter
+  const pkmDokter = dokter.puskesmasId || dokter.faskesId
+  if (pkmDokter) {
+    const adaRujukanPuskesmas = daftarRujukan.some(
+      (r) => r.balitaId === balita.id && r.puskesmasId === pkmDokter,
+    )
+    if (adaRujukanPuskesmas) return true
+  }
+
+  // 3. Data pasien yang dirujuk ke Rumah Sakit tempat dokter bertugas
+  const faskesDokter = dokter.faskesId || dokter.puskesmasId
+  if (faskesDokter) {
+    const adaRujukanRS = daftarRujukan.some(
+      (r) => r.balitaId === balita.id && r.rsTujuanId === faskesDokter,
+    )
+    if (adaRujukanRS) return true
+  }
+
+  return false
+}
+
+/**
+ * Pemeriksaan menyeluruh apakah pengguna berwenang melihat profil/data balita.
+ */
+export function bolehLihatBalita(
+  balita: BalitaAksesInput,
+  profil: ProfilAksesInput,
+  daftarRujukan: RujukanAksesInput[] = [],
+): boolean {
+  if (profil.peran === 'admin') return true
+  if (profil.peran === 'kader') {
+    return Boolean(profil.posyanduId && balita.posyanduId === profil.posyanduId)
+  }
+  if (profil.peran === 'dietisien') {
+    const faskesId = profil.puskesmasId || profil.faskesId
+    return Boolean(faskesId && balita.puskesmasId === faskesId)
+  }
+  if (profil.peran === 'dokter') {
+    return dokterBolehLihatBalita(balita, profil, daftarRujukan)
+  }
+  return false
 }
 

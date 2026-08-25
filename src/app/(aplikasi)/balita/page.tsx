@@ -1,6 +1,8 @@
 import Link from 'next/link'
-import { Plus, Search, UserPlus, ChevronRight, Filter } from 'lucide-react'
+import { Plus, Search, UserPlus, ChevronRight, Filter, Stethoscope } from 'lucide-react'
 import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
 import { formatTanggal, formatUmurBulan } from '@/lib/tampilan/format'
@@ -13,12 +15,19 @@ export default async function HalamanDaftarBalita({
   searchParams: Promise<{ q?: string; status?: string }>
 }) {
   const profil = await ambilProfil()
+  const daftarRujukan = ambilSemuaRujukan()
+  const isDokter = profil?.peran === 'dokter'
   const isRumahSakit = profil?.jenisFaskes === 'rumah_sakit'
 
   const { q, status } = await searchParams
   const kueri = (q ?? '').toLowerCase()
 
   const balitaList = SAMPLE_BALITA_DATABASE.filter((b) => {
+    // Terapkan filter hak akses peran klinis
+    if (profil && !bolehLihatBalita(b, profil, daftarRujukan)) {
+      return false
+    }
+
     if (kueri && !b.nama.toLowerCase().includes(kueri) && !(b.nik && b.nik.includes(kueri))) {
       return false
     }
@@ -53,18 +62,18 @@ export default async function HalamanDaftarBalita({
         </Link>
       </div>
 
-      {/* Pemberitahuan Cakupan Data Khusus Spesialis / Nakes Rumah Sakit (Keputusan D-9) */}
-      {isRumahSakit && (
+      {/* Pemberitahuan Cakupan Data Khusus Akun Dokter */}
+      {isDokter && (
         <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-xs text-sky-900 shadow-sm flex items-start gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white">
-            <Hospital className="size-4" />
+            <Stethoscope className="size-4" />
           </div>
           <div>
             <p className="font-bold text-sky-950">
-              Pemberitahuan Cakupan Data (Pengguna Rumah Sakit):
+              Cakupan Data Rekam Medis (Akun Dokter):
             </p>
             <p className="mt-0.5 text-sky-800 leading-relaxed">
-              Sesuai standar privasi medis Kemenkes (Keputusan D-9), daftar ini hanya menampilkan pasien balita yang <strong>Anda input sendiri</strong> di rumah sakit atau pasien yang memiliki <strong>rujukan aktif</strong> dari Puskesmas.
+              Sesuai standar kerahasiaan medis, Anda hanya dapat melihat data pasien balita yang <strong>Anda input sendiri</strong>, pasien yang <strong>dirujuk ke Puskesmas wilayah Anda</strong>, atau pasien yang <strong>dirujuk ke Rumah Sakit tempat bertugas</strong>.
             </p>
           </div>
         </div>

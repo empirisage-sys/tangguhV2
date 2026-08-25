@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { cariBalitaById, SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { semuaKurva } from '@/lib/grafik/seri'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
@@ -24,6 +26,12 @@ export default async function HalamanDetailBalita({
   }
 
   const profil = await ambilProfil()
+  const daftarRujukan = ambilSemuaRujukan()
+
+  if (profil && !bolehLihatBalita(balita, profil, daftarRujukan)) {
+    notFound()
+  }
+
   const peran = profil?.peran ?? 'dokter'
 
   const jenisKelaminEngine = balita.jenisKelamin === 'L' ? 'lk' : 'pr'

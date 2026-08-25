@@ -578,34 +578,87 @@ create policy "admin kelola profil" on public.profiles
 -- ---- Balita ----------------------------------------------------------
 create policy "baca balita sesuai cakupan" on public.balita
   for select to authenticated
-  using (deleted_at is null and public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id));
+  using (
+    deleted_at is null
+    and (
+      public.is_admin()
+      or (public.my_role() = 'kader' and posyandu_id = public.my_posyandu_id())
+      or (public.my_role() = 'dietisien' and puskesmas_id = public.my_puskesmas_id())
+      or (
+        public.my_role() = 'dokter'
+        and (
+          created_by = auth.uid()
+          or exists (
+            select 1 from public.rujukan r
+            where r.balita_id = public.balita.id
+            and (
+              r.puskesmas_id = public.my_puskesmas_id()
+              or r.rs_tujuan_id = public.my_puskesmas_id()
+            )
+          )
+        )
+      )
+    )
+  );
 
 create policy "tambah balita sesuai cakupan" on public.balita
   for insert to authenticated
   with check (
     public.is_aktif()
     and created_by = auth.uid()
-    and public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id)
   );
 
 create policy "ubah balita sesuai cakupan" on public.balita
   for update to authenticated
-  using (public.is_aktif() and public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id))
-  with check (public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id));
+  using (
+    public.is_aktif()
+    and (
+      public.is_admin()
+      or (public.my_role() = 'kader' and posyandu_id = public.my_posyandu_id())
+      or (public.my_role() = 'dietisien' and puskesmas_id = public.my_puskesmas_id())
+      or (public.my_role() = 'dokter' and created_by = auth.uid())
+    )
+  )
+  with check (
+    public.is_admin()
+    or (public.my_role() = 'kader' and posyandu_id = public.my_posyandu_id())
+    or (public.my_role() = 'dietisien' and puskesmas_id = public.my_puskesmas_id())
+    or (public.my_role() = 'dokter' and created_by = auth.uid())
+  );
 
 -- Tidak ada policy DELETE: penghapusan hanya via kolom deleted_at.
 
 -- ---- Skrining --------------------------------------------------------
 create policy "baca skrining sesuai cakupan" on public.skrining
   for select to authenticated
-  using (deleted_at is null and public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id));
+  using (
+    deleted_at is null
+    and (
+      public.is_admin()
+      or (public.my_role() = 'kader' and posyandu_id = public.my_posyandu_id())
+      or (public.my_role() = 'dietisien' and puskesmas_id = public.my_puskesmas_id())
+      or (
+        public.my_role() = 'dokter'
+        and (
+          created_by = auth.uid()
+          or exists (
+            select 1 from public.rujukan r
+            where r.balita_id = public.skrining.balita_id
+            and (
+              r.puskesmas_id = public.my_puskesmas_id()
+              or r.rs_tujuan_id = public.my_puskesmas_id()
+            )
+          )
+        )
+      )
+    )
+  );
 
 create policy "tambah skrining sesuai cakupan" on public.skrining
   for insert to authenticated
   with check (
     public.is_aktif()
     and created_by = auth.uid()
-    and public.boleh_lihat(posyandu_id, puskesmas_id, kabupaten_id)
   );
 
 -- Koreksi data hanya oleh pembuatnya dalam 24 jam, atau oleh admin.

@@ -32,6 +32,7 @@ export type BalitaDetail = {
   namaKabupaten: string
   bbLahirKg?: number
   pbLahirCm?: number
+  createdBy?: string | null
   riwayat: SkriningRiwayatItem[]
 }
 

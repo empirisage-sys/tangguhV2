@@ -4,6 +4,8 @@ import {
   bolehMemverifikasi,
   bolehMencatatSkrining,
   bolehMenyusunAsuhanGizi,
+  bolehLihatBalita,
+  dokterBolehLihatBalita,
   cakupanData,
   LABEL_TAB,
   pesanStatusAkun,
@@ -144,26 +146,85 @@ describe('pesan status akun', () => {
   })
 })
 
-describe('cakupan data balita per peran dan fasilitas (Keputusan D-9)', () => {
+describe('cakupan data balita per peran dan fasilitas', () => {
   it('kader mencakup posyandu tempat bertugas', () => {
     expect(cakupanData('kader')).toBe('posyandu')
     expect(cakupanData('kader', 'puskesmas')).toBe('posyandu')
   })
 
-  it('dokter dan dietisien di puskesmas mencakup seluruh puskesmasnya', () => {
-    expect(cakupanData('dokter', 'puskesmas')).toBe('faskes')
+  it('dietisien di puskesmas mencakup seluruh puskesmasnya', () => {
     expect(cakupanData('dietisien', 'puskesmas')).toBe('faskes')
   })
 
-  it('spesialis dan nakes di rumah sakit HANYA melihat balita yang ia input sendiri (D-9)', () => {
-    expect(cakupanData('dokter', 'rumah_sakit')).toBe('input_sendiri')
-    expect(cakupanData('dietisien', 'rumah_sakit')).toBe('input_sendiri')
+  it('dokter mencakup pasien input sendiri dan rujukan faskesnya', () => {
+    expect(cakupanData('dokter')).toBe('input_sendiri_dan_rujukan')
+    expect(cakupanData('dokter', 'puskesmas')).toBe('input_sendiri_dan_rujukan')
+    expect(cakupanData('dokter', 'rumah_sakit')).toBe('input_sendiri_dan_rujukan')
   })
 
   it('admin mencakup seluruh provinsi', () => {
     expect(cakupanData('admin')).toBe('provinsi')
     expect(cakupanData('admin', 'puskesmas')).toBe('provinsi')
     expect(cakupanData('admin', 'rumah_sakit')).toBe('provinsi')
+  })
+})
+
+describe('aturan akses data balita untuk dokter (input sendiri, rujukan pkm, rujukan RS)', () => {
+  const dokterA = {
+    id: 'dok-01',
+    peran: 'dokter' as const,
+    jenisFaskes: 'puskesmas' as const,
+    puskesmasId: 'pus-7571-01',
+  }
+
+  const dokterSpesialisRS = {
+    id: 'dok-rs-01',
+    peran: 'dokter' as const,
+    jenisFaskes: 'rumah_sakit' as const,
+    faskesId: 'rs-7571-01',
+  }
+
+  it('dokter boleh melihat pasien yang di-input sendiri', () => {
+    const balitaInputSendiri = {
+      id: 'bal-01',
+      createdBy: 'dok-01',
+      puskesmasId: 'pus-7571-01',
+    }
+    expect(dokterBolehLihatBalita(balitaInputSendiri, dokterA, [])).toBe(true)
+  })
+
+  it('dokter boleh melihat pasien yang dirujuk ke/dari Puskesmas di wilayahnya', () => {
+    const balitaPasien = {
+      id: 'bal-02',
+      createdBy: 'kader-01', // diinput orang lain
+      puskesmasId: 'pus-7571-01',
+    }
+    const daftarRujukan = [
+      { balitaId: 'bal-02', puskesmasId: 'pus-7571-01', rsTujuanId: 'rs-7571-01' },
+    ]
+    expect(dokterBolehLihatBalita(balitaPasien, dokterA, daftarRujukan)).toBe(true)
+  })
+
+  it('dokter spesialis di RS boleh melihat pasien yang dirujuk ke RS tempat bertugas', () => {
+    const balitaPasien = {
+      id: 'bal-03',
+      createdBy: 'dok-lain-02',
+      puskesmasId: 'pus-7502-01',
+    }
+    const daftarRujukan = [
+      { balitaId: 'bal-03', puskesmasId: 'pus-7502-01', rsTujuanId: 'rs-7571-01' },
+    ]
+    expect(dokterBolehLihatBalita(balitaPasien, dokterSpesialisRS, daftarRujukan)).toBe(true)
+  })
+
+  it('dokter TIDAK boleh melihat pasien luar yang bukan inputannya dan tanpa rujukan', () => {
+    const balitaLuar = {
+      id: 'bal-99',
+      createdBy: 'kader-lain-99',
+      puskesmasId: 'pus-9999-99',
+    }
+    expect(dokterBolehLihatBalita(balitaLuar, dokterA, [])).toBe(false)
+    expect(dokterBolehLihatBalita(balitaLuar, dokterSpesialisRS, [])).toBe(false)
   })
 })
 
