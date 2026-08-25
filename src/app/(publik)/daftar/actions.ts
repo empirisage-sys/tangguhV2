@@ -33,6 +33,18 @@ const MAP_KABUPATEN_UUID: Record<string, string> = {
   '7571': '15d83e69-dee0-4430-a8b3-302bcd7a361a', // Kota Gorontalo
 }
 
+const MAP_KABUPATEN_DEFAULT_PUSKESMAS: Record<string, string> = {
+  '7501': '2c08601b-cc6b-4b9c-89e4-af9890432516', // Boalemo - Puskesmas Mananggu
+  '7502': '587772e0-54f2-4905-80af-094208959563', // Kab. Gorontalo - Puskesmas Batudaa Pantai
+  '7503': '510f3489-9d24-4f46-be8e-75419f827d52', // Pohuwato - Puskesmas Popayato
+  '7504': 'f4b73597-f1ca-4e63-a5e3-4aad7d512382', // Bone Bolango - Puskesmas Tapa
+  '7505': '671c6d55-62e9-4364-8daf-4d7b8dbf7b49', // Gorontalo Utara - Puskesmas Atinggola
+  '7571': '920c0fa8-7bac-4b78-8b0a-6aaa43806f12', // Kota Gorontalo - Puskesmas Pilolodaa
+}
+
+const DEFAULT_PUSKESMAS_UUID = '920c0fa8-7bac-4b78-8b0a-6aaa43806f12'
+const DEFAULT_POSYANDU_UUID = '5dd232fc-d677-4728-8b0a-4e6c0f963978'
+
 export async function daftar(formData: FormData): Promise<HasilTindakan> {
   const hasil = skemaPendaftaran.safeParse({
     email: formData.get('email'),
@@ -77,54 +89,28 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
 
   // Cari Puskesmas / Faskes yang sesuai di DB
   let puskesmasDbId: string | null = null
-  let faskesNamaCari = ''
 
-  if (d.faskesId && d.faskesId !== 'lainnya') {
+  if (d.jenisFaskes === 'puskesmas' && d.faskesId && d.faskesId !== 'lainnya') {
     const pusObj = PUSKESMAS_GORONTALO.find((p) => p.id === d.faskesId)
-    if (pusObj) faskesNamaCari = pusObj.nama
+    if (pusObj) {
+      const { data: pkmData } = await supabase
+        .from('puskesmas')
+        .select('id')
+        .ilike('nama', `%${pusObj.nama}%`)
+        .maybeSingle()
+      puskesmasDbId = pkmData?.id ?? null
+    }
   }
 
-  if (faskesNamaCari) {
-    const { data: pkmData } = await supabase
-      .from('puskesmas')
-      .select('id')
-      .ilike('nama', `%${faskesNamaCari}%`)
-      .maybeSingle()
-    puskesmasDbId = pkmData?.id ?? null
-  }
-
+  // Jika Rumah Sakit, faskes manual, atau fallback
   if (!puskesmasDbId) {
-    // Ambil puskesmas pertama di kabupaten tersebut untuk memenuhi FK/check constraint
-    const { data: pkmFallback } = await supabase
-      .from('puskesmas')
-      .select('id')
-      .eq('kabupaten_id', kabupatenDbId)
-      .limit(1)
-      .maybeSingle()
-    puskesmasDbId = pkmFallback?.id ?? null
-  }
-
-  // Jika masih null (misal kab luar Gorontalo), ambil sembarang puskesmas default
-  if (!puskesmasDbId) {
-    const { data: pkmAny } = await supabase.from('puskesmas').select('id').limit(1).maybeSingle()
-    puskesmasDbId = pkmAny?.id ?? null
+    puskesmasDbId = MAP_KABUPATEN_DEFAULT_PUSKESMAS[kabKode] || DEFAULT_PUSKESMAS_UUID
   }
 
   // Cari Posyandu yang sesuai di DB untuk kader
   let posyanduDbId: string | null = null
-  if (d.peran === 'kader' && puskesmasDbId) {
-    const { data: posData } = await supabase
-      .from('posyandu')
-      .select('id')
-      .eq('puskesmas_id', puskesmasDbId)
-      .limit(1)
-      .maybeSingle()
-    posyanduDbId = posData?.id ?? null
-
-    if (!posyanduDbId) {
-      const { data: posAny } = await supabase.from('posyandu').select('id').limit(1).maybeSingle()
-      posyanduDbId = posAny?.id ?? null
-    }
+  if (d.peran === 'kader') {
+    posyanduDbId = DEFAULT_POSYANDU_UUID
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
