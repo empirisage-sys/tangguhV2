@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { ambilProfil } from '@/lib/supabase/penjaga'
+import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import {
   Activity,
   AlertTriangle,
   Baby,
   BarChart3,
-  Calendar,
   ChevronRight,
   FileSpreadsheet,
   HeartPulse,
@@ -14,73 +16,70 @@ import {
   Sparkles,
   Users,
   Utensils,
+  Stethoscope,
 } from 'lucide-react'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
 import { formatTanggal } from '@/lib/tampilan/format'
-import type { StatusBBU, StatusTBU, StatusBBTB } from '@/lib/zscore/tipe'
-
-type SampleBalitaItem = {
-  id: string
-  nama: string
-  umurBulan: number
-  jenisKelamin: 'L' | 'P'
-  tanggalPeriksa: string
-  beratKg: number
-  panjangCm: number
-  statusBBU: StatusBBU
-  statusTBU: StatusTBU
-  statusBBTB: StatusBBTB
-  isRedFlag: boolean
-}
-
-// Data demonstrasi sampel untuk dasbor
-const SAMPLE_BALITA_TERAKHIR: SampleBalitaItem[] = [
-  {
-    id: 'bal-01',
-    nama: 'Ahmad Fadel',
-    umurBulan: 24,
-    jenisKelamin: 'L',
-    tanggalPeriksa: '2026-08-19',
-    beratKg: 8.0,
-    panjangCm: 78.0,
-    statusBBU: 'berat_badan_sangat_kurang',
-    statusTBU: 'pendek',
-    statusBBTB: 'gizi_buruk',
-    isRedFlag: true,
-  },
-  {
-    id: 'bal-02',
-    nama: 'Nurul Aini',
-    umurBulan: 18,
-    jenisKelamin: 'P',
-    tanggalPeriksa: '2026-08-18',
-    beratKg: 9.8,
-    panjangCm: 81.2,
-    statusBBU: 'berat_badan_normal',
-    statusTBU: 'normal',
-    statusBBTB: 'gizi_baik',
-    isRedFlag: false,
-  },
-  {
-    id: 'bal-03',
-    nama: 'Rizky Pratama',
-    umurBulan: 12,
-    jenisKelamin: 'L',
-    tanggalPeriksa: '2026-08-16',
-    beratKg: 7.9,
-    panjangCm: 73.0,
-    statusBBU: 'berat_badan_kurang',
-    statusTBU: 'pendek',
-    statusBBTB: 'gizi_kurang',
-    isRedFlag: false,
-  },
-]
 
 export default async function DasborPage() {
   const profil = await ambilProfil()
+  const daftarRujukan = ambilSemuaRujukan()
   const peran = profil?.peran ?? 'kader'
-  const nama = profil?.namaLengkap ?? 'Petugas Posyandu'
+  const nama = profil?.namaLengkap ?? 'Pengguna TANGGUH'
+  const jenisFaskes = profil?.jenisFaskes ?? 'puskesmas'
+
+  // Filter balita sesuai hak akses klinis
+  const balitaList = SAMPLE_BALITA_DATABASE.filter((b) => {
+    if (profil && !bolehLihatBalita(b, profil, daftarRujukan)) return false
+    return true
+  })
+
+  const totalBalita = balitaList.length
+  let totalDitimbangBulanIni = 0
+  let totalStuntingWasting = 0
+  let totalRedFlag = 0
+
+  const sekarang = new Date()
+  const bulanIni = `${sekarang.getFullYear()}-${String(sekarang.getMonth() + 1).padStart(2, '0')}`
+
+  for (const b of balitaList) {
+    const s = b.riwayat[b.riwayat.length - 1]
+    if (s) {
+      if (s.tanggal.startsWith(bulanIni)) {
+        totalDitimbangBulanIni++
+      }
+      const isStunting = s.statusTBU === 'pendek' || s.statusTBU === 'sangat_pendek'
+      const isWasting = s.statusBBTB === 'gizi_kurang' || s.statusBBTB === 'gizi_buruk'
+      if (isStunting || isWasting) {
+        totalStuntingWasting++
+      }
+      if (s.statusBBTB === 'gizi_buruk' || s.statusTBU === 'sangat_pendek' || s.edema) {
+        totalRedFlag++
+      }
+    }
+  }
+
+  // Pengukuran terbaru
+  const balitaTerbaru = balitaList
+    .filter((b) => b.riwayat.length > 0)
+    .sort((a, b) => {
+      const tA = a.riwayat[a.riwayat.length - 1]?.tanggal ?? ''
+      const tB = b.riwayat[b.riwayat.length - 1]?.tanggal ?? ''
+      return tB.localeCompare(tA)
+    })
+    .slice(0, 5)
+
+  const labelPeran =
+    peran === 'admin'
+      ? 'Administrator'
+      : peran === 'dokter'
+      ? jenisFaskes === 'rumah_sakit'
+        ? 'Dokter Spesialis RS'
+        : 'Dokter Puskesmas'
+      : peran === 'dietisien'
+      ? 'Dietisien Puskesmas'
+      : 'Kader Posyandu'
 
   return (
     <div className="space-y-6">
@@ -90,7 +89,7 @@ export default async function DasborPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur-md">
               <Sparkles className="size-3.5 text-karawo-400" />
-              <span className="capitalize">Peran: {peran} Posyandu</span>
+              <span>Peran: {labelPeran}</span>
             </div>
             <h1 className="font-display mt-2 text-2xl font-extrabold sm:text-3xl">
               Halo, {nama} 👋
@@ -125,7 +124,7 @@ export default async function DasborPage() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-laut-50 text-laut-600">
             <Baby className="size-5" />
           </div>
-          <p className="angka mt-3 text-2xl font-bold text-tinta-900 sm:text-3xl">48</p>
+          <p className="angka mt-3 text-2xl font-bold text-tinta-900 sm:text-3xl">{totalBalita}</p>
           <p className="text-xs font-semibold text-tinta-600">Balita Terdaftar</p>
         </div>
 
@@ -133,7 +132,7 @@ export default async function DasborPage() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-aman-bg text-aman-teks">
             <Activity className="size-5" />
           </div>
-          <p className="angka mt-3 text-2xl font-bold text-aman-teks sm:text-3xl">36</p>
+          <p className="angka mt-3 text-2xl font-bold text-aman-teks sm:text-3xl">{totalDitimbangBulanIni}</p>
           <p className="text-xs font-semibold text-tinta-600">Ditimbang Bulan Ini</p>
         </div>
 
@@ -141,7 +140,7 @@ export default async function DasborPage() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-waspada-bg text-waspada-teks">
             <AlertTriangle className="size-5" />
           </div>
-          <p className="angka mt-3 text-2xl font-bold text-waspada-teks sm:text-3xl">5</p>
+          <p className="angka mt-3 text-2xl font-bold text-waspada-teks sm:text-3xl">{totalStuntingWasting}</p>
           <p className="text-xs font-semibold text-tinta-600">Pendek / Wasted</p>
         </div>
 
@@ -149,7 +148,7 @@ export default async function DasborPage() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-bahaya-bg text-bahaya-teks">
             <HeartPulse className="size-5" />
           </div>
-          <p className="angka mt-3 text-2xl font-bold text-bahaya-teks sm:text-3xl">2</p>
+          <p className="angka mt-3 text-2xl font-bold text-bahaya-teks sm:text-3xl">{totalRedFlag}</p>
           <p className="text-xs font-semibold text-tinta-600">Perlu Rujukan (Red Flag)</p>
         </div>
       </div>
@@ -158,29 +157,31 @@ export default async function DasborPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left 2 Cols: Screening History & Urgent Items */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Action Alert Banner */}
-          <div className="rounded-2xl bg-bahaya-bg p-5 ring-1 ring-bahaya-garis">
-            <div className="flex items-start gap-3">
-              <HeartPulse className="size-5 shrink-0 text-bahaya-teks" />
-              <div className="flex-1">
-                <h2 className="text-sm font-bold text-bahaya-teks">
-                  2 Balita Memerlukan Intervensi & Rujukan Segera
-                </h2>
-                <p className="mt-1 text-xs text-bahaya-teks/90">
-                  Ditemukan balita dengan status Gizi Buruk (BB/TB &lt; -3 SD) dan Stunting Berat pada penimbangan terakhir di Posyandu.
-                </p>
-                <div className="mt-3">
-                  <Link
-                    href="/dietisien"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-bahaya-teks px-3.5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-                  >
-                    Buka Tindak Lanjut Asuhan Gizi
-                    <ChevronRight className="size-3.5" />
-                  </Link>
+          {/* Action Alert Banner (Hanya muncul jika ada red flag aktif) */}
+          {totalRedFlag > 0 && (
+            <div className="rounded-2xl bg-bahaya-bg p-5 ring-1 ring-bahaya-garis">
+              <div className="flex items-start gap-3">
+                <HeartPulse className="size-5 shrink-0 text-bahaya-teks" />
+                <div className="flex-1">
+                  <h2 className="text-sm font-bold text-bahaya-teks">
+                    {totalRedFlag} Balita Memerlukan Intervensi & Rujukan Segera
+                  </h2>
+                  <p className="mt-1 text-xs text-bahaya-teks/90">
+                    Ditemukan balita dengan status Gizi Buruk (BB/TB &lt; -3 SD) atau Stunting Berat pada penimbangan terakhir.
+                  </p>
+                  <div className="mt-3">
+                    <Link
+                      href="/dietisien"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-bahaya-teks px-3.5 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                    >
+                      Buka Tindak Lanjut Asuhan Gizi
+                      <ChevronRight className="size-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Recent Screening Table / Cards */}
           <div className="rounded-2xl bg-white p-5 shadow-[var(--shadow-kartu)] sm:p-6">
@@ -199,48 +200,68 @@ export default async function DasborPage() {
               </Link>
             </div>
 
-            <div className="mt-4 divide-y divide-kabut-100">
-              {SAMPLE_BALITA_TERAKHIR.map((balita) => {
-                const statusBB = tampilanBBTB(balita.statusBBTB)
-                const statusTB = tampilanTBU(balita.statusTBU)
-
-                return (
-                  <div
-                    key={balita.id}
-                    className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center"
+            {balitaTerbaru.length === 0 ? (
+              <div className="mt-4 rounded-xl bg-kabut-50 p-8 text-center text-xs text-tinta-500 space-y-2">
+                <Baby className="mx-auto size-8 text-tinta-300" />
+                <p className="font-bold text-tinta-800">Belum Ada Pengukuran Balita</p>
+                <p>Mulai catat pertumbuhan balita pertama di wilayah binaan Anda.</p>
+                <div className="pt-2">
+                  <Link
+                    href="/balita/baru"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-laut-600 px-4 py-2 text-xs font-bold text-white hover:bg-laut-700 transition-colors"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <Plus className="size-3.5" />
+                    Tambah Balita Baru
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 divide-y divide-kabut-100">
+                {balitaTerbaru.map((balita) => {
+                  const skriningAkhir = balita.riwayat[balita.riwayat.length - 1]
+                  if (!skriningAkhir) return null
+
+                  const statusBB = tampilanBBTB(skriningAkhir.statusBBTB)
+                  const statusTB = tampilanTBU(skriningAkhir.statusTBU)
+
+                  return (
+                    <div
+                      key={balita.id}
+                      className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/balita/${balita.id}`}
+                            className="font-bold text-tinta-900 hover:text-laut-700 hover:underline"
+                          >
+                            {balita.nama}
+                          </Link>
+                          <span className="angka rounded-md bg-kabut-100 px-2 py-0.5 text-xs font-semibold text-tinta-600">
+                            {skriningAkhir.umurBulan} bln • {balita.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
+                          </span>
+                        </div>
+                        <p className="angka text-xs text-tinta-600">
+                          {skriningAkhir.beratKg} kg • {skriningAkhir.panjangCm} cm • Diperiksa {formatTanggal(skriningAkhir.tanggal)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <LencanaStatus status={statusBB} ukuran="kecil" />
+                        <LencanaStatus status={statusTB} ukuran="kecil" />
                         <Link
                           href={`/balita/${balita.id}`}
-                          className="font-bold text-tinta-900 hover:text-laut-700 hover:underline"
+                          className="rounded-xl p-2 text-tinta-400 hover:bg-kabut-100 hover:text-tinta-900"
+                          title="Buka Profil"
                         >
-                          {balita.nama}
+                          <ChevronRight className="size-4" />
                         </Link>
-                        <span className="angka rounded-md bg-kabut-100 px-2 py-0.5 text-xs font-semibold text-tinta-600">
-                          {balita.umurBulan} bln • {balita.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
-                        </span>
                       </div>
-                      <p className="angka text-xs text-tinta-600">
-                        {balita.beratKg} kg • {balita.panjangCm} cm • Diperiksa {formatTanggal(balita.tanggalPeriksa)}
-                      </p>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <LencanaStatus status={statusBB} ukuran="kecil" />
-                      <LencanaStatus status={statusTB} ukuran="kecil" />
-                      <Link
-                        href={`/balita/${balita.id}`}
-                        className="rounded-xl p-2 text-tinta-400 hover:bg-kabut-100 hover:text-tinta-900"
-                        title="Buka Profil"
-                      >
-                        <ChevronRight className="size-4" />
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
