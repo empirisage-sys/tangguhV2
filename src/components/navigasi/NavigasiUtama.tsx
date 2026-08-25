@@ -12,6 +12,7 @@ import {
   LogOut,
   User,
   TrendingUp,
+  Users,
 } from 'lucide-react'
 import type { Peran } from '@/lib/tampilan/akses'
 
@@ -71,6 +72,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Verifikasi',
     href: '/admin/verifikasi',
     icon: ShieldCheck,
+    peranBoleh: ['admin'],
+  },
+  {
+    id: 'pengguna',
+    label: 'Manajemen Akun',
+    href: '/admin/pengguna',
+    icon: Users,
     peranBoleh: ['admin'],
   },
 ]

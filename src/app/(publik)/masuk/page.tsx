@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { masuk } from './actions'
 import { Button } from '@/components/ui/Button'
-import { Lock, Mail, ShieldAlert } from 'lucide-react'
+import { Lock, Mail, ShieldAlert, HelpCircle } from 'lucide-react'
 
 export default function HalamanMasuk() {
   const [sedangProses, setSedangProses] = useState(false)
@@ -75,6 +75,12 @@ export default function HalamanMasuk() {
                 <label htmlFor="sandi" className="block text-sm font-semibold text-tinta-900">
                   Kata Sandi <span className="text-bahaya-teks">*</span>
                 </label>
+                <Link
+                  href="/lupa-sandi"
+                  className="text-xs font-semibold text-laut-600 hover:text-laut-800 hover:underline"
+                >
+                  Lupa kata sandi?
+                </Link>
               </div>
               <div className="relative mt-1.5 flex items-center">
                 <Lock className="pointer-events-none absolute left-3.5 size-5 text-tinta-400" />
@@ -84,7 +90,7 @@ export default function HalamanMasuk() {
                   type="password"
                   required
                   autoComplete="current-password"
-                  placeholder="Minimal 10 karakter"
+                  placeholder="Minimal 8 karakter"
                   className="h-12 w-full rounded-xl bg-white pl-11 pr-4 text-sm text-tinta-900 ring-1 ring-kabut-200 transition-colors focus:ring-2 focus:ring-laut-500 focus:outline-none"
                 />
               </div>
@@ -107,6 +113,17 @@ export default function HalamanMasuk() {
               <Link href="/skrining-tamu" className="font-bold text-karawo-700 underline hover:text-karawo-900">
                 Masuk sebagai Tamu →
               </Link>
+            </div>
+
+            <div className="mt-4 border-t border-kabut-100 pt-3 text-center">
+              <a
+                href="mailto:empirisage@gmail.com?subject=Permohonan%20Bantuan%20Aplikasi%20TANGGUH&body=Halo%20Admin%20TANGGUH%2C%0A%0ASaya%20mengalami%20kendala%20saat%20mengakses%20aplikasi.%20Berikut%20detailnya%3A%0A-%20Nama%3A%20%0A-%20Nomor%20HP%3A%20%0A-%20Kendala%3A%20%0A%0ATerima%20kasih."
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-tinta-500 hover:text-laut-600 transition-colors"
+                title="Kirim pesan permohonan bantuan ke Administrator"
+              >
+                <HelpCircle className="size-3.5" />
+                <span>Pusat Bantuan &amp; Layanan Teknis Admin</span>
+              </a>
             </div>
           </div>
         </div>

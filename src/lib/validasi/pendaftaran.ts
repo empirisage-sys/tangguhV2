@@ -35,11 +35,11 @@ export const LABEL_JENIS_FASKES: Record<JenisFaskesPendaftaran, string> = {
 
 /**
  * Kata sandi.
- * Panjang minimum 10 karakter untuk keamanan optimal.
+ * Panjang minimum 8 karakter.
  */
 const sandi = z
   .string()
-  .min(10, 'Kata sandi minimal 10 karakter. Kalimat pendek lebih mudah diingat.')
+  .min(8, 'Kata sandi minimal 8 karakter.')
   .max(72, 'Kata sandi maksimal 72 karakter')
 
 const email = z
@@ -99,21 +99,27 @@ export const skemaPendaftaran = z
   })
   // Validasi Kabupaten (wajib pilih atau isi manual jika luar Gorontalo)
   .refine(
-    (d) => (d.provinsiId === 'prov-75' ? Boolean(d.kabupatenId) : Boolean(d.kabupatenManual?.trim() || d.kabupatenId)),
+    (d) => {
+      if (d.provinsiId === 'prov-75') return Boolean(d.kabupatenId && d.kabupatenId.trim().length > 0)
+      return Boolean(d.kabupatenManual && d.kabupatenManual.trim().length >= 3)
+    },
     {
-      message: 'Pilih atau isi kabupaten/kota tempat Anda bertugas',
+      message: 'Pilih kabupaten/kota Anda, atau tuliskan nama kabupaten/kota jika di luar Gorontalo',
       path: ['kabupatenId'],
     },
   )
-  // Validasi Faskes Rumah Sakit: selalu wajib isi faskesManual
+  // Validasi Faskes Rumah Sakit: selalu wajib faskesManual
   .refine(
-    (d) => d.jenisFaskes !== 'rumah_sakit' || Boolean(d.faskesManual && d.faskesManual.trim().length >= 3),
+    (d) => {
+      if (d.jenisFaskes !== 'rumah_sakit') return true
+      return Boolean(d.faskesManual && d.faskesManual.trim().length >= 3)
+    },
     {
-      message: 'Tuliskan nama lengkap Rumah Sakit tempat Anda bertugas',
+      message: 'Tuliskan nama Rumah Sakit tempat Anda bertugas',
       path: ['faskesManual'],
     },
   )
-  // Validasi Faskes Puskesmas Gorontalo: wajib faskesId kecuali 'lainnya' yang wajib faskesManual
+  // Validasi Faskes Puskesmas Gorontalo: wajib pilih faskesId (bila "lainnya" wajib faskesManual)
   .refine(
     (d) => {
       if (d.jenisFaskes !== 'puskesmas' || d.provinsiId !== 'prov-75') return true
@@ -155,6 +161,42 @@ export const skemaMasuk = z.object({
 })
 
 export type MasukanMasuk = z.output<typeof skemaMasuk>
+
+export const skemaLupaSandi = z.object({
+  email,
+})
+
+export type MasukanLupaSandi = z.output<typeof skemaLupaSandi>
+
+export const skemaAturUlangSandi = z
+  .object({
+    sandi,
+    ulangiSandi: z.string(),
+  })
+  .refine((d) => d.sandi === d.ulangiSandi, {
+    message: 'Ulangi kata sandi belum sama',
+    path: ['ulangiSandi'],
+  })
+
+export type MasukanAturUlangSandi = z.output<typeof skemaAturUlangSandi>
+
+export const skemaEditPenggunaAdmin = z.object({
+  penggunaId: z.string().min(1, 'ID pengguna wajib diisi'),
+  namaLengkap: z.string().trim().min(3, 'Nama lengkap minimal 3 karakter'),
+  role: z.enum(['kader', 'dokter', 'dietisien', 'admin']),
+  statusAkun: z.enum(['menunggu', 'disetujui', 'ditolak']),
+  noHp: noHp.optional().or(z.literal('')),
+  noStr: z.string().trim().optional().or(z.literal('')),
+})
+
+export type MasukanEditPenggunaAdmin = z.output<typeof skemaEditPenggunaAdmin>
+
+export const skemaResetSandiAdmin = z.object({
+  penggunaId: z.string().min(1, 'ID pengguna wajib diisi'),
+  sandiBaru: sandi,
+})
+
+export type MasukanResetSandiAdmin = z.output<typeof skemaResetSandiAdmin>
 
 export const skemaVerifikasi = z
   .object({

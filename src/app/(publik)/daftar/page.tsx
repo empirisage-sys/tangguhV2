@@ -397,7 +397,7 @@ export default function HalamanDaftar() {
                   <input
                     type="password"
                     name="sandi"
-                    placeholder="Minimal 10 karakter..."
+                    placeholder="Minimal 8 karakter..."
                     className="mt-1.5 h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
                     required
                   />
