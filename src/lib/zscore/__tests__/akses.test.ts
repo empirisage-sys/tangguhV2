@@ -6,6 +6,7 @@ import {
   bolehMenyusunAsuhanGizi,
   bolehLihatBalita,
   dokterBolehLihatBalita,
+  spesialisAnakBolehLihatBalita,
   cakupanData,
   LABEL_TAB,
   pesanStatusAkun,
@@ -17,7 +18,7 @@ import {
 import { skemaPendaftaran } from '@/lib/validasi/pendaftaran'
 import { cariFaskesMiripLokal } from '@/lib/db/wilayah'
 
-const SEMUA_PERAN: Peran[] = ['kader', 'dokter', 'dietisien', 'admin']
+const SEMUA_PERAN: Peran[] = ['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien', 'admin']
 
 describe('tab kurva menurut peran', () => {
   it('setiap peran melihat ketiga kurva WHO', () => {
@@ -346,3 +347,125 @@ describe('pencarian kemiripan faskes usulan untuk admin verifikasi', () => {
   })
 })
 
+
+
+// =====================================================================
+// PERAN DOKTER SPESIALIS ANAK (BERTUGAS DI RUMAH SAKIT)
+//
+// Peran ini berada di ujung rantai rujukan. Yang diuji di sini adalah
+// batasnya: ia melihat pasien yang dikirim kepadanya, bukan seluruh balita
+// di puskesmas pembina wilayahnya.
+// =====================================================================
+
+const RS_PROVINSI = 'rs-prov-01'
+const RS_LAIN = 'rs-lain-02'
+const PKM_PEMBINA = 'pkm-7571-01'
+
+const spesialis = {
+  id: 'dsa-1',
+  peran: 'dokter_spesialis_anak' as const,
+  jenisFaskes: 'rumah_sakit' as const,
+  faskesId: RS_PROVINSI,
+  puskesmasId: PKM_PEMBINA,
+  kabupatenId: 'kab-7571',
+}
+
+describe('akses klinis dokter spesialis anak', () => {
+  it('melihat balita yang ia catat sendiri', () => {
+    const balita = { id: 'b-1', createdBy: 'dsa-1', puskesmasId: 'pkm-lain' }
+    expect(spesialisAnakBolehLihatBalita(balita, spesialis)).toBe(true)
+    expect(bolehLihatBalita(balita, spesialis)).toBe(true)
+  })
+
+  it('melihat balita yang dirujuk ke rumah sakit tempat ia bertugas', () => {
+    const balita = { id: 'b-2', createdBy: 'kader-9', puskesmasId: PKM_PEMBINA }
+    const rujukan = [{ balitaId: 'b-2', rsTujuanId: RS_PROVINSI }]
+    expect(spesialisAnakBolehLihatBalita(balita, spesialis, rujukan)).toBe(true)
+    expect(bolehLihatBalita(balita, spesialis, rujukan)).toBe(true)
+  })
+
+  it('TIDAK melihat balita yang dirujuk ke rumah sakit lain', () => {
+    const balita = { id: 'b-3', createdBy: 'kader-9', puskesmasId: PKM_PEMBINA }
+    const rujukan = [{ balitaId: 'b-3', rsTujuanId: RS_LAIN }]
+    expect(spesialisAnakBolehLihatBalita(balita, spesialis, rujukan)).toBe(false)
+    expect(bolehLihatBalita(balita, spesialis, rujukan)).toBe(false)
+  })
+
+  it('TIDAK melihat seluruh balita puskesmas pembina hanya karena sewilayah', () => {
+    const balita = { id: 'b-4', createdBy: 'kader-9', puskesmasId: PKM_PEMBINA }
+    expect(bolehLihatBalita(balita, spesialis, [])).toBe(false)
+  })
+
+  it('cakupan datanya adalah input sendiri dan rujukan, bukan satu faskes penuh', () => {
+    expect(cakupanData('dokter_spesialis_anak', 'rumah_sakit')).toBe(
+      'input_sendiri_dan_rujukan',
+    )
+  })
+
+  it('berwenang mencatat skrining, menyusun asuhan gizi, dan melihat tren nilai Z', () => {
+    expect(bolehMencatatSkrining('dokter_spesialis_anak')).toBe(true)
+    expect(bolehMenyusunAsuhanGizi('dokter_spesialis_anak')).toBe(true)
+    expect(bolehLihatTrenZ('dokter_spesialis_anak')).toBe(true)
+  })
+
+  it('tetap tidak berwenang memverifikasi pendaftaran orang lain', () => {
+    expect(bolehMemverifikasi('dokter_spesialis_anak')).toBe(false)
+  })
+
+  it('wajib mencantumkan STR dan tidak wajib posyandu', () => {
+    expect(strWajib('dokter_spesialis_anak')).toBe(true)
+    expect(posyanduWajib('dokter_spesialis_anak')).toBe(false)
+  })
+})
+
+describe('validasi pendaftaran dokter spesialis anak', () => {
+  const dasar = {
+    email: 'spesialis@rsud.go.id',
+    sandi: 'sandiKuat123',
+    ulangiSandi: 'sandiKuat123',
+    namaLengkap: 'dr. Anak Sehat, Sp.A',
+    peran: 'dokter_spesialis_anak' as const,
+    noHp: '081234567890',
+    noStr: 'STR-99887766',
+    provinsiId: 'prov-75',
+    kabupatenId: 'kab-7571',
+    kabupatenManual: '',
+    faskesId: '',
+    faskesManual: 'RSUD Prof. Dr. H. Aloei Saboe',
+    posyanduManual: '',
+    setujuKetentuan: true as const,
+  }
+
+  it('diterima bila jenis fasilitas rumah sakit dan nama RS diisi', () => {
+    const hasil = skemaPendaftaran.safeParse({ ...dasar, jenisFaskes: 'rumah_sakit' })
+    expect(hasil.success).toBe(true)
+  })
+
+  it('ditolak bila memilih puskesmas sebagai tempat bertugas', () => {
+    const hasil = skemaPendaftaran.safeParse({
+      ...dasar,
+      jenisFaskes: 'puskesmas',
+      faskesId: 'pus-7571-01',
+      faskesManual: '',
+    })
+    expect(hasil.success).toBe(false)
+  })
+
+  it('ditolak bila nomor STR kosong', () => {
+    const hasil = skemaPendaftaran.safeParse({
+      ...dasar,
+      jenisFaskes: 'rumah_sakit',
+      noStr: '',
+    })
+    expect(hasil.success).toBe(false)
+  })
+
+  it('ditolak bila nama rumah sakit tidak dituliskan', () => {
+    const hasil = skemaPendaftaran.safeParse({
+      ...dasar,
+      jenisFaskes: 'rumah_sakit',
+      faskesManual: '',
+    })
+    expect(hasil.success).toBe(false)
+  })
+})
