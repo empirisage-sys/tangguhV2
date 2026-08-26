@@ -73,9 +73,11 @@ export default async function DasborPage() {
   const labelPeran =
     peran === 'admin'
       ? 'Administrator'
+      : peran === 'dokter_spesialis_anak'
+      ? 'Dokter Spesialis Anak'
       : peran === 'dokter'
       ? jenisFaskes === 'rumah_sakit'
-        ? 'Dokter Spesialis RS'
+        ? 'Dokter Rumah Sakit'
         : 'Dokter Puskesmas'
       : peran === 'dietisien'
       ? 'Dietisien Puskesmas'
