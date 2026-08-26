@@ -7,7 +7,7 @@ import { skemaSkrining, periksaTerhadapBalita } from '@/lib/validasi/skrining'
 
 export async function POST(request: Request) {
   try {
-    const profil = await wajibPeran(['kader', 'dokter', 'dietisien'])
+    const profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
     const body = await request.json()
     const validasi = skemaSkrining.safeParse(body.masukan)
 
