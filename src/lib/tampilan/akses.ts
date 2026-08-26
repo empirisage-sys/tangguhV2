@@ -11,7 +11,7 @@
  * membebani pengguna dengan hal yang bukan urusannya.
  */
 
-export type Peran = 'kader' | 'dokter' | 'dietisien' | 'admin'
+export type Peran = 'kader' | 'dokter' | 'dokter_spesialis_anak' | 'dietisien' | 'admin'
 
 export type StatusAkun = 'menunggu' | 'disetujui' | 'ditolak'
 
@@ -31,7 +31,9 @@ export type TabKurva = 'bbu' | 'tbu' | 'bbtb' | 'trenZ'
  */
 export function tabKurvaUntuk(peran: Peran): TabKurva[] {
   const dasar: TabKurva[] = ['bbu', 'tbu', 'bbtb']
-  if (peran === 'dokter' || peran === 'admin') return [...dasar, 'trenZ']
+  if (peran === 'dokter' || peran === 'dokter_spesialis_anak' || peran === 'admin') {
+    return [...dasar, 'trenZ']
+  }
   return dasar
 }
 
@@ -106,12 +108,23 @@ export function pesanStatusAkun(
 
 /** Apakah peran ini dapat mencatat skrining, bila akunnya sudah disetujui. */
 export function bolehMencatatSkrining(peran: Peran): boolean {
-  return peran === 'kader' || peran === 'dokter' || peran === 'dietisien'
+  return (
+    peran === 'kader' ||
+    peran === 'dokter' ||
+    peran === 'dokter_spesialis_anak' ||
+    peran === 'dietisien'
+  )
 }
 
-/** Apakah peran ini dapat menyusun asuhan gizi. */
+/**
+ * Apakah peran ini dapat menyusun asuhan gizi.
+ *
+ * Dietisien menyusunnya sebagai tugas pokok. Dokter spesialis anak ikut
+ * berwenang karena pasien rujukan di rumah sakit sering memerlukan formulasi
+ * PKMK yang ditetapkan langsung olehnya.
+ */
 export function bolehMenyusunAsuhanGizi(peran: Peran): boolean {
-  return peran === 'dietisien'
+  return peran === 'dietisien' || peran === 'dokter_spesialis_anak'
 }
 
 /** Apakah peran ini dapat memverifikasi pendaftaran orang lain. */
@@ -121,7 +134,7 @@ export function bolehMemverifikasi(peran: Peran): boolean {
 
 /** Apakah nomor STR wajib diisi saat pendaftaran. */
 export function strWajib(peran: Peran): boolean {
-  return peran === 'dokter' || peran === 'dietisien'
+  return peran === 'dokter' || peran === 'dokter_spesialis_anak' || peran === 'dietisien'
 }
 
 /** Apakah posyandu wajib dipilih saat pendaftaran. */
@@ -146,6 +159,7 @@ export function cakupanData(
   if (peran === 'kader') return 'posyandu'
   if (peran === 'dietisien') return 'faskes'
   if (peran === 'dokter') return 'input_sendiri_dan_rujukan'
+  if (peran === 'dokter_spesialis_anak') return 'input_sendiri_dan_rujukan'
   return 'input_sendiri_dan_rujukan'
 }
 
@@ -213,6 +227,39 @@ export function dokterBolehLihatBalita(
 }
 
 /**
+ * Aturan Akses Klinis untuk DOKTER SPESIALIS ANAK (bertugas di Rumah Sakit):
+ * 1. Balita yang ia catat sendiri (createdBy === spesialis.id)
+ * 2. Balita yang dirujuk ke Rumah Sakit tempat ia bertugas (rsTujuanId)
+ *
+ * Ia sengaja TIDAK diberi cakupan satu puskesmas penuh seperti dokter umum.
+ * Spesialis anak berada di ujung rantai rujukan, jadi yang menjadi urusannya
+ * adalah pasien yang benar-benar dikirim kepadanya, bukan seluruh balita di
+ * wilayah pembina.
+ */
+export function spesialisAnakBolehLihatBalita(
+  balita: BalitaAksesInput,
+  spesialis: ProfilAksesInput,
+  daftarRujukan: RujukanAksesInput[] = [],
+): boolean {
+  if (spesialis.peran !== 'dokter_spesialis_anak') return false
+
+  // 1. Pasien yang ia input sendiri
+  if (balita.createdBy && balita.createdBy === spesialis.id) {
+    return true
+  }
+
+  // 2. Pasien yang dirujuk ke rumah sakit tempat ia bertugas
+  const rsSpesialis = spesialis.faskesId || spesialis.puskesmasId
+  if (rsSpesialis) {
+    return daftarRujukan.some(
+      (r) => r.balitaId === balita.id && r.rsTujuanId === rsSpesialis,
+    )
+  }
+
+  return false
+}
+
+/**
  * Pemeriksaan menyeluruh apakah pengguna berwenang melihat profil/data balita.
  */
 export function bolehLihatBalita(
@@ -230,6 +277,9 @@ export function bolehLihatBalita(
   }
   if (profil.peran === 'dokter') {
     return dokterBolehLihatBalita(balita, profil, daftarRujukan)
+  }
+  if (profil.peran === 'dokter_spesialis_anak') {
+    return spesialisAnakBolehLihatBalita(balita, profil, daftarRujukan)
   }
   return false
 }
