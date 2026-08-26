@@ -16,13 +16,28 @@
 import { z } from 'zod'
 
 /** Peran yang boleh dipilih saat mendaftar. `admin` tidak termasuk. */
-export const PERAN_PENDAFTARAN = ['kader', 'dokter', 'dietisien'] as const
+export const PERAN_PENDAFTARAN = ['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'] as const
 export type PeranPendaftaran = (typeof PERAN_PENDAFTARAN)[number]
 
 export const LABEL_PERAN: Record<PeranPendaftaran, string> = {
   kader: 'Kader posyandu',
   dokter: 'Dokter',
+  dokter_spesialis_anak: 'Dokter Spesialis Anak (bertugas di Rumah Sakit)',
   dietisien: 'Dietisien atau nutrisionis',
+}
+
+/**
+ * Peran yang tempat tugasnya selalu Rumah Sakit.
+ *
+ * Spesialis anak berada di ujung rantai rujukan Posyandu -> Puskesmas -> RS.
+ * Pilihan jenis fasilitas karena itu tidak ditawarkan kepadanya: nilainya
+ * ditetapkan, dan hal yang sama ditegakkan oleh batasan
+ * `chk_spesialis_anak_di_rs` di Postgres.
+ */
+export const PERAN_WAJIB_RUMAH_SAKIT: readonly PeranPendaftaran[] = ['dokter_spesialis_anak']
+
+export function wajibRumahSakit(peran: string): boolean {
+  return (PERAN_WAJIB_RUMAH_SAKIT as readonly string[]).includes(peran)
 }
 
 export const JENIS_FASKES = ['puskesmas', 'rumah_sakit'] as const
@@ -64,7 +79,7 @@ export const skemaPendaftaran = z
       .min(3, 'Nama lengkap minimal 3 huruf')
       .max(100, 'Nama lengkap maksimal 100 huruf'),
     peran: z.enum(PERAN_PENDAFTARAN, {
-      message: 'Pilih peran Anda: kader posyandu, dokter, atau dietisien',
+      message: 'Pilih peran Anda: kader posyandu, dokter, dokter spesialis anak, atau dietisien',
     }),
     noHp,
     noStr: z.string().trim().max(50).optional().or(z.literal('')),
@@ -94,8 +109,13 @@ export const skemaPendaftaran = z
     path: ['ulangiSandi'],
   })
   .refine((d) => d.peran === 'kader' || (d.noStr ?? '').trim().length >= 5, {
-    message: 'Nomor STR wajib diisi minimal 5 karakter untuk dokter dan dietisien',
+    message: 'Nomor STR wajib diisi minimal 5 karakter untuk dokter, dokter spesialis anak, dan dietisien',
     path: ['noStr'],
+  })
+  // Dokter spesialis anak selalu bertugas di rumah sakit.
+  .refine((d) => !wajibRumahSakit(d.peran) || d.jenisFaskes === 'rumah_sakit', {
+    message: 'Dokter Spesialis Anak bertugas di Rumah Sakit. Pilih jenis fasilitas Rumah Sakit.',
+    path: ['jenisFaskes'],
   })
   // Validasi Kabupaten (wajib pilih atau isi manual jika luar Gorontalo)
   .refine(
@@ -183,7 +203,7 @@ export type MasukanAturUlangSandi = z.output<typeof skemaAturUlangSandi>
 export const skemaEditPenggunaAdmin = z.object({
   penggunaId: z.string().min(1, 'ID pengguna wajib diisi'),
   namaLengkap: z.string().trim().min(3, 'Nama lengkap minimal 3 karakter'),
-  role: z.enum(['kader', 'dokter', 'dietisien', 'admin']),
+  role: z.enum(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien', 'admin']),
   statusAkun: z.enum(['menunggu', 'disetujui', 'ditolak']),
   noHp: noHp.optional().or(z.literal('')),
   noStr: z.string().trim().optional().or(z.literal('')),
