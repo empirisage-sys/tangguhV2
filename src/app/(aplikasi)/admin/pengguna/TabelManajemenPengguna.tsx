@@ -31,7 +31,7 @@ import { formatTanggal } from '@/lib/tampilan/format'
 export type PenggunaItem = {
   id: string
   namaLengkap: string
-  role: 'kader' | 'dokter' | 'dietisien' | 'admin'
+  role: 'kader' | 'dokter' | 'dokter_spesialis_anak' | 'dietisien' | 'admin'
   noHp?: string | null
   noStr?: string | null
   statusAkun: 'menunggu' | 'disetujui' | 'ditolak'
@@ -44,6 +44,10 @@ export type PenggunaItem = {
 const LABEL_PERAN: Record<string, { label: string; badge: string }> = {
   admin: { label: 'Administrator', badge: 'bg-tinta-900 text-white' },
   dokter: { label: 'Dokter', badge: 'bg-aman-bg text-aman-teks border border-aman-garis' },
+  dokter_spesialis_anak: {
+    label: 'Dokter Spesialis Anak',
+    badge: 'bg-indigo-50 text-indigo-800 border border-indigo-200',
+  },
   dietisien: { label: 'Dietisien / Nutrisionis', badge: 'bg-karawo-100 text-karawo-800 border border-karawo-300' },
   kader: { label: 'Kader Posyandu', badge: 'bg-laut-50 text-laut-800 border border-laut-200' },
 }
@@ -204,6 +208,7 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
             >
               <option value="semua">Semua Peran</option>
               <option value="dokter">Dokter</option>
+              <option value="dokter_spesialis_anak">Dokter Spesialis Anak</option>
               <option value="dietisien">Dietisien</option>
               <option value="kader">Kader Posyandu</option>
               <option value="admin">Administrator</option>
@@ -423,6 +428,7 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
                   >
                     <option value="kader">Kader Posyandu</option>
                     <option value="dokter">Dokter</option>
+                    <option value="dokter_spesialis_anak">Dokter Spesialis Anak (RS)</option>
                     <option value="dietisien">Dietisien / Nutrisionis</option>
                     <option value="admin">Administrator</option>
                   </select>

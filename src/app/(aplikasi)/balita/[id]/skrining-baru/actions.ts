@@ -11,7 +11,7 @@ import { cariBalitaById } from '@/lib/db/balita-mock'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
 export async function simpanSkrining(formData: FormData): Promise<HasilTindakan> {
-  const profil = await wajibPeran(['kader', 'dokter', 'dietisien'])
+  const profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
 
   const hasil = skemaSkrining.safeParse({
     balitaId: formData.get('balitaId'),

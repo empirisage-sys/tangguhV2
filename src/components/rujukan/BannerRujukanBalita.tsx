@@ -87,7 +87,7 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
               </span>
 
               {/* Tombol Tindakan untuk Dokter / Spesialis RS */}
-              {(peran === 'dokter' || peran === 'admin') && (
+              {(peran === 'dokter' || peran === 'dokter_spesialis_anak' || peran === 'admin') && (
                 <button
                   type="button"
                   onClick={() => setModalBalasBuka(true)}
@@ -183,7 +183,10 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
               </div>
             </div>
 
-            {(peran === 'dokter' || peran === 'admin' || peran === 'dietisien') && (
+            {(peran === 'dokter' ||
+              peran === 'dokter_spesialis_anak' ||
+              peran === 'admin' ||
+              peran === 'dietisien') && (
               <button
                 type="button"
                 onClick={() => setModalTerbitBuka(true)}

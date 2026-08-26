@@ -13,6 +13,7 @@ import {
 import {
   PERAN_PENDAFTARAN,
   LABEL_PERAN,
+  wajibRumahSakit,
   type PeranPendaftaran,
   type JenisFaskesPendaftaran,
 } from '@/lib/validasi/pendaftaran'
@@ -115,12 +116,18 @@ export default function HalamanDaftar() {
               <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
                 Peran Bertugas <span className="text-bahaya-teks">*</span>
               </label>
-              <div className="mt-2 grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {PERAN_PENDAFTARAN.map((p) => (
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setPeran(p)}
+                    onClick={() => {
+                      setPeran(p)
+                      // Dokter Spesialis Anak selalu bertugas di rumah sakit.
+                      // Menetapkannya di sini mencegah kombinasi yang pasti
+                      // ditolak validasi maupun batasan di Postgres.
+                      if (wajibRumahSakit(p)) setJenisFaskes('rumah_sakit')
+                    }}
                     className={[
                       'min-h-12 rounded-xl p-2.5 text-center text-xs font-bold transition-all',
                       peran === p
@@ -133,6 +140,13 @@ export default function HalamanDaftar() {
                 ))}
               </div>
               <input type="hidden" name="peran" value={peran} />
+              {wajibRumahSakit(peran) && (
+                <p className="mt-2 rounded-xl bg-laut-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-laut-800">
+                  Dokter Spesialis Anak bertugas di Rumah Sakit sebagai penerima
+                  rujukan dari Puskesmas. Jenis fasilitas otomatis disetel ke
+                  Rumah Sakit.
+                </p>
+              )}
             </div>
 
             {/* 2. JENJANG WILAYAH: PROVINSI & KABUPATEN/KOTA */}
@@ -202,12 +216,15 @@ export default function HalamanDaftar() {
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <button
                   type="button"
+                  disabled={wajibRumahSakit(peran)}
                   onClick={() => setJenisFaskes('puskesmas')}
                   className={[
-                    'flex min-h-[54px] items-center justify-center gap-2.5 rounded-2xl p-3 text-xs font-bold transition-all cursor-pointer',
-                    jenisFaskes === 'puskesmas'
-                      ? 'border-2 border-laut-600 bg-laut-50/80 text-laut-900 shadow-sm ring-2 ring-laut-500/20'
-                      : 'border border-kabut-200 bg-white text-tinta-700 hover:bg-kabut-50',
+                    'flex min-h-[54px] items-center justify-center gap-2.5 rounded-2xl p-3 text-xs font-bold transition-all',
+                    wajibRumahSakit(peran)
+                      ? 'cursor-not-allowed border border-kabut-200 bg-kabut-100 text-tinta-400'
+                      : jenisFaskes === 'puskesmas'
+                        ? 'cursor-pointer border-2 border-laut-600 bg-laut-50/80 text-laut-900 shadow-sm ring-2 ring-laut-500/20'
+                        : 'cursor-pointer border border-kabut-200 bg-white text-tinta-700 hover:bg-kabut-50',
                   ].join(' ')}
                 >
                   <Building2 className="size-5 text-laut-600" />
