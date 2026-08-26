@@ -8,7 +8,7 @@ import { skemaBalita } from '@/lib/validasi/skrining'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
 export async function simpanBalita(formData: FormData): Promise<HasilTindakan> {
-  const profil = await wajibPeran(['kader', 'dokter', 'dietisien'])
+  const profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
   const wilayah = wilayahUntukMenulis(profil)
 
   const hasil = skemaBalita.safeParse({
