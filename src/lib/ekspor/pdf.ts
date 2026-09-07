@@ -1,3 +1,4 @@
+import { ENGINE_VERSION } from '@/lib/zscore'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { BalitaDetail } from '@/lib/db/balita-mock'
@@ -203,7 +204,7 @@ export async function buatPdfSkriningBalita(
   // 7. Footer Versi Engine
   doc.setFontSize(8)
   doc.setTextColor(122, 149, 155)
-  doc.text('Aplikasi TANGGUH • Engine: zscore-2.0.0 • Standar WHO 2006', 15, 287)
+  doc.text(`Aplikasi TANGGUH • Engine: ${ENGINE_VERSION} • Standar WHO 2006`, 15, 287)
 
   return new Uint8Array(doc.output('arraybuffer'))
 }

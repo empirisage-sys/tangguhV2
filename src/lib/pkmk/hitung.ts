@@ -28,8 +28,28 @@ export const BATAS = {
   mlPerSajiWajarMaks: 250,
   /** Selisih terhadap target yang masih dapat diterima, dalam persen. */
   toleransiPersen: 10,
-  /** Batas atas sendok takar per saji yang masih masuk akal. */
-  sendokPerSajiMaks: 15,
+  /**
+   * Batas atas sendok takar per saji.
+   *
+   * Diturunkan dari 15 menjadi 6 atas keputusan pemilik aplikasi. Enam sendok
+   * per saji sudah menghasilkan volume larutan yang besar untuk balita, dan
+   * angka di atasnya lebih menandakan pilihan produk yang kurang tepat
+   * daripada takaran yang benar.
+   *
+   * Konstanta ini adalah SATU-SATUNYA tempat angka itu ditulis. Ia mengatur
+   * sekaligus: pilihan pada dropdown dietisien, penjepitan pada mode
+   * `dari_target`, peringatan `target_tidak_tercapai`, dan batas maksimum pada
+   * skema validasi server `asuhan-gizi.ts`.
+   *
+   * AKIBAT YANG PERLU DIKETAHUI: pada produk berdensitas rendah, target tumbuh
+   * kejar yang tinggi kini bisa tidak tercapai — misalnya SGM Gain 100
+   * (20 kkal/sendok) pada 3x sehari hanya mencapai 6 x 3 x 20 = 360 kkal.
+   * Bila itu terjadi, peringatan `target_tidak_tercapai` akan terbit dan
+   * dietisien perlu menambah frekuensi atau memilih produk yang lebih padat
+   * energi. Perilaku itu memang yang diinginkan: lebih baik menyatakan target
+   * tidak tercapai daripada diam-diam menuliskan takaran yang tidak wajar.
+   */
+  sendokPerSajiMaks: 6,
   sendokPerSajiMin: 1,
   frekuensiMin: 1,
   frekuensiMaks: 6,

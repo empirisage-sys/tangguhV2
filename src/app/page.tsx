@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ENGINE_VERSION } from '@/lib/zscore'
 import {
   Activity,
   Baby,
@@ -57,7 +58,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-laut-100 px-3.5 py-1.5 text-xs font-bold text-laut-800 ring-1 ring-laut-300">
               <Sparkles className="size-3.5 text-karawo-500" />
-              <span>Standar WHO 2006 & Kemenkes RI • Engine zscore-2.0.0</span>
+              <span>Standar WHO 2006 &amp; Kemenkes RI • Engine {ENGINE_VERSION}</span>
             </div>
 
             <h1 className="font-display mt-6 text-3xl font-extrabold tracking-tight text-tinta-900 sm:text-5xl sm:leading-tight">

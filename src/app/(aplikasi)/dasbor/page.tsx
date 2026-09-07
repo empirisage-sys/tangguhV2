@@ -1,3 +1,4 @@
+import { ENGINE_VERSION } from '@/lib/zscore'
 import Link from 'next/link'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
@@ -192,7 +193,7 @@ export default async function DasborPage() {
                 <h2 className="font-display text-base font-bold text-tinta-900 sm:text-lg">
                   Pengukuran Terakhir di Wilayah Anda
                 </h2>
-                <p className="text-xs text-tinta-600">Hasil perhitungan otomatis engine WHO zscore-2.0.0</p>
+                <p className="text-xs text-tinta-600">Hasil perhitungan otomatis engine WHO {ENGINE_VERSION}</p>
               </div>
               <Link
                 href="/balita"

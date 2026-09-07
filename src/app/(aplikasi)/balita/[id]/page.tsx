@@ -9,7 +9,7 @@ import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanBBU, tampilanTBU, tampilanVelocity } from '@/lib/tampilan/status'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
-import { hitungVelocity, apakahPerluPKMK } from '@/lib/zscore'
+import { hitungVelocity, apakahPerluPKMK, ENGINE_VERSION } from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
 
@@ -141,7 +141,7 @@ export default async function HalamanDetailBalita({
         <div className="rounded-2xl bg-white p-5 shadow-[var(--shadow-kartu)] sm:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xs font-bold uppercase tracking-wider text-tinta-400">
-              Status Antropometri Terakhir (WHO zscore-2.0.0)
+              Status Antropometri Terakhir (WHO {ENGINE_VERSION})
             </h2>
             {evaluasiVelocity && (
               <span

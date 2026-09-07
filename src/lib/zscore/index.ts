@@ -143,6 +143,17 @@ export function koreksiPosisi(
 
 const KOSONG: HasilIndikator = { z: null, keterangan: 'Tidak dapat dinilai' }
 
+/**
+ * Angka untuk kalimat berbahasa Indonesia: pemisah desimal koma.
+ *
+ * Sebelumnya catatan di luar rentang memakai titik ("-13.789", "24.0 bulan")
+ * sementara seluruh aplikasi memakai koma lewat `formatZ` dan `angka` di
+ * `src/lib/tampilan/format.ts`. Ditemukan saat uji produksi.
+ */
+function angkaId(nilai: number, desimal = 3): string {
+  return nilai.toFixed(desimal).replace(/\.?0+$/, '').replace('.', ',') || '0'
+}
+
 /** `true` bila nilai Z berada di luar batas kemasukakalan biologis WHO. */
 function zTidakMasukAkal(z: number | null, batas: { min: number; maks: number }): boolean {
   if (z === null) return false
@@ -188,7 +199,7 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   if (umur.bulan > UMUR_MAKS_BULAN) {
     alasan.push('umur_melebihi_60_bulan')
     catatan.push(
-      `Umur ${umur.bulan.toFixed(1)} bulan berada di luar cakupan standar WHO 0-60 bulan ` +
+      `Umur ${angkaId(umur.bulan, 1)} bulan berada di luar cakupan standar WHO 0-60 bulan ` +
         'yang dipakai aplikasi ini. Untuk anak di atas 5 tahun berlaku rujukan WHO 5-19 tahun ' +
         'yang belum tersedia di aplikasi.',
     )
@@ -197,7 +208,7 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   if (input.beratKg < BATAS.beratMinKg || input.beratKg > BATAS.beratMaksKg) {
     alasan.push('berat_di_luar_batas_wajar')
     catatan.push(
-      `Berat ${input.beratKg} kg di luar batas wajar ${BATAS.beratMinKg}-${BATAS.beratMaksKg} kg. ` +
+      `Berat ${angkaId(input.beratKg, 2)} kg di luar batas wajar ${angkaId(BATAS.beratMinKg, 1)}-${angkaId(BATAS.beratMaksKg, 1)} kg. ` +
         'Periksa kembali angka penimbangan.',
     )
   }
@@ -210,7 +221,7 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   ) {
     alasan.push('panjang_di_luar_batas_wajar')
     catatan.push(
-      `Panjang atau tinggi ${input.panjangCm} cm di luar batas wajar ` +
+      `Panjang atau tinggi ${angkaId(input.panjangCm, 1)} cm di luar batas wajar ` +
         `${BATAS.panjangMinCm}-${BATAS.panjangMaksCm} cm. Periksa kembali angka di alat ukur.`,
     )
   }
@@ -233,12 +244,12 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     )
     if (!diLuarRentang) {
       const z = bulatkanZ(hitungZ(input.beratKg, lms))
-      bbu = { z, keterangan: `BB/U pada umur ${umur.bulan.toFixed(2)} bulan` }
+      bbu = { z, keterangan: `BB/U pada umur ${angkaId(umur.bulan, 2)} bulan` }
       if (zTidakMasukAkal(z, BATAS_Z_WAJAR.bbu)) {
         alasan.push('berat_tidak_wajar_untuk_umur')
         catatan.push(
-          `Z BB/U ${z} berada di luar batas kemasukakalan biologis WHO ` +
-            `(${BATAS_Z_WAJAR.bbu.min} sampai ${BATAS_Z_WAJAR.bbu.maks} SD). ` +
+          `Z BB/U ${angkaId(z!)} berada di luar batas kemasukakalan biologis WHO ` +
+            `(${angkaId(BATAS_Z_WAJAR.bbu.min)} sampai ${angkaId(BATAS_Z_WAJAR.bbu.maks)} SD). ` +
             'Nilainya tetap ditampilkan, tetapi berat badan dan tanggal lahir wajib ' +
             'diperiksa ulang sebelum hasil ini dipakai.',
         )
@@ -259,15 +270,15 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
       const z = bulatkanZ(hitungZ(panjangTerkoreksiCm, lms))
       tbu = {
         z,
-        keterangan: `${label} pada umur ${umur.bulan.toFixed(2)} bulan, ` +
-          `panjang terkoreksi ${panjangTerkoreksiCm} cm`,
+        keterangan: `${label} pada umur ${angkaId(umur.bulan, 2)} bulan, ` +
+          `panjang terkoreksi ${angkaId(panjangTerkoreksiCm, 1)} cm`,
       }
       if (zTidakMasukAkal(z, BATAS_Z_WAJAR.tbu)) {
         alasan.push('panjang_tidak_wajar_untuk_umur')
         catatan.push(
-          `Z ${label} ${z} berada di luar batas kemasukakalan biologis WHO ` +
-            `(${BATAS_Z_WAJAR.tbu.min} sampai ${BATAS_Z_WAJAR.tbu.maks} SD): panjang ` +
-            `${panjangTerkoreksiCm} cm tidak wajar pada umur ${umur.bulan.toFixed(1)} bulan. ` +
+          `Z ${label} ${angkaId(z!)} berada di luar batas kemasukakalan biologis WHO ` +
+            `(${angkaId(BATAS_Z_WAJAR.tbu.min)} sampai ${angkaId(BATAS_Z_WAJAR.tbu.maks)} SD): panjang ` +
+            `${angkaId(panjangTerkoreksiCm, 1)} cm tidak wajar pada umur ${angkaId(umur.bulan, 1)} bulan. ` +
             'Nilainya tetap ditampilkan, tetapi WAJIB diukur ulang sebelum dipakai. ' +
             'Salah ketik satu angka pada alat ukur menghasilkan pola seperti ini.',
         )
@@ -303,7 +314,7 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     if (diLuarRentang || !lms) {
       alasan.push('panjang_di_luar_tabel')
       catatan.push(
-        `Panjang atau tinggi terkoreksi ${panjangTerkoreksiCm} cm berada di luar rentang ` +
+        `Panjang atau tinggi terkoreksi ${angkaId(panjangTerkoreksiCm, 1)} cm berada di luar rentang ` +
           `tabel ${indikator === 'bbpb' ? 'BB/PB (45-110 cm)' : 'BB/TB (65-120 cm)'}. ` +
           'Indikator BB/PB atau BB/TB tidak dapat dinilai.',
       )
@@ -313,14 +324,14 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
       bbtb = {
         z,
         keterangan:
-          `${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} pada ${panjangTerkoreksiCm} cm`,
+          `${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} pada ${angkaId(panjangTerkoreksiCm, 1)} cm`,
       }
       if (zTidakMasukAkal(z, BATAS_Z_WAJAR.bbtb)) {
         alasan.push('berat_tidak_wajar_untuk_panjang')
         catatan.push(
-          `Z ${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} ${z} berada di luar batas ` +
-            `kemasukakalan biologis WHO (${BATAS_Z_WAJAR.bbtb.min} sampai ` +
-            `${BATAS_Z_WAJAR.bbtb.maks} SD). Nilainya tetap ditampilkan dan penanda ` +
+          `Z ${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} ${angkaId(z!)} berada di luar batas ` +
+            `kemasukakalan biologis WHO (${angkaId(BATAS_Z_WAJAR.bbtb.min)} sampai ` +
+            `${angkaId(BATAS_Z_WAJAR.bbtb.maks)} SD). Nilainya tetap ditampilkan dan penanda ` +
             'rujukan tetap berlaku, tetapi berat dan panjang wajib diperiksa ulang.',
         )
       }

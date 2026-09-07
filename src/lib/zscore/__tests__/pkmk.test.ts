@@ -151,11 +151,23 @@ describe('hitungTakaran — mode dari_target dan pembulatan sendok', () => {
     expect(hasil.persenTerhadapTarget).toBe(106.7)
   })
 
-  it('sesuai tabel telaah untuk frekuensi 2x dan 4x', () => {
+  it('sesuai tabel telaah untuk frekuensi 2x dan 4x, dengan batas 6 sendok', () => {
+    // Frekuensi 2x: takaran ideal 675 / (2 x 40) = 8,44 sendok.
+    //
+    // Sebelum batas diturunkan menjadi 6, hasilnya 8 sendok / 640 kkal / 360 ml.
+    // Sekarang sendoknya dijepit ke 6, sehingga energinya turun ke 480 kkal —
+    // DAN peringatan `target_tidak_tercapai` WAJIB terbit. Justru itu inti
+    // penurunan batas ini: lebih baik menyatakan target tidak tercapai
+    // daripada menuliskan 8 sendok dalam satu saji.
     const dua = hitungTakaran({ produk: optigrow, mode: 'dari_target', frekuensiPerHari: 2, targetKkal: 675 })
-    expect([dua.sendokPerSaji, dua.kkalDiberikan, dua.mlLarutanPerSaji]).toEqual([8, 640, 360])
+    expect([dua.sendokPerSaji, dua.kkalDiberikan, dua.mlLarutanPerSaji]).toEqual([6, 480, 270])
+    expect(dua.peringatan.map((p) => p.kode)).toContain('target_tidak_tercapai')
+
+    // Frekuensi 4x: ideal 675 / (4 x 40) = 4,22 sendok — masih di bawah batas,
+    // jadi hasilnya tidak berubah sama sekali.
     const empat = hitungTakaran({ produk: optigrow, mode: 'dari_target', frekuensiPerHari: 4, targetKkal: 675 })
     expect([empat.sendokPerSaji, empat.kkalDiberikan, empat.mlLarutanPerSaji]).toEqual([4, 640, 180])
+    expect(empat.peringatan.map((p) => p.kode)).not.toContain('target_tidak_tercapai')
   })
 
   it('sendok tidak pernah kurang dari satu meski target nol', () => {

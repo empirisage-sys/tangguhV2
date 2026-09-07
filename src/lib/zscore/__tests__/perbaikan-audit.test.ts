@@ -6,7 +6,12 @@
  * memastikan cacat yang sama tidak kembali tanpa disadari.
  */
 import { describe, expect, it } from 'vitest'
-import { hitungSkrining, hitungVelocity, hitungUsiaKoreksi, BATAS, BATAS_Z_WAJAR } from '@/lib/zscore'
+import {
+  hitungSkrining, hitungVelocity, hitungUsiaKoreksi,
+  BATAS as BATAS_SKRINING, BATAS_Z_WAJAR, ENGINE_VERSION,
+} from '@/lib/zscore'
+import { BATAS, hitungTakaran } from '@/lib/pkmk/hitung'
+import { PRODUK_PKMK_LIST } from '@/lib/db/pkmk'
 import { statusDariKenaikan, ambangP5Gram } from '@/lib/zscore/velocity'
 import { nilaiDariLms, interpolasiLms } from '@/lib/zscore/lms'
 import { tabelVelocity, tabelPanjang, tabelUmur } from '@/lib/who'
@@ -298,6 +303,70 @@ describe('kodeRedFlag tersedia untuk penyaringan', () => {
 })
 
 // =========================================================================
+// Batas 6 sendok takar per saji (keputusan pemilik aplikasi)
+// =========================================================================
+describe('batas sendok takar per saji', () => {
+  it('batasnya 6, dan itu satu-satunya sumber angka tersebut', () => {
+    expect(BATAS.sendokPerSajiMaks).toBe(6)
+    expect(BATAS.sendokPerSajiMin).toBe(1)
+  })
+
+  it('mode dari_takaran menjepit masukan di atas 6', () => {
+    const produk = PRODUK_PKMK_LIST.find((p) => p.nama === 'SGM Optigrow')!
+    for (const diminta of [7, 10, 15, 99]) {
+      const h = hitungTakaran({
+        produk, mode: 'dari_takaran', frekuensiPerHari: 3, sendokPerSaji: diminta, targetKkal: 600,
+      })
+      expect(h.sendokPerSaji, `diminta ${diminta}`).toBe(6)
+      // Energi tetap turunan takaran AKHIR, bukan takaran yang diminta.
+      expect(h.kkalDiberikan).toBe(6 * 3 * produk.kkalPerSendok)
+    }
+  })
+
+  it('mode dari_target menjepit ke 6 dan MENYATAKAN target tidak tercapai', () => {
+    const produk = PRODUK_PKMK_LIST.find((p) => p.nama === 'SGM Gain 100')! // 20 kkal/sendok
+    const h = hitungTakaran({ produk, mode: 'dari_target', frekuensiPerHari: 3, targetKkal: 900 })
+    expect(h.sendokPerSaji).toBe(6)
+    expect(h.kkalDiberikan).toBe(360) // 6 x 3 x 20
+    expect(h.peringatan.map((p) => p.kode)).toContain('target_tidak_tercapai')
+  })
+
+  it('tidak pernah menghasilkan takaran di atas 6 pada kombinasi apa pun', () => {
+    for (const produk of PRODUK_PKMK_LIST) {
+      for (let target = 50; target <= 1500; target += 50) {
+        for (let f = BATAS.frekuensiMin; f <= BATAS.frekuensiMaks; f++) {
+          const h = hitungTakaran({ produk, mode: 'dari_target', frekuensiPerHari: f, targetKkal: target })
+          expect(h.sendokPerSaji, `${produk.nama} ${target} kkal ${f}x`).toBeLessThanOrEqual(6)
+          expect(h.sendokPerSaji).toBeGreaterThanOrEqual(1)
+        }
+      }
+    }
+  })
+})
+
+// =========================================================================
+// Versi engine tidak ditulis tangan di lapisan tampilan
+// =========================================================================
+describe('versi engine', () => {
+  it('ENGINE_VERSION adalah satu-satunya sumber nomor versi', () => {
+    expect(ENGINE_VERSION).toBe('zscore-2.1.0')
+  })
+})
+
+// =========================================================================
+// Catatan memakai pemisah desimal Indonesia
+// =========================================================================
+describe('pemisah desimal pada catatan', () => {
+  it('catatan di luar rentang memakai koma, bukan titik', () => {
+    const h = hitungSkrining({ ...dasar, panjangCm: 45 })
+    expect(h.catatanDiLuarRentang).toBeTruthy()
+    // Tidak boleh ada pola angka bertitik desimal, mis. "-13.789" atau "24.0".
+    expect(h.catatanDiLuarRentang!).not.toMatch(/-?\d+\.\d/)
+    expect(h.catatanDiLuarRentang!).toMatch(/-?\d+,\d/)
+  })
+})
+
+// =========================================================================
 // Z-12  Cakupan tabel KBM selaras dengan batas mesin
 // =========================================================================
 describe('Z-12 batas velocity', () => {
@@ -313,8 +382,8 @@ describe('Z-12 batas velocity', () => {
   })
 
   it('BATAS mesin skrining dan ambang Z terekspos untuk dipakai lapisan lain', () => {
-    expect(BATAS.panjangMinCm).toBe(30)
-    expect(BATAS.panjangMaksCm).toBe(140)
+    expect(BATAS_SKRINING.panjangMinCm).toBe(30)
+    expect(BATAS_SKRINING.panjangMaksCm).toBe(140)
     expect(BATAS_Z_WAJAR.tbu).toEqual({ min: -6, maks: 6 })
   })
 })
