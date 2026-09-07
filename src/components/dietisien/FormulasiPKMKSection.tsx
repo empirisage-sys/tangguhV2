@@ -201,6 +201,7 @@ export function FormulasiPKMKSection({
    */
   const handleCetak = async () => {
     setSedangCetak(true)
+    setBalasan(null)
     try {
       const { buatPdfLembarAsuhanGizi } = await import('@/lib/ekspor/pdf-asuhan-gizi')
       const berkas = await buatPdfLembarAsuhanGizi(
@@ -213,16 +214,39 @@ export function FormulasiPKMKSection({
         },
         hasil,
       )
+
       const url = URL.createObjectURL(
         new Blob([berkas as unknown as BlobPart], { type: 'application/pdf' }),
       )
       const tautan = document.createElement('a')
       tautan.href = url
-      tautan.download = `Lembar_Asuhan_Gizi_${namaBalita.replace(/\s+/g, '_')}.pdf`
+      tautan.download = `Tata_Laksana_Nutrisi_${namaBalita.replace(/\s+/g, '_')}.pdf`
+
+      // Tautan harus benar-benar berada di dokumen sebelum diklik: sebagian
+      // peramban mengabaikan klik pada elemen yang belum ditempelkan.
+      tautan.style.display = 'none'
+      document.body.appendChild(tautan)
       tautan.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      setBalasan({ ok: false, pesan: 'Lembar asuhan gizi gagal dibuat. Coba lagi.' })
+      document.body.removeChild(tautan)
+
+      // Alamat objek dilepas belakangan. Melepasnya seketika membatalkan
+      // unduhan yang baru saja dimulai pada sebagian peramban.
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (err) {
+      // Sebab kegagalan ikut ditampilkan. Pesan umum tanpa sebab membuat
+      // masalah seperti pemuatan modul yang gagal setelah aplikasi diperbarui
+      // tidak dapat dibedakan dari galat lain.
+      const sebab = err instanceof Error ? err.message : String(err)
+      const modulGagal = /import|module|chunk|fetch/i.test(sebab)
+      setBalasan({
+        ok: false,
+        pesan: 'Tata Laksana Nutrisi Anak gagal dibuat.',
+        galatMedan: {
+          sebab: modulGagal
+            ? 'Halaman ini memuat versi aplikasi yang lama. Muat ulang halaman (Ctrl+Shift+R), lalu coba lagi.'
+            : sebab,
+        },
+      })
     } finally {
       setSedangCetak(false)
     }
@@ -552,7 +576,7 @@ export function FormulasiPKMKSection({
           className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-laut-300 bg-white text-sm font-bold text-laut-800 transition hover:bg-laut-50 disabled:opacity-60"
         >
           <Printer className="size-4" />
-          {sedangCetak ? 'Menyiapkan lembar...' : 'Cetak Lembar Asuhan Gizi (PDF)'}
+          {sedangCetak ? 'Menyiapkan lembar...' : 'Cetak Tata Laksana Nutrisi Anak (PDF)'}
         </button>
 
         {balasan && (
