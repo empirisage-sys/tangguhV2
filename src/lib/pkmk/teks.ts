@@ -7,6 +7,7 @@
 
 import type { HasilTakaran, Peringatan } from './hitung'
 import type { Jadwal, SlotJadwal } from './jadwal'
+import type { KelompokProtein } from './protein'
 
 function angka(nilai: number): string {
   const dibulatkan = Math.round(nilai * 10) / 10
@@ -93,6 +94,7 @@ export function judulJadwal(jadwal: Jadwal): string {
 export function bacaSlotJadwal(
   slot: SlotJadwal,
   namaProduk: string,
+  protein?: KelompokProtein | null,
 ): { tebal: string; biasa: string } {
   switch (slot.jenis) {
     case 'pkmk':
@@ -101,9 +103,19 @@ export function bacaSlotJadwal(
         biasa: ` — ${namaProduk}, ${angka(slot.sendokPerSaji ?? 0)} sendok takar dalam ${angka(slot.mlPerSaji ?? 0)} ml larutan`,
       }
     case 'makan_utama':
-      return { tebal: '', biasa: 'Makan mengandung protein hewani min 6 gr protein hewani' }
+      return {
+        tebal: '',
+        biasa: protein
+          ? 'Makan utama — protein hewani, pilih satu variasi pada tabel di bawah'
+          : 'Makan utama dengan sumber protein hewani',
+      }
     case 'selingan':
-      return { tebal: '', biasa: 'Selingan yang mengandung Protein Hewani' }
+      return {
+        tebal: '',
+        biasa: protein
+          ? `Selingan — protein hewani, misalnya ${protein.sumberTambahanPosyandu}`
+          : 'Selingan yang mengandung protein hewani',
+      }
     case 'asi':
       return { tebal: '', biasa: 'ASI sesuai permintaan anak' }
   }

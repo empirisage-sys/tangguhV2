@@ -11,6 +11,7 @@ import {
   ringkasanTakaran,
 } from '@/lib/pkmk/teks'
 import { susunJadwal } from '@/lib/pkmk/jadwal'
+import { proteinUntukUmur, SUMBER_PANDUAN_PROTEIN_RINGKAS } from '@/lib/pkmk/protein'
 
 /**
  * Lembar "Tata Laksana Nutrisi Anak" yang dibawa pulang ibu.
@@ -91,7 +92,7 @@ export async function buatPdfLembarAsuhanGizi(
     startY: 37,
     margin: { left: 15, right: 15 },
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 1.3, textColor: [15, 43, 49] },
+    styles: { fontSize: 8.6, cellPadding: 1.1, textColor: [15, 43, 49] },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 35, textColor: [74, 107, 114] },
       1: { cellWidth: 55 },
@@ -169,7 +170,7 @@ export async function buatPdfLembarAsuhanGizi(
     startY: posTakaran + tinggiKotak + 5,
     margin: { left: 15, right: 15 },
     theme: 'grid',
-    styles: { fontSize: 8.8, cellPadding: 1.9, textColor: [15, 43, 49] },
+    styles: { fontSize: 8.3, cellPadding: 1.5, textColor: [15, 43, 49] },
     headStyles: { fillColor: [14, 150, 161], textColor: [255, 255, 255], fontStyle: 'bold' },
     head: [['Rincian Energi Harian', 'Nilai']],
     body: [
@@ -206,6 +207,8 @@ export async function buatPdfLembarAsuhanGizi(
   // 5. Jadwal makan harian. Baris PKMK-nya turunan dari takaran yang sama,
   //    bukan tabel terpisah yang ditulis tangan.
   const jadwal = susunJadwal({ hasil, masihASI: identitas.masihASI ?? false })
+  const protein =
+    identitas.umurBulan != null ? proteinUntukUmur(identitas.umurBulan) : null
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
@@ -216,7 +219,7 @@ export async function buatPdfLembarAsuhanGizi(
     startY: posY + 2.5,
     margin: { left: 15, right: 15 },
     theme: 'plain',
-    styles: { fontSize: 8.3, cellPadding: 1.4, textColor: [15, 43, 49] },
+    styles: { fontSize: 8, cellPadding: 1.15, textColor: [15, 43, 49] },
     headStyles: {
       fontStyle: 'bold',
       textColor: [74, 107, 114],
@@ -227,7 +230,7 @@ export async function buatPdfLembarAsuhanGizi(
     columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 158 } },
     head: [['Waktu', 'Jenis nutrisi']],
     body: jadwal.slot.map((slot) => {
-      const teks = bacaSlotJadwal(slot, hasil.produk.nama)
+      const teks = bacaSlotJadwal(slot, hasil.produk.nama, protein)
       return [slot.jam, `${teks.tebal}${teks.biasa}`]
     }),
     didParseCell: (data) => {
@@ -240,13 +243,62 @@ export async function buatPdfLembarAsuhanGizi(
 
   posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
 
+  // 5b. Kecukupan protein hewani harian menurut umur.
+  //     Ketiga variasi dicetak seluruhnya: sumbernya menawarkannya sebagai
+  //     pilihan setara, agar keluarga dapat memakai bahan yang tersedia.
+  if (protein) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(11, 118, 129)
+    doc.text(`Kecukupan Protein Hewani Harian (${protein.labelUmur})`, 15, posY)
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(6.8)
+    doc.setTextColor(122, 149, 155)
+    doc.text(`Sumber: ${SUMBER_PANDUAN_PROTEIN_RINGKAS}`, 195, posY, { align: 'right' })
+
+    autoTable(doc, {
+      startY: posY + 2.5,
+      margin: { left: 15, right: 15 },
+      theme: 'grid',
+      styles: { fontSize: 7.3, cellPadding: 1.1, textColor: [15, 43, 49], valign: 'top' },
+      headStyles: { fillColor: [237, 243, 245], textColor: [15, 43, 49], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 22, fontStyle: 'bold' },
+        1: { cellWidth: 38 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 40 },
+      },
+      head: [
+        [
+          'AKG Protein',
+          'Tambahan posyandu',
+          'Variasi 1',
+          'Variasi 2',
+          'Variasi 3',
+        ],
+      ],
+      body: [
+        [
+          `${protein.akgProteinGram} g/hari`,
+          `${protein.sumberTambahanPosyandu}  +`,
+          protein.variasi[0],
+          protein.variasi[1],
+          protein.variasi[2],
+        ],
+      ],
+    })
+
+    posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+  }
+
   // 6. Peringatan — seluruhnya, tanpa disaring
   if (peringatan.length > 0) {
     autoTable(doc, {
       startY: posY,
       margin: { left: 15, right: 15 },
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 1.8, textColor: [15, 43, 49] },
+      styles: { fontSize: 7.6, cellPadding: 1.4, textColor: [15, 43, 49] },
       headStyles: { fillColor: [255, 246, 224], textColor: [122, 74, 0], fontStyle: 'bold' },
       head: [['Perhatian', 'Saran Tindakan']],
       body: peringatan.map((p) => [p.pesan, p.saran]),
