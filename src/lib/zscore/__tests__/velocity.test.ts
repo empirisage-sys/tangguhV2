@@ -170,7 +170,8 @@ describe('pemilihan interval dan pembatasan jarak timbang', () => {
     const baru = hitungVelocity(input)
     expect(baru.status).toBe('tidak_dapat_dinilai')
     expect(baru.kenaikanMinimalGram).toBeNull()
-    expect(baru.alasan).toContain('110 hari')
+    expect(baru.alasan).toBe('jarak_terlalu_jauh')
+    expect(baru.alasanAngka.batasHari).toBe(110)
 
     const lama = hitungVelocityLama(
       input.tanggalLahir,
@@ -195,7 +196,8 @@ describe('pemilihan interval dan pembatasan jarak timbang', () => {
       beratAkhirKg: 7.6,
     })
     expect(hasil.status).toBe('tidak_dapat_dinilai')
-    expect(hasil.alasan).toContain('21 hari')
+    expect(hasil.alasan).toBe('jarak_terlalu_rapat')
+    expect(hasil.alasanAngka.batasHari).toBe(21)
   })
 
   it('menolak urutan tanggal yang tidak logis', () => {
@@ -212,7 +214,7 @@ describe('pemilihan interval dan pembatasan jarak timbang', () => {
 })
 
 describe('jalur cadangan KBM di luar cakupan tabel WHO', () => {
-  it('anak umur 3 tahun dinilai dengan KBM, dengan metode yang dinyatakan terbuka', () => {
+  it('anak umur 3 tahun dinilai dengan KBM, dan metodenya dinyatakan sebagai kode terbuka', () => {
     const hasil = hitungVelocity({
       tanggalLahir: '2023-01-01',
       jenisKelamin: 'lk',
@@ -223,7 +225,7 @@ describe('jalur cadangan KBM di luar cakupan tabel WHO', () => {
     })
 
     expect(hasil.status).not.toBe('tidak_dapat_dinilai')
-    expect(hasil.metode).toContain('KBM perkiraan')
+    expect(hasil.metode).toBe('kbm_perkiraan')
     expect(hasil.kenaikanMinimalGram).toBe(ambangKbmGram(hasil.umurAwalBulan, 31))
   })
 
@@ -236,7 +238,7 @@ describe('jalur cadangan KBM di luar cakupan tabel WHO', () => {
       tanggalAkhir: '2026-08-04',
       beratAkhirKg: 10.2,
     })
-    expect(hasil.metode).toContain('KBM perkiraan')
+    expect(hasil.metode).toBe('kbm_perkiraan')
   })
 
   it('anak umur 6 bulan dengan jarak 1 bulan memakai standar WHO', () => {
@@ -248,7 +250,8 @@ describe('jalur cadangan KBM di luar cakupan tabel WHO', () => {
       tanggalAkhir: '2026-08-31',
       beratAkhirKg: 7.3,
     })
-    expect(hasil.metode).toContain('WHO weight velocity')
+    expect(hasil.metode).toBe('who_velocity')
+    expect(hasil.metodeAngka.deltaGram).toBeGreaterThan(0)
   })
 })
 

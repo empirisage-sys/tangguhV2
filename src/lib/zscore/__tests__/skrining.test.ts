@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { tabelUmur } from '@/lib/who'
 import {
   ENGINE_VERSION,
   hitungSkrining,
@@ -82,8 +83,8 @@ describe('batas 24 bulan menurut konvensi hari per bulan', () => {
 
 describe('versi engine', () => {
   it('mencatat versi 2 karena perilakunya berbeda dari aplikasi lama', () => {
-    expect(ENGINE_VERSION).toBe('zscore-2.0.0')
-    expect(hitungSkrining(input()).engineVersion).toBe('zscore-2.0.0')
+    expect(ENGINE_VERSION).toBe('zscore-2.1.0')
+    expect(hitungSkrining(input()).engineVersion).toBe('zscore-2.1.0')
   })
 })
 
@@ -341,13 +342,23 @@ describe('kasus lintas umur dan jenis kelamin', () => {
       const periksa = new Date(lahir.getTime() + hari * 86_400_000)
       const iso = (d: Date) => d.toISOString().slice(0, 10)
 
-      // Memakai median tabel agar seluruh indikator berada di tengah rentang.
+      // Memakai MEDIAN TABEL yang sungguhan, bukan rumus perkiraan.
+      //
+      // Versi sebelumnya memakai `2.5 + bulan * 0.26` kg dan `49 + bulan` cm
+      // sambil mengaku "memakai median tabel". Rumus itu menghasilkan Z antara
+      // -0,1 dan -6,2 — pada umur 11 bulan Z TB/U-nya -6,24, yaitu anak yang
+      // secara biologis tidak masuk akal. Uji ini jadi tidak menguji apa yang
+      // dimaksudkannya. Sekarang mediannya diambil langsung dari tabel WHO,
+      // sehingga seluruh Z benar-benar berada di sekitar nol.
+      const panjangMedian = tabelUmur('tbu', seks)[bulan]![1]
+      const beratMedian = tabelUmur('bbu', seks)[bulan]![1]
+
       const hasil = hitungSkrining({
         tanggalLahir: iso(lahir),
         tanggalPeriksa: iso(periksa),
         jenisKelamin: seks,
-        beratKg: bulan === 0 ? 3.3 : Math.min(2.5 + bulan * 0.26, 20),
-        panjangCm: Math.min(49 + bulan * 1, 110),
+        beratKg: Math.round(beratMedian * 10) / 10,
+        panjangCm: Math.round(panjangMedian * 10) / 10,
         posisiUkur: 'otomatis',
       })
 

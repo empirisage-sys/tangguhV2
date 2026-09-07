@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { SeriKurva, TitikRujukan } from '@/lib/grafik/seri'
+import { titikGambarAnak, type SeriKurva, type TitikGambarAnak, type TitikRujukan } from '@/lib/grafik/seri'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
 import { Baby, Info } from 'lucide-react'
 
@@ -29,101 +29,45 @@ type Props = {
   tinggi?: number
 }
 
-function interpolasiRujukan(
-  x: number,
-  rPrev: TitikRujukan,
-  rNext: TitikRujukan,
-) {
-  const dx = rNext.x - rPrev.x
-  const rasio = dx === 0 ? 0 : (x - rPrev.x) / dx
-  const lerp = (v1: number, v2: number) =>
-    Math.round((v1 + (v2 - v1) * rasio) * 100) / 100
-
-  return {
-    sd_n3: lerp(rPrev.sd_n3, rNext.sd_n3),
-    sd_n2: lerp(rPrev.sd_n2, rNext.sd_n2),
-    sd_n1: lerp(rPrev.sd_n1, rNext.sd_n1),
-    sd_0: lerp(rPrev.sd_0, rNext.sd_0),
-    sd_p1: lerp(rPrev.sd_p1, rNext.sd_p1),
-    sd_p2: lerp(rPrev.sd_p2, rNext.sd_p2),
-    sd_p3: lerp(rPrev.sd_p3, rNext.sd_p3),
-  }
-}
-
 export function KurvaWHO({ seri, tinggi = 360 }: Props) {
   const isLaki = seri.seks === 'lk'
 
   const warnaAnak = isLaki ? '#0284C7' : '#E11D48'
   const warnaTitik = isLaki ? '#0369A1' : '#BE123C'
 
-  // Siapkan data kurva dengan referensi rujukan
-  const data = seri.rujukan.map((r) => {
-    const titikAnak = seri.anak.find((a) => Math.abs(a.x - r.x) < 1e-4)
-    return {
-      ...r,
-      anak: titikAnak?.tidakDinilai ? null : titikAnak?.y ?? null,
-      tanggal: titikAnak?.tanggal ?? null,
-      z: titikAnak?.z ?? null,
-    }
-  })
+  // ==========================================================================
+  // DUA SUMBER DATA, TIDAK DIGABUNG
+  //
+  // Versi sebelumnya menggabungkan titik anak ke dalam baris rujukan memakai
+  // `.find()` lalu melewati titik yang x-nya sudah ada di `data`. Akibatnya
+  // bila DUA kunjungan berada pada sumbu-x yang sama — hal yang sangat lazim
+  // pada kurva BB/TB, karena tinggi badan anak yang pertumbuhannya mandek tidak
+  // berubah antar kunjungan — hanya SATU titik yang tergambar, dan tidak ada
+  // catatan apa pun yang memberi tahu bahwa sebuah pengukuran hilang.
+  //
+  // Kasus terburuknya persis kasus yang paling perlu dilihat: anak yang tinggi
+  // badannya berhenti bertambah sementara beratnya turun. Lihat temuan Z-2.
+  //
+  // Sekarang garis rujukan dan titik anak menjadi dua seri terpisah dengan
+  // `data` masing-masing, sehingga jumlah titik anak yang tergambar selalu
+  // sama dengan jumlah kunjungan yang diberikan.
+  // ==========================================================================
+  const dataRujukan: TitikRujukan[] = seri.rujukan
+  const dataAnak: TitikGambarAnak[] = titikGambarAnak(seri)
 
-  // Sisipkan titik anak yang x-nya tidak persis sama dengan grid rujukan
-  for (const a of seri.anak) {
-    if (!data.some((d) => Math.abs(d.x - a.x) < 1e-4)) {
-      let rPrev: TitikRujukan | undefined
-      let rNext: TitikRujukan | undefined
-
-      for (const r of seri.rujukan) {
-        if (r.x <= a.x) rPrev = r
-        if (r.x >= a.x && !rNext) rNext = r
+  /** Baris rujukan terdekat pada sebuah x, untuk keperluan tooltip. */
+  const rujukanTerdekat = (x: number): TitikRujukan | null => {
+    let terdekat: TitikRujukan | null = null
+    let jarakTerdekat = Number.POSITIVE_INFINITY
+    for (const r of dataRujukan) {
+      const jarak = Math.abs(r.x - x)
+      if (jarak < jarakTerdekat) {
+        jarakTerdekat = jarak
+        terdekat = r
       }
-
-      let rujukanNilai: ReturnType<typeof interpolasiRujukan>
-      if (rPrev && rNext && rPrev !== rNext) {
-        rujukanNilai = interpolasiRujukan(a.x, rPrev, rNext)
-      } else if (rPrev) {
-        rujukanNilai = {
-          sd_n3: rPrev.sd_n3,
-          sd_n2: rPrev.sd_n2,
-          sd_n1: rPrev.sd_n1,
-          sd_0: rPrev.sd_0,
-          sd_p1: rPrev.sd_p1,
-          sd_p2: rPrev.sd_p2,
-          sd_p3: rPrev.sd_p3,
-        }
-      } else if (rNext) {
-        rujukanNilai = {
-          sd_n3: rNext.sd_n3,
-          sd_n2: rNext.sd_n2,
-          sd_n1: rNext.sd_n1,
-          sd_0: rNext.sd_0,
-          sd_p1: rNext.sd_p1,
-          sd_p2: rNext.sd_p2,
-          sd_p3: rNext.sd_p3,
-        }
-      } else {
-        rujukanNilai = {
-          sd_n3: 0,
-          sd_n2: 0,
-          sd_n1: 0,
-          sd_0: 0,
-          sd_p1: 0,
-          sd_p2: 0,
-          sd_p3: 0,
-        }
-      }
-
-      data.push({
-        x: a.x,
-        ...rujukanNilai,
-        anak: a.tidakDinilai ? null : a.y,
-        tanggal: a.tanggal,
-        z: a.z,
-      })
     }
+    return terdekat
   }
-
-  data.sort((a, b) => a.x - b.x)
 
   const satuan = seri.labelY.includes('kg') ? 'kg' : 'cm'
   const satuanX = seri.indikator === 'bbtb' ? 'cm' : 'bulan'
@@ -162,7 +106,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
         className="relative rounded-2xl border border-kabut-200 bg-white p-3 shadow-inner"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 12, right: 36, bottom: 24, left: 6 }}>
+          <ComposedChart margin={{ top: 12, right: 36, bottom: 24, left: 6 }}>
             <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" strokeOpacity={0.7} />
 
             <XAxis
@@ -193,6 +137,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             {/* Garis-Garis Standar WHO Child Growth Standards */}
             <Line
               dataKey="sd_p3"
+              data={dataRujukan}
               stroke="#DC2626"
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -202,6 +147,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_p2"
+              data={dataRujukan}
               stroke="#F59E0B"
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -211,6 +157,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_p1"
+              data={dataRujukan}
               stroke="#3B82F6"
               strokeDasharray="2 2"
               strokeWidth={0.8}
@@ -221,6 +168,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_0"
+              data={dataRujukan}
               stroke="#15803D"
               strokeWidth={2.5}
               dot={false}
@@ -229,6 +177,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_n1"
+              data={dataRujukan}
               stroke="#3B82F6"
               strokeDasharray="2 2"
               strokeWidth={0.8}
@@ -239,6 +188,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_n2"
+              data={dataRujukan}
               stroke="#F59E0B"
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -248,6 +198,7 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             />
             <Line
               dataKey="sd_n3"
+              data={dataRujukan}
               stroke="#DC2626"
               strokeDasharray="4 4"
               strokeWidth={1.5}
@@ -256,9 +207,10 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
               name="-3 SD"
             />
 
-            {/* Garis & Titik Pengukuran Anak */}
+            {/* Garis & Titik Pengukuran Anak (seri terpisah, lihat Z-2) */}
             <Line
-              dataKey="anak"
+              data={dataAnak}
+              dataKey="y"
               stroke={warnaAnak}
               strokeWidth={2.5}
               dot={{
@@ -273,7 +225,6 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
                 stroke: '#FFFFFF',
                 strokeWidth: 2.5,
               }}
-              connectNulls
               isAnimationActive={false}
               name="Pengukuran Anak"
             />
@@ -281,15 +232,28 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
             <Tooltip
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
-                const d = payload[0]?.payload as (typeof data)[number] | undefined
-                if (!d) return null
+
+                // Payload kini dapat berasal dari dua seri berbeda: baris
+                // rujukan atau titik anak. Keduanya dibaca terpisah.
+                const titikAnak = payload
+                  .map((p) => p.payload as TitikGambarAnak | undefined)
+                  .find((p) => p !== undefined && typeof p.y === 'number' && typeof p.tanggal === 'string')
+
+                const barisRujukan = payload
+                  .map((p) => p.payload as TitikRujukan)
+                  .find((p) => p && typeof p.sd_0 === 'number')
+
+                const x = titikAnak?.x ?? barisRujukan?.x
+                if (x === undefined) return null
+
+                const r = barisRujukan ?? rujukanTerdekat(x)
 
                 return (
                   <div className="rounded-xl bg-tinta-900/95 p-3.5 text-xs text-white shadow-2xl backdrop-blur-md ring-1 ring-white/20">
                     <p className="font-bold text-karawo-400">
-                      {d.tanggal
-                        ? `${formatTanggal(d.tanggal)} (${d.x} ${satuanX})`
-                        : `${seri.labelX}: ${d.x} ${satuanX}`}
+                      {titikAnak?.tanggal
+                        ? `${formatTanggal(titikAnak.tanggal)} (${x} ${satuanX})`
+                        : `${seri.labelX}: ${x} ${satuanX}`}
                     </p>
 
                     <div className="mt-2 space-y-1.5 min-w-[170px]">
@@ -297,24 +261,24 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
                       <div className="flex items-center justify-between gap-4 rounded-lg bg-emerald-950/70 px-2.5 py-1.5 ring-1 ring-emerald-500/50">
                         <span className="font-bold text-emerald-300">Median (0 SD):</span>
                         <span className="angka font-black text-emerald-200 text-sm">
-                          {d.sd_0 !== undefined && !Number.isNaN(d.sd_0) ? `${d.sd_0} ${satuan}` : '-'}
+                          {r ? `${r.sd_0} ${satuan}` : '-'}
                         </span>
                       </div>
 
                       {/* Hasil Ukur Titik Anak bila ada */}
-                      {d.anak !== null && d.anak !== undefined && (
+                      {titikAnak && (
                         <div className="border-t border-white/15 pt-1.5 space-y-1">
                           <div className="flex justify-between gap-4">
                             <span className="text-white/80 font-medium">Hasil Ukur:</span>
                             <span className="angka font-bold text-white">
-                              {d.anak} {satuan}
+                              {titikAnak.y} {satuan}
                             </span>
                           </div>
-                          {d.z !== null && d.z !== undefined && (
+                          {titikAnak.z !== null && titikAnak.z !== undefined && (
                             <div className="flex justify-between gap-4">
                               <span className="text-white/80 font-medium">Nilai Z-Score:</span>
                               <span className="angka font-bold text-cyan-300">
-                                {formatZ(d.z)} SD
+                                {formatZ(titikAnak.z)} SD
                               </span>
                             </div>
                           )}
@@ -322,16 +286,18 @@ export function KurvaWHO({ seri, tinggi = 360 }: Props) {
                       )}
 
                       {/* Batas Baku WHO ±2 SD & ±3 SD */}
-                      <div className="border-t border-white/15 pt-1 text-[11px] text-white/70 space-y-0.5">
-                        <div className="flex justify-between gap-3">
-                          <span>±2 SD:</span>
-                          <span className="angka">{d.sd_n2} – {d.sd_p2} {satuan}</span>
+                      {r && (
+                        <div className="border-t border-white/15 pt-1 text-[11px] text-white/70 space-y-0.5">
+                          <div className="flex justify-between gap-3">
+                            <span>±2 SD:</span>
+                            <span className="angka">{r.sd_n2} – {r.sd_p2} {satuan}</span>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <span>±3 SD:</span>
+                            <span className="angka">{r.sd_n3} – {r.sd_p3} {satuan}</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between gap-3">
-                          <span>±3 SD:</span>
-                          <span className="angka">{d.sd_n3} – {d.sd_p3} {satuan}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )

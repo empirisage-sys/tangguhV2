@@ -39,6 +39,22 @@ export function PanelKurva({
 }: Props) {
   const tab = tabKurvaUntuk(peran)
   const [aktif, setAktif] = useState<TabKurva>('bbu')
+
+  /**
+   * Jendela sumbu umur.
+   *
+   * `data` memakai `jendelaUmur()`, yaitu jendela yang memang dibangun untuk
+   * memilih rentang informatif (umur terkecil-2 sampai terbesar+4, lebar
+   * minimal 6 bulan). `penuh` memaksa 0-60 bulan.
+   *
+   * Sebelumnya panel ini SELALU memaksa [0, 60] sehingga `jendelaUmur` tidak
+   * pernah terpakai: riwayat seorang bayi 6 bulan hanya menempati sekitar 10%
+   * lebar grafik, dan yang paling penting dibaca dari kurva pertumbuhan —
+   * apakah anak berjalan menyusuri koridornya atau menyimpang — jadi tidak
+   * terlihat. Lihat temuan audit Z-8.
+   */
+  const [jendela, setJendela] = useState<'data' | 'penuh'>('data')
+  const rentangUmur = jendela === 'penuh' ? ([0, 60] as [number, number]) : undefined
   
   // Jenis kelamin otomatis terkunci sesuai data balita
   const seks: JenisKelamin = initialBbu?.seks ?? jenisKelaminAwal
@@ -46,17 +62,17 @@ export function PanelKurva({
   // Bangun kurva standar WHO 0–60 bulan (0–5 tahun)
   const kurvaBBU = useMemo(() => {
     if (riwayat.length > 0) {
-      return seriBBU(riwayat, seks, [0, 60])
+      return seriBBU(riwayat, seks, rentangUmur)
     }
     return initialBbu
-  }, [riwayat, seks, initialBbu])
+  }, [riwayat, seks, initialBbu, rentangUmur])
 
   const kurvaTBU = useMemo(() => {
     if (riwayat.length > 0) {
-      return seriTBU(riwayat, seks, [0, 60])
+      return seriTBU(riwayat, seks, rentangUmur)
     }
     return initialTbu
-  }, [riwayat, seks, initialTbu])
+  }, [riwayat, seks, initialTbu, rentangUmur])
 
   const kurvaBBTB = useMemo(() => {
     if (riwayat.length > 0) {
@@ -98,6 +114,39 @@ export function PanelKurva({
               {LABEL_TAB[t]}
             </button>
           ))}
+        </div>
+
+        {/* Pemilih Jendela Sumbu Umur (Z-8) */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {(aktif === 'bbu' || aktif === 'tbu') && riwayat.length > 0 && (
+            <div
+              role="group"
+              aria-label="Pilih rentang umur yang ditampilkan"
+              className="flex gap-1 rounded-xl bg-white p-1 ring-1 ring-kabut-200"
+            >
+              {(
+                [
+                  ['data', 'Sesuai data'],
+                  ['penuh', '0–60 bln'],
+                ] as const
+              ).map(([nilai, label]) => (
+                <button
+                  key={nilai}
+                  type="button"
+                  aria-pressed={jendela === nilai}
+                  onClick={() => setJendela(nilai)}
+                  className={[
+                    'min-h-9 rounded-lg px-2.5 text-[11px] font-bold transition-all',
+                    jendela === nilai
+                      ? 'bg-laut-600 text-white'
+                      : 'text-tinta-600 hover:bg-kabut-100',
+                  ].join(' ')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Lencana Otomatis Jenis Kelamin Balita */}

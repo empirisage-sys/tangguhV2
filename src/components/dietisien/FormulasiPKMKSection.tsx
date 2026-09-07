@@ -1,12 +1,11 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { AlertTriangle, Calculator, CheckCircle2, Info, Printer, ShieldAlert, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import {
   PERINGATAN_DATA_PRODUK,
   PRODUK_PKMK,
-  produkUntukUmur,
   type ProdukPKMK,
 } from '@/lib/pkmk/produk'
 import {
@@ -64,7 +63,20 @@ export type FormulasiPKMKProps = {
    */
   aksiSimpan?: (formData: FormData) => Promise<BalasanSimpan>
   onSimpan?: (data: DataAsuhanGiziPKMK) => void
+  /**
+   * Master data produk PKMK. Bila diberikan, dipakai apa adanya (untuk
+   * pemanggil yang sudah membacanya di server). Bila tidak, komponen ini
+   * membacanya sendiri dari `/api/pkmk`.
+   *
+   * Sebelum perbaikan T-0 komponen ini mengimpor `PRODUK_PKMK` yang
+   * di-hardcode dan tidak punya jalan masuk sama sekali untuk master data,
+   * sehingga seluruh pengelolaan produk oleh admin tidak berpengaruh pada
+   * peresepan — termasuk penonaktifan produk yang ditarik dari peredaran.
+   */
+  daftarProduk?: ProdukPKMK[]
 }
+
+type StatusMuatProduk = 'memuat' | 'siap' | 'cadangan'
 
 const KELAS_NADA: Record<'waspada' | 'bahaya', string> = {
   waspada: 'border-waspada-garis/50 bg-waspada-bg text-waspada-teks',
@@ -84,15 +96,66 @@ export function FormulasiPKMKSection({
   skriningId,
   aksiSimpan,
   onSimpan,
+  daftarProduk,
 }: FormulasiPKMKProps) {
+  // ==========================================================================
+  // MASTER DATA PRODUK
+  //
+  // Urutan sumber: prop dari server -> /api/pkmk -> daftar statis (ditandai).
+  // Daftar statis TIDAK PERNAH dipakai secara senyap; bila ia yang aktif,
+  // spanduk peringatan wajib muncul. Lihat temuan audit T-0.
+  // ==========================================================================
+  const [produkMaster, setProdukMaster] = useState<ProdukPKMK[] | null>(daftarProduk ?? null)
+  const [statusMuat, setStatusMuat] = useState<StatusMuatProduk>(
+    daftarProduk ? 'siap' : 'memuat',
+  )
+
+  useEffect(() => {
+    if (daftarProduk) {
+      setProdukMaster(daftarProduk)
+      setStatusMuat('siap')
+      return
+    }
+
+    let dibatalkan = false
+    const ambil = async () => {
+      try {
+        const res = await fetch('/api/pkmk', { cache: 'no-store' })
+        const muatan: unknown = await res.json()
+        const data =
+          typeof muatan === 'object' && muatan !== null && 'data' in muatan
+            ? (muatan as { data?: ProdukPKMK[] }).data
+            : undefined
+
+        if (dibatalkan) return
+        if (res.ok && Array.isArray(data) && data.length > 0) {
+          setProdukMaster(data)
+          setStatusMuat('siap')
+        } else {
+          setProdukMaster(PRODUK_PKMK)
+          setStatusMuat('cadangan')
+        }
+      } catch {
+        if (dibatalkan) return
+        setProdukMaster(PRODUK_PKMK)
+        setStatusMuat('cadangan')
+      }
+    }
+    void ambil()
+    return () => {
+      dibatalkan = true
+    }
+  }, [daftarProduk])
+
   const produkTersedia = useMemo<ProdukPKMK[]>(() => {
-    const sesuaiUmur = produkUntukUmur(umurBulan)
-    return sesuaiUmur.length > 0 ? sesuaiUmur : PRODUK_PKMK
-  }, [umurBulan])
+    const sumber = produkMaster ?? []
+    const sesuaiUmur = sumber.filter((p) => umurBulan >= p.minUsiaBulan)
+    return sesuaiUmur.length > 0 ? sesuaiUmur : sumber
+  }, [produkMaster, umurBulan])
 
   const [tataLaksana, setTataLaksana] = useState('PKMK + observasi 2 minggu')
   const [targetPersen, setTargetPersen] = useState(80)
-  const [produkId, setProdukId] = useState(produkTersedia[0]!.id)
+  const [produkId, setProdukId] = useState<string>(produkTersedia[0]?.id ?? '')
   const [mode, setMode] = useState<ModeTakaran>('dari_takaran')
   const [frekuensi, setFrekuensi] = useState(3)
   const [sendokPerSaji, setSendokPerSaji] = useState(3)
@@ -101,10 +164,37 @@ export function FormulasiPKMKSection({
   const [sedangCetak, setSedangCetak] = useState(false)
   const [masihASI, setMasihASI] = useState(false)
 
-  const produk = useMemo(
-    () => produkTersedia.find((p) => p.id === produkId) ?? produkTersedia[0]!,
+  // Menyelaraskan pilihan bila daftar produk berubah (mis. selesai dimuat).
+  useEffect(() => {
+    if (produkTersedia.length === 0) return
+    if (!produkTersedia.some((p) => p.id === produkId)) {
+      setProdukId(produkTersedia[0]!.id)
+    }
+  }, [produkTersedia, produkId])
+
+  const produk: ProdukPKMK | null = useMemo(
+    () => produkTersedia.find((p) => p.id === produkId) ?? produkTersedia[0] ?? null,
     [produkTersedia, produkId],
   )
+
+  /**
+   * Produk pengganti untuk menjaga `hitungTakaran` tetap murni saat master data
+   * belum termuat. Hasilnya TIDAK PERNAH ditampilkan: render mengembalikan
+   * spanduk keadaan kosong lebih dulu (lihat bagian bawah komponen).
+   */
+  const produkAman: ProdukPKMK = produk ?? {
+    id: '',
+    nama: '-',
+    merek: '-',
+    sendokPerSaji: 1,
+    kkalPerSaji: 1,
+    mlLarutanPerSaji: 1,
+    minUsiaBulan: 0,
+    catatanKlinis: '',
+    kkalPerSendok: 1,
+    mlLarutanPerSendok: 1,
+    densitasKkalPerMl: 1,
+  }
 
   const targetKkal = Math.round((targetEnergiDefaultKkal * targetPersen) / 100)
 
@@ -112,19 +202,19 @@ export function FormulasiPKMKSection({
   const hasil = useMemo(
     () =>
       hitungTakaran({
-        produk,
+        produk: produkAman,
         mode,
         frekuensiPerHari: frekuensi,
         sendokPerSaji,
         targetKkal,
       }),
-    [produk, mode, frekuensi, sendokPerSaji, targetKkal],
+    [produkAman, mode, frekuensi, sendokPerSaji, targetKkal],
   )
 
   const peringatan = bacaSeluruhPeringatan(hasil)
   const sisaMakanan = sisaDariMakanan(targetEnergiDefaultKkal, hasil)
   const daftarPilihan = useMemo(
-    () => (mode === 'dari_target' ? pilihanTakaran(produk, targetKkal) : []),
+    () => (mode === 'dari_target' && produk ? pilihanTakaran(produk, targetKkal) : []),
     [mode, produk, targetKkal],
   )
 
@@ -162,8 +252,8 @@ export function FormulasiPKMKSection({
 
     const data: DataAsuhanGiziPKMK = {
       tataLaksana,
-      produkId: produk.id,
-      produkNama: produk.nama,
+      produkId: produkAman.id,
+      produkNama: produkAman.nama,
       mode,
       targetKaloriPersen: targetPersen,
       targetKkal: hasil.targetKkal,
@@ -255,8 +345,54 @@ export function FormulasiPKMKSection({
   const kelasSelect =
     'mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-bold text-tinta-900 focus:border-laut-500 focus:outline-none'
 
+  // Keadaan memuat dan keadaan kosong ditangani lebih dulu. Tidak ada satu pun
+  // angka takaran yang boleh tampil sebelum master data produk benar-benar ada.
+  if (statusMuat === 'memuat' && produkMaster === null) {
+    return (
+      <div className="rounded-2xl border border-kabut-200 bg-white p-6 text-sm text-tinta-600 shadow-[var(--shadow-kartu)]">
+        Memuat master data produk PKMK…
+      </div>
+    )
+  }
+
+  if (!produk) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-[var(--shadow-kartu)]">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="text-sm text-amber-900">
+            <p className="font-bold">Master data produk PKMK belum tersedia.</p>
+            <p className="mt-1 text-xs leading-relaxed sm:text-sm">
+              Peresepan PKMK tidak dapat dilakukan sampai administrator mengisi master produk
+              pada halaman Master Produk Susu PKMK. Formulir ini sengaja tidak menampilkan
+              produk contoh, karena produk contoh belum diverifikasi terhadap label kemasan
+              dan tidak boleh dipakai meresepkan.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 rounded-2xl border border-kabut-200 bg-white p-5 shadow-[var(--shadow-kartu)] sm:p-6">
+      {statusMuat === 'cadangan' && (
+        <div className="flex items-start gap-3 rounded-xl border border-rose-300 bg-rose-50 p-3.5">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-rose-600" />
+          <div className="text-xs leading-relaxed text-rose-900">
+            <p className="font-bold">
+              Master data produk tidak dapat dibaca. Formulir ini memakai daftar cadangan.
+            </p>
+            <p className="mt-1">
+              Angka pada daftar cadangan BELUM diverifikasi terhadap label kemasan dan tidak
+              mencerminkan pengelolaan produk oleh administrator — termasuk produk yang mungkin
+              sudah dinonaktifkan. Jangan dipakai meresepkan; muat ulang halaman, dan bila tetap
+              muncul, hubungi administrator.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="font-display text-lg font-bold text-laut-800 sm:text-xl">
           Tata Laksana &amp; Rekomendasi Intervensi Gizi

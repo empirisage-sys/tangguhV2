@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   basisUntukUmur,
-  GARIS_SD,
+  GARIS_SD_LENGKAP,
+  GARIS_SD_UTAMA,
   jendelaPanjang,
   jendelaUmur,
   semuaKurva,
@@ -97,8 +98,10 @@ describe('jendela tampilan', () => {
 describe('kurva BB/U', () => {
   const seri = seriBBU(RIWAYAT_MELAMBAT, 'lk')
 
-  it('menghasilkan lima garis rujukan pada setiap titik', () => {
-    expect(GARIS_SD).toHaveLength(5)
+  it('menghasilkan tujuh garis rujukan pada setiap titik', () => {
+    // GARIS_SD_LENGKAP adalah yang benar-benar dihitung dan digambar (Z-10).
+    expect(GARIS_SD_LENGKAP).toHaveLength(7)
+    expect(GARIS_SD_UTAMA).toHaveLength(5)
     expect(seri.rujukan.length).toBeGreaterThan(10)
     for (const t of seri.rujukan) {
       expect(t.sd_n3).toBeLessThan(t.sd_n2)

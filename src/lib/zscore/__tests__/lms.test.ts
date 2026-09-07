@@ -154,8 +154,8 @@ describe('hitungZ', () => {
   it('koreksi WHO aktif di luar 3 SD dan berbeda dari rumus LMS mentah', () => {
     const lms = tabelPanjang('bbtb', 'lk')[85] as readonly [number, number, number]
     const [L, M, S] = lms
-    const sd3 = nilaiDariLms(lms, 3)
-    const sd2 = nilaiDariLms(lms, 2)
+    const sd3 = nilaiDariLms(lms, 3)!
+    const sd2 = nilaiDariLms(lms, 2)!
 
     // Anak dengan berat satu "lebar SD" di atas SD3 harus tepat berada di Z = 4.
     const berat = sd3 + (sd3 - sd2)
@@ -167,8 +167,8 @@ describe('hitungZ', () => {
 
   it('koreksi WHO berlaku simetris di bawah -3 SD', () => {
     const lms = tabelPanjang('bbtb', 'pr')[85] as readonly [number, number, number]
-    const sd3 = nilaiDariLms(lms, -3)
-    const sd2 = nilaiDariLms(lms, -2)
+    const sd3 = nilaiDariLms(lms, -3)!
+    const sd2 = nilaiDariLms(lms, -2)!
     const berat = sd3 - (sd2 - sd3)
     expect(hitungZ(berat, lms)).toBeCloseTo(-4, 6)
   })

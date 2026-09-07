@@ -35,7 +35,12 @@ import { tabelVelocity } from '@/lib/who'
 import type { IntervalVelocity, JenisKelamin, TabelVelocity } from '@/lib/who'
 import { nilaiDariLms } from './lms'
 import { HARI_PER_BULAN, hitungUmur, selisihHari } from './umur'
-import type { HasilVelocity, InputVelocity, StatusVelocity } from './tipe'
+import type {
+  AlasanTidakDinilaiVelocity,
+  HasilVelocity,
+  InputVelocity,
+  StatusVelocity,
+} from './tipe'
 
 /** Nilai Z yang setara persentil 5 pada distribusi normal. */
 export const Z_PERSENTIL_5 = -1.645
@@ -72,6 +77,7 @@ export function ambangP5Gram(
   if (!lms) return null
 
   const nilaiTergeser = nilaiDariLms(lms, Z_PERSENTIL_5)
+  if (nilaiTergeser === null) return null
   const p5Sebenarnya = nilaiTergeser - tabel.deltaGram
   const diskalakan = (p5Sebenarnya / tabel.hariStandar) * selisih
 
@@ -102,7 +108,10 @@ const TABEL_KBM_HARIAN: ReadonlyArray<{ sampaiBulan: number; gramPerHari: number
   { sampaiBulan: 9, gramPerHari: 15 },
   { sampaiBulan: 12, gramPerHari: 12 },
   { sampaiBulan: 36, gramPerHari: 8 },
-  { sampaiBulan: 72, gramPerHari: 6 },
+  // Batas atas 60 bulan, selaras dengan UMUR_MAKS_BULAN. Baris 72 bulan pada
+  // versi sebelumnya tidak pernah tercapai karena mesin z-score menolak umur
+  // di atas 60 bulan lebih dulu (temuan Z-12).
+  { sampaiBulan: 60, gramPerHari: 6 },
 ]
 
 export function kbmGramPerHari(umurBulan: number): number {
@@ -131,17 +140,40 @@ function tidakDapatDinilai(
   selisih: number,
   kenaikanGram: number,
   umurAwalBulan: number,
-  alasan: string,
+  alasan: AlasanTidakDinilaiVelocity,
+  alasanAngka: Record<string, number> = {},
 ): HasilVelocity {
   return {
     status: 'tidak_dapat_dinilai',
     selisihHari: selisih,
     kenaikanAktualGram: kenaikanGram,
     kenaikanMinimalGram: null,
-    metode: '-',
+    metode: 'tidak_ada',
+    metodeAngka: { interval: null, deltaGram: null, cakupanBulanMin: null, cakupanBulanMaks: null },
+    ambangNegatif: false,
     umurAwalBulan,
     alasan,
+    alasanAngka,
   }
+}
+
+/**
+ * Menentukan status dari kenaikan sebenarnya dan ambangnya.
+ *
+ * ATURAN YANG TIDAK BOLEH DILANGGAR: kenaikan nol atau negatif TIDAK PERNAH
+ * berstatus 'naik', berapa pun ambangnya. Ambang persentil 5 WHO bernilai
+ * negatif pada 33 kombinasi umur, interval, dan jenis kelamin, sehingga versi
+ * sebelumnya melaporkan 'naik' untuk anak yang beratnya turun 50 g. Anak tidak
+ * bertambah berat hanya karena penurunannya masih dalam sebaran normal.
+ * Lihat temuan audit Z-1.
+ */
+export function statusDariKenaikan(kenaikanGram: number, ambangGram: number): StatusVelocity {
+  if (kenaikanGram > 0) {
+    return kenaikanGram < ambangGram ? 'growth_faltering' : 'naik'
+  }
+  if (kenaikanGram === 0) return 'tidak_naik'
+  // Berat turun. Yang membedakan hanya apakah penurunannya masih dalam batas WHO.
+  return kenaikanGram >= ambangGram ? 'turun_masih_dalam_batas' : 'tidak_naik'
 }
 
 export function hitungVelocity(input: InputVelocity): HasilVelocity {
@@ -156,7 +188,7 @@ export function hitungVelocity(input: InputVelocity): HasilVelocity {
       selisih,
       kenaikanGram,
       umurAwal.bulan,
-      'Tanggal penimbangan sebelumnya mendahului tanggal lahir.',
+      'umur_negatif',
     )
   }
 
@@ -165,7 +197,7 @@ export function hitungVelocity(input: InputVelocity): HasilVelocity {
       selisih,
       kenaikanGram,
       umurAwal.bulan,
-      'Tanggal penimbangan sekarang tidak boleh sama atau mendahului penimbangan sebelumnya.',
+      'urutan_tanggal_salah',
     )
   }
 
@@ -175,9 +207,10 @@ export function hitungVelocity(input: InputVelocity): HasilVelocity {
       selisih,
       kenaikanGram,
       umurAwal.bulan,
+      selisih < SELISIH_HARI_MIN ? 'jarak_terlalu_rapat' : 'jarak_terlalu_jauh',
       selisih < SELISIH_HARI_MIN
-        ? `Jarak penimbangan hanya ${selisih} hari. Standar WHO tersedia untuk jarak minimal ${SELISIH_HARI_MIN} hari.`
-        : `Jarak penimbangan ${selisih} hari melebihi batas ${SELISIH_HARI_MAKS} hari. Lakukan penimbangan baru sebagai titik awal.`,
+        ? { selisihHari: selisih, batasHari: SELISIH_HARI_MIN }
+        : { selisihHari: selisih, batasHari: SELISIH_HARI_MAKS },
     )
   }
 
@@ -188,25 +221,24 @@ export function hitungVelocity(input: InputVelocity): HasilVelocity {
   const memakaiWho = ambangWho !== null
   const ambang = memakaiWho ? ambangWho : ambangKbmGram(umurAwal.bulan, selisih)
 
-  const metode = memakaiWho
-    ? `WHO weight velocity interval ${interval}, persentil 5, delta ${tabel.deltaGram} g dikurangkan`
-    : `KBM perkiraan (di luar cakupan tabel velocity WHO ${tabel.bulanAwalMin}-${tabel.bulanAwalMaks} bulan)`
-
-  let status: StatusVelocity
-  if (kenaikanGram < ambang) {
-    status = kenaikanGram <= 0 ? 'tidak_naik' : 'growth_faltering'
-  } else {
-    status = 'naik'
-  }
+  const status = statusDariKenaikan(kenaikanGram, ambang)
 
   return {
     status,
     selisihHari: selisih,
     kenaikanAktualGram: kenaikanGram,
     kenaikanMinimalGram: ambang,
-    metode,
+    metode: memakaiWho ? 'who_velocity' : 'kbm_perkiraan',
+    metodeAngka: {
+      interval,
+      deltaGram: memakaiWho ? tabel.deltaGram : null,
+      cakupanBulanMin: tabel.bulanAwalMin,
+      cakupanBulanMaks: tabel.bulanAwalMaks,
+    },
+    ambangNegatif: ambang < 0,
     umurAwalBulan: Math.round(umurAwal.bulan * 100) / 100,
     alasan: null,
+    alasanAngka: {},
   }
 }
 

@@ -220,16 +220,50 @@ export async function adminHapusProdukPKMK(id: string): Promise<HasilTindakanPKM
   const supabase = await createClient()
 
   try {
-    // 1. Periksa integritas klinis: apakah produk ini sudah pernah diresepkan pada asuhan_gizi
-    const { count, error: countError } = await supabase
+    // ======================================================================
+    // PENJAGA INTEGRITAS REKAM MEDIS (temuan audit T-0b)
+    //
+    // Versi sebelumnya HANYA memeriksa `produk_pkmk_id`, padahal jalur
+    // peresepan menulis KODE TEKS ke `produk_pkmk_kode` dan meninggalkan
+    // `produk_pkmk_id` tetap NULL. Akibatnya `count` selalu 0, penjaga selalu
+    // lolos, dan produk yang sudah diresepkan kepada anak sungguhan DAPAT
+    // dihapus permanen — sementara dialog konfirmasi meyakinkan admin bahwa
+    // itu mustahil.
+    //
+    // Sekarang KEDUA kolom diperiksa, dan penjaganya FAIL-CLOSED: bila jumlah
+    // tidak dapat dipastikan (RLS, tabel berubah), penghapusan DITOLAK.
+    // Penjaga integritas rekam medis tidak boleh gagal dengan cara
+    // mengizinkan.
+    // ======================================================================
+    const { count: countById, error: galatById } = await supabase
       .from('asuhan_gizi')
       .select('id', { count: 'exact', head: true })
       .eq('produk_pkmk_id', id)
 
-    if (!countError && count && count > 0) {
+    const { count: countByKode, error: galatByKode } = await supabase
+      .from('asuhan_gizi')
+      .select('id', { count: 'exact', head: true })
+      .eq('produk_pkmk_kode', id)
+
+    if (galatById || galatByKode) {
+      console.warn('Penjaga integritas hapus produk PKMK gagal memastikan jumlah:', {
+        galatById,
+        galatByKode,
+      })
       return {
         ok: false,
-        pesan: `Produk tidak dapat dihapus karena telah terhubung dengan ${count} rekam medis asuhan gizi. Silakan nonaktifkan status produk agar tidak muncul lagi pada resep baru.`,
+        pesan:
+          'Penghapusan dibatalkan: sistem tidak dapat memastikan apakah produk ini pernah ' +
+          'tercatat pada rekam medis asuhan gizi. Demi keutuhan audit klinis, produk tidak ' +
+          'dihapus. Gunakan opsi nonaktifkan, atau hubungi pengelola basis data.',
+      }
+    }
+
+    const jumlahTerpakai = (countById ?? 0) + (countByKode ?? 0)
+    if (jumlahTerpakai > 0) {
+      return {
+        ok: false,
+        pesan: `Produk tidak dapat dihapus karena telah terhubung dengan ${jumlahTerpakai} rekam medis asuhan gizi. Silakan nonaktifkan status produk agar tidak muncul lagi pada resep baru.`,
       }
     }
 

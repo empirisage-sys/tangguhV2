@@ -83,9 +83,18 @@ export function interpolasiLms(x: number, tabel: TabelLms, langkah: number): Has
     return { lms: lmsLantai, diLuarRentang: false }
   }
 
-  // x berada pada baris terakhir tabel dan tidak ada baris berikutnya.
+  // x berada pada baris TERAKHIR tabel dan tidak ada baris berikutnya.
+  //
+  // Hanya sah bila lantai memang tepi atas tabel. Versi sebelumnya menerima
+  // setiap kasus "lantai ada, atap tidak ada" dan mengembalikan baris lantai
+  // apa adanya dengan `diLuarRentang: false`, sehingga celah di tengah tabel
+  // akan menghasilkan nilai tebakan yang tampak sahih. Lihat temuan Z-13.
   if (lmsLantai && !lmsAtap) {
-    return { lms: lmsLantai, diLuarRentang: false }
+    if (Math.abs(lantai - maks) < 1e-6) {
+      return { lms: lmsLantai, diLuarRentang: false }
+    }
+    // Celah di tengah tabel. Tidak boleh menebak.
+    return { lms: null, diLuarRentang: true }
   }
 
   if (!lmsLantai || !lmsAtap) {
@@ -116,14 +125,24 @@ export function lmsUntukKurva(x: number, tabel: TabelLms, langkah: number): Lms 
 /**
  * Menghitung nilai pengukuran pada Z tertentu (kebalikan dari Z-Score).
  * Dipakai untuk menggambar garis rujukan kurva dan untuk koreksi nilai ekstrem.
+ *
+ * Mengembalikan `null` bila basis Box-Cox tidak positif, yaitu ketika
+ * distribusi LMS tidak mendefinisikan nilai pada z tersebut. Versi sebelumnya
+ * mengembalikan 0, dan angka 0 itu ikut dipakai menghitung jarak SD pada
+ * koreksi |Z| > 3 sehingga menghasilkan Z yang salah alih-alih menyatakan
+ * tidak dapat dinilai. Lihat temuan Z-9. Ambang `Math.abs(L) < 0.01` untuk
+ * beralih ke rumus logaritmik dipertahankan; galat maksimalnya 0,005 SD dan
+ * hanya berlaku pada 5 baris tabel (BB/U lk bulan 20-23, BB/U pr bulan 4).
  */
-export function nilaiDariLms(lms: Lms, z: number): number {
+export function nilaiDariLms(lms: Lms, z: number): number | null {
   const [L, M, S] = lms
+  if (!Number.isFinite(M) || !Number.isFinite(S) || M <= 0 || S <= 0) return null
   if (Math.abs(L) < 0.01) return M * Math.exp(S * z)
 
   const basis = 1 + L * S * z
-  if (basis <= 0) return 0
-  return M * Math.pow(basis, 1 / L)
+  if (basis <= 0) return null
+  const nilai = M * Math.pow(basis, 1 / L)
+  return Number.isFinite(nilai) ? nilai : null
 }
 
 /**
@@ -158,6 +177,7 @@ export function hitungZ(nilai: number, lms: Lms | null): number | null {
   if (z > 3) {
     const sd3 = nilaiDariLms(lms, 3)
     const sd2 = nilaiDariLms(lms, 2)
+    if (sd3 === null || sd2 === null) return null
     const jarak = sd3 - sd2
     if (jarak === 0) return z
     return 3 + (nilai - sd3) / jarak
@@ -166,6 +186,7 @@ export function hitungZ(nilai: number, lms: Lms | null): number | null {
   if (z < -3) {
     const sd3 = nilaiDariLms(lms, -3)
     const sd2 = nilaiDariLms(lms, -2)
+    if (sd3 === null || sd2 === null) return null
     const jarak = sd2 - sd3
     if (jarak === 0) return z
     return -3 + (nilai - sd3) / jarak
