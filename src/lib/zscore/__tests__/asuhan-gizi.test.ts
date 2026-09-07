@@ -178,10 +178,16 @@ describe('lembar asuhan gizi PDF', () => {
     expect(isi).toContain('3 sendok takar')
   })
 
-  it('setiap cetakan memuat peringatan data produk belum terverifikasi', async () => {
+  it('mencetak penyangkalan klinis', async () => {
     const berkas = await buatPdfLembarAsuhanGizi(identitas, hasilKasusLama)
     const isi = new TextDecoder('latin1').decode(berkas)
-    expect(isi).toContain('belum diverifikasi')
+    expect(isi).toContain('bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan')
+  })
+
+  it('TIDAK mencetak peringatan data produk (diminta pemilik aplikasi)', async () => {
+    const berkas = await buatPdfLembarAsuhanGizi(identitas, hasilKasusLama)
+    const isi = new TextDecoder('latin1').decode(berkas)
+    expect(isi).not.toContain('belum diverifikasi')
   })
 
   it('mencetak peringatan kurang dari target', async () => {
