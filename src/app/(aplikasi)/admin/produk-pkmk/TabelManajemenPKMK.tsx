@@ -7,11 +7,9 @@ import {
   adminToggleStatusPKMK,
   adminHapusProdukPKMK,
 } from './actions'
-import {
-  type ProdukPKMK,
-  hitungKkalPerSendok,
-  hitungFormulasiPKMK,
-} from '@/lib/db/pkmk'
+import { type ProdukPKMK, hitungKkalPerSendok } from '@/lib/db/pkmk'
+import { BATAS as BATAS_TAKARAN, hitungTakaran, type HasilTakaran } from '@/lib/pkmk/hitung'
+import { bacaSeluruhPeringatan, ringkasanTakaran } from '@/lib/pkmk/teks'
 import {
   Search,
   Filter,
@@ -80,34 +78,67 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
 
   // Perhitungan Kkal per Sendok Real-Time di Form
   const formKkalPerSendok = useMemo(() => {
-    return hitungKkalPerSendok(formKkalPerSaji, formSendokPerSaji)
+    return hitungKkalPerSendok(formKkalPerSaji, formSendokPerSaji) ?? 0
   }, [formKkalPerSaji, formSendokPerSaji])
 
-  // Mini Simulasi Resep Real-Time di Form
-  const previewSimulasi = useMemo(() => {
+  // ==========================================================================
+  // SIMULASI TAKARAN
+  //
+  // Memakai `hitungTakaran` dari `src/lib/pkmk/hitung.ts`, bukan lagi
+  // `hitungFormulasiPKMK` yang sudah dihapus.
+  //
+  // Fungsi lama membulatkan dua kali lalu mengembalikan TARGET sebagai hasil,
+  // tanpa pernah menghitung energi yang benar-benar diminum anak dan tanpa satu
+  // pun peringatan. Pada sapuan 500 kombinasi, 23% menyimpang lebih dari 10%
+  // dari target; terburuk +300% (SGM Optigrow, target 50 kkal, 5x sehari).
+  // Ia juga menampilkan dua volume cairan yang saling bertentangan dalam satu
+  // kartu, karena "Volume Cairan Total" dihitung dari target ÷ densitas
+  // sementara "Air Hangat / Minum" dihitung dari sendok × ml air per sendok.
+  // Lihat temuan audit T-1 dan T-2.
+  //
+  // `hitungTakaran` menjamin invarian: energi SELALU diturunkan ulang dari
+  // takaran akhir setelah pembulatan sendok, dan volume larutan hanya berasal
+  // dari satu jalur.
+  // ==========================================================================
+
+  /** Membatasi masukan simulator agar tidak menghasilkan angka mustahil (T-10). */
+  const targetSimValid = Number.isFinite(simTargetKkal) && simTargetKkal >= 50
+  const targetSimAman = targetSimValid ? Math.min(simTargetKkal, 1500) : 0
+
+  const previewSimulasi = useMemo<HasilTakaran | null>(() => {
     if (!formKkalPerSendok || formKkalPerSendok <= 0) return null
+    if (!targetSimValid) return null
+
+    const mlLarutanPerSaji = formMlPerSaji || 180
     const dummy: ProdukPKMK = {
       id: 'preview',
       nama: formNama || 'Produk Uji',
       merek: formMerek || 'Merek',
-      kkalPerMl: formDensitas || 1.0,
       sendokPerSaji: formSendokPerSaji || 5,
       kkalPerSaji: formKkalPerSaji || 180,
-      mlLarutanPerSaji: formMlPerSaji || 180,
-      mlPerSaji: formMlPerSaji || 180,
-      mlLarutanPerSendok: formMlAirPerSendok || 30,
+      mlLarutanPerSaji,
+      mlPerSaji: mlLarutanPerSaji,
+      // Volume larutan per sendok DITURUNKAN dari volume per saji, bukan dari
+      // takaran air. Air 30 ml per sendok tidak menghasilkan larutan 30 ml
+      // karena bubuk menempati ruang (T-3).
+      mlLarutanPerSendok: mlLarutanPerSaji / (formSendokPerSaji || 5),
       mlAirPerSendok: formMlAirPerSendok || 30,
-      densitasKkalPerMl: formDensitas || 1.0,
+      densitasKkalPerMl: (formKkalPerSaji || 180) / mlLarutanPerSaji,
+      kkalPerMl: (formKkalPerSaji || 180) / mlLarutanPerSaji,
       kkalPerSendok: formKkalPerSendok,
       minUsiaBulan: formMinUsia || 12,
       catatanKlinis: formAnjuran,
       anjuranKlinis: formAnjuran,
     }
-    return hitungFormulasiPKMK(dummy, simTargetKkal, simFrekuensi)
+    return hitungTakaran({
+      produk: dummy,
+      mode: 'dari_target',
+      frekuensiPerHari: simFrekuensi,
+      targetKkal: targetSimAman,
+    })
   }, [
     formNama,
     formMerek,
-    formDensitas,
     formSendokPerSaji,
     formKkalPerSaji,
     formMlPerSaji,
@@ -115,7 +146,8 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     formKkalPerSendok,
     formMinUsia,
     formAnjuran,
-    simTargetKkal,
+    targetSimValid,
+    targetSimAman,
     simFrekuensi,
   ])
 
@@ -369,7 +401,8 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                 filteredProduk.map((item) => {
                   const kkalSendok =
                     item.kkalPerSendok ||
-                    hitungKkalPerSendok(item.kkalPerSaji, item.sendokPerSaji)
+                    hitungKkalPerSendok(item.kkalPerSaji, item.sendokPerSaji) ||
+                    0
                   const isActive = item.isActive !== false
 
                   return (
@@ -840,28 +873,50 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                     <div className="rounded-xl bg-white p-2.5 text-center shadow-xs">
                       <span className="text-[10px] text-tinta-500">Target Tambahan</span>
                       <p className="font-mono text-xs font-bold text-tinta-900">
-                        {simTargetKkal} kkal/hari
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-white p-2.5 text-center shadow-xs">
-                      <span className="text-[10px] text-tinta-500">Frekuensi Minum</span>
-                      <p className="font-mono text-xs font-bold text-tinta-900">
-                        {simFrekuensi}x sehari
+                        {previewSimulasi.targetKkal} kkal/hari
                       </p>
                     </div>
                     <div className="rounded-xl bg-white p-2.5 text-center shadow-xs">
                       <span className="text-[10px] text-tinta-500">Takaran per Minum</span>
                       <p className="font-mono text-xs font-bold text-laut-700">
-                        {previewSimulasi.sendokPerPorsi} sendok
+                        {previewSimulasi.sendokPerSaji} sendok
+                      </p>
+                    </div>
+                    {/* Energi NYATA, bukan target. Inilah invarian T-1. */}
+                    <div className="rounded-xl bg-white p-2.5 text-center shadow-xs ring-1 ring-laut-200">
+                      <span className="text-[10px] text-tinta-500">Energi Diberikan</span>
+                      <p className="font-mono text-xs font-black text-laut-800">
+                        {previewSimulasi.kkalDiberikan} kkal
+                      </p>
+                      <p className="text-[10px] text-tinta-400">
+                        {previewSimulasi.persenTerhadapTarget}% target
                       </p>
                     </div>
                     <div className="rounded-xl bg-white p-2.5 text-center shadow-xs">
-                      <span className="text-[10px] text-tinta-500">Air Hangat / Saji</span>
+                      <span className="text-[10px] text-tinta-500">Larutan / Saji</span>
                       <p className="font-mono text-xs font-bold text-laut-700">
-                        {previewSimulasi.mlAirPerPorsi} ml
+                        {previewSimulasi.mlLarutanPerSaji} ml
+                      </p>
+                      <p className="text-[10px] text-tinta-400">
+                        {previewSimulasi.mlLarutanPerHari} ml/hari
                       </p>
                     </div>
                   </div>
+
+                  {bacaSeluruhPeringatan(previewSimulasi).map((p) => (
+                    <div
+                      key={p.kode}
+                      className={[
+                        'mt-2 rounded-xl border p-2.5 text-[11px] leading-relaxed',
+                        p.nada === 'bahaya'
+                          ? 'border-rose-300 bg-rose-50 text-rose-900'
+                          : 'border-amber-300 bg-amber-50 text-amber-900',
+                      ].join(' ')}
+                    >
+                      <p className="font-bold">{p.pesan}</p>
+                      <p className="mt-0.5">{p.saran}</p>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -940,18 +995,37 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                     onChange={(e) => setSimFrekuensi(Number(e.target.value))}
                     className="mt-1 h-10 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
                   >
-                    <option value={1}>1 kali sehari</option>
-                    <option value={2}>2 kali sehari</option>
-                    <option value={3}>3 kali sehari</option>
-                    <option value={4}>4 kali sehari</option>
-                    <option value={5}>5 kali sehari</option>
+                    {Array.from(
+                      { length: BATAS_TAKARAN.frekuensiMaks - BATAS_TAKARAN.frekuensiMin + 1 },
+                      (_, i) => BATAS_TAKARAN.frekuensiMin + i,
+                    ).map((f) => (
+                      <option key={f} value={f}>
+                        {f} kali sehari
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              {/* Result Card */}
+              {/* Kartu Hasil: energi NYATA, satu jalur volume, dan peringatan */}
               {(() => {
-                const res = hitungFormulasiPKMK(simulatorTarget, simTargetKkal, simFrekuensi)
+                if (!targetSimValid) {
+                  return (
+                    <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
+                      Masukkan target kalori tambahan minimal 50 kkal per hari untuk melihat
+                      rekomendasi takaran.
+                    </div>
+                  )
+                }
+
+                const res = hitungTakaran({
+                  produk: simulatorTarget,
+                  mode: 'dari_target',
+                  frekuensiPerHari: simFrekuensi,
+                  targetKkal: targetSimAman,
+                })
+                const peringatan = bacaSeluruhPeringatan(res)
+
                 return (
                   <div className="space-y-3 rounded-2xl border border-laut-200 bg-laut-50/60 p-4">
                     <h4 className="text-xs font-bold text-laut-800">
@@ -959,30 +1033,83 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                     </h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-xl bg-white p-3 shadow-xs">
-                        <span className="text-[10px] text-tinta-500">Total Bubuk Harian</span>
-                        <p className="font-mono text-base font-extrabold text-laut-800">
-                          {res.totalSendokHarian} sendok takar
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-white p-3 shadow-xs">
                         <span className="text-[10px] text-tinta-500">Takaran Tiap Minum</span>
                         <p className="font-mono text-base font-extrabold text-laut-800">
-                          {res.sendokPerPorsi} sendok takar
+                          {res.sendokPerSaji} sendok takar
+                        </p>
+                        <p className="text-[10px] text-tinta-400">
+                          {res.frekuensiPerHari}x sehari — total {res.sendokPerHari} sendok/hari
+                        </p>
+                      </div>
+
+                      {/*
+                        ENERGI YANG BENAR-BENAR DIBERIKAN, bukan target.
+                        Versi sebelumnya tidak menampilkan angka ini sama sekali,
+                        sehingga kartu bisa menyiratkan target tercapai padahal
+                        takarannya menyimpang sampai +300% (temuan T-1).
+                      */}
+                      <div className="rounded-xl bg-white p-3 shadow-xs ring-1 ring-laut-300">
+                        <span className="text-[10px] text-tinta-500">Energi Diberikan</span>
+                        <p className="font-mono text-base font-black text-laut-800">
+                          {res.kkalDiberikan} kkal / hari
+                        </p>
+                        <p className="text-[10px] text-tinta-400">
+                          {res.persenTerhadapTarget}% dari target {res.targetKkal} kkal
+                          {res.selisihKkal !== 0 &&
+                            ` (${res.selisihKkal > 0 ? '+' : ''}${res.selisihKkal} kkal)`}
+                        </p>
+                      </div>
+
+                      {/*
+                        SATU jalur volume. Versi sebelumnya menampilkan
+                        "Air Hangat / Minum" (sendok x ml air) berdampingan
+                        dengan "Volume Cairan Total" (target / densitas) yang
+                        bisa berselisih 200 ml untuk resep yang sama (temuan T-2).
+                      */}
+                      <div className="rounded-xl bg-white p-3 shadow-xs">
+                        <span className="text-[10px] text-tinta-500">Larutan Jadi / Saji</span>
+                        <p className="font-mono text-base font-extrabold text-laut-800">
+                          {res.mlLarutanPerSaji} ml
+                        </p>
+                        <p className="text-[10px] text-tinta-400">
+                          Air per sendok menurut label: {simulatorTarget.mlAirPerSendok ?? '-'} ml
                         </p>
                       </div>
                       <div className="rounded-xl bg-white p-3 shadow-xs">
-                        <span className="text-[10px] text-tinta-500">Air Hangat / Minum</span>
+                        <span className="text-[10px] text-tinta-500">Larutan Jadi / Hari</span>
                         <p className="font-mono text-base font-extrabold text-laut-800">
-                          {res.mlAirPerPorsi} ml air
+                          {res.mlLarutanPerHari} ml
                         </p>
-                      </div>
-                      <div className="rounded-xl bg-white p-3 shadow-xs">
-                        <span className="text-[10px] text-tinta-500">Volume Cairan Total</span>
-                        <p className="font-mono text-base font-extrabold text-laut-800">
-                          {res.volumeHarianMl} ml / hari
+                        <p className="text-[10px] text-tinta-400">
+                          {res.kkalPerSendok.toFixed(1)} kkal per sendok takar
                         </p>
                       </div>
                     </div>
+
+                    {peringatan.length > 0 && (
+                      <div className="space-y-2">
+                        {peringatan.map((p) => (
+                          <div
+                            key={p.kode}
+                            className={[
+                              'flex items-start gap-2 rounded-xl border p-3 text-[11px] leading-relaxed',
+                              p.nada === 'bahaya'
+                                ? 'border-rose-300 bg-rose-50 text-rose-900'
+                                : 'border-amber-300 bg-amber-50 text-amber-900',
+                            ].join(' ')}
+                          >
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            <span>
+                              <strong>{p.pesan}</strong> {p.saran}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="border-t border-laut-200 pt-2 text-[11px] leading-relaxed text-laut-900">
+                      {ringkasanTakaran(res)}
+                    </p>
                   </div>
                 )
               })()}

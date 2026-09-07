@@ -1,6 +1,6 @@
-import type { JenisKelamin } from '@/lib/who'
+import type { JenisKelamin, IntervalVelocity } from '@/lib/who'
 
-export type { JenisKelamin }
+export type { JenisKelamin, IntervalVelocity }
 
 /** Posisi pengukuran panjang atau tinggi badan saat di lapangan. */
 export type PosisiUkur = 'terlentang' | 'berdiri' | 'otomatis'
@@ -24,9 +24,40 @@ export type StatusBBTB =
   | 'gizi_lebih'
   | 'obesitas'
 
-export type StatusVelocity = 'naik' | 'tidak_naik' | 'growth_faltering' | 'tidak_dapat_dinilai'
+/**
+ * Status kenaikan berat badan.
+ *
+ * `turun_masih_dalam_batas` ada karena ambang persentil 5 WHO dapat bernilai
+ * NEGATIF pada 33 kombinasi umur, interval, dan jenis kelamin (mis. laki-laki
+ * umur awal 11 bulan, interval 1 bulan: -106 g). Tanpa status ini, anak yang
+ * beratnya turun 50 g tetapi masih di atas ambang negatif akan dilabeli 'naik',
+ * yaitu pernyataan yang tidak benar. Lihat temuan audit Z-1.
+ */
+export type StatusVelocity =
+  | 'naik'
+  | 'turun_masih_dalam_batas'
+  | 'tidak_naik'
+  | 'growth_faltering'
+  | 'tidak_dapat_dinilai'
+
+/**
+ * Metode yang dipakai menghitung ambang kenaikan minimal.
+ * Kode, bukan teks. Kalimatnya disusun di lapisan tampilan (AGENTS.md 2.4).
+ */
+export type KodeMetodeVelocity = 'who_velocity' | 'kbm_perkiraan' | 'tidak_ada'
 
 export type MetodeKalori = 'pemeliharaan' | 'catch_up'
+
+/** Kode alasan rujukan. Dipakai untuk menyaring; kalimatnya disusun di tampilan. */
+export type KodeRedFlag =
+  | 'tbu_sangat_pendek'
+  | 'bbtb_gizi_buruk'
+  | 'bbu_sangat_kurang'
+  | 'edema_bilateral'
+  /** LILA < 11,5 cm pada umur 6-59 bulan: gizi buruk akut. */
+  | 'lila_gizi_buruk_akut'
+  /** LILA 11,5-12,4 cm pada umur 6-59 bulan: gizi kurang akut sedang. */
+  | 'lila_gizi_kurang_akut'
 
 /** Alasan sebuah indikator tidak dapat dinilai. */
 export type AlasanTidakDinilai =
@@ -34,6 +65,17 @@ export type AlasanTidakDinilai =
   | 'umur_negatif'
   | 'panjang_di_luar_tabel'
   | 'berat_di_luar_batas_wajar'
+  /** Panjang di luar 30-140 cm. Sebelumnya BATAS.panjang* tidak pernah dipakai (Z-3). */
+  | 'panjang_di_luar_batas_wajar'
+  /**
+   * Nilai Z di luar batas kemasukakalan biologis WHO. Menangkap salah ketik
+   * yang lolos batas absolut, misalnya panjang 45 cm pada anak umur 24 bulan
+   * yang menghasilkan Z TB/U -13,8 namun sebelumnya disajikan sebagai sahih.
+   * Lihat temuan audit Z-3 dan `BATAS_Z_WAJAR`.
+   */
+  | 'berat_tidak_wajar_untuk_umur'
+  | 'panjang_tidak_wajar_untuk_umur'
+  | 'berat_tidak_wajar_untuk_panjang'
   | 'data_tidak_lengkap'
 
 export type InputSkrining = {
@@ -55,6 +97,15 @@ export type InputSkrining = {
   lilaCm?: number
   /** Edema bilateral pitting. Penentu gizi buruk yang tidak terlihat pada BB/TB. */
   edema?: boolean
+  /**
+   * Usia gestasi saat lahir dalam minggu. Bila diisi dan di bawah 37 minggu,
+   * umur yang dipakai untuk SELURUH indikator adalah umur koreksi.
+   *
+   * Sebelumnya koreksi prematuritas hanya ada di halaman skrining tamu dan
+   * dikerjakan dengan menyuntikkan tanggal lahir palsu, sehingga hasilnya tidak
+   * dapat dibedakan dari umur kronologis saat tersimpan. Lihat temuan Z-4.
+   */
+  usiaGestasiMinggu?: number
 }
 
 export type HasilIndikator = {
@@ -89,8 +140,21 @@ export type HasilGizi = {
 export type HasilSkrining = {
   engineVersion: string
 
+  /** Umur yang DIPAKAI untuk menilai indikator. Sama dengan umur koreksi bila prematur. */
   umurHari: number
   umurBulan: number
+
+  /**
+   * Jejak koreksi prematuritas. WAJIB disimpan bersama hasil: tanpa ini,
+   * baris skrining tidak dapat diaudit kembali karena umur terkoreksi dan umur
+   * kronologis tampak sama.
+   */
+  umurDikoreksiPrematur: boolean
+  umurKronologisHari: number
+  umurKronologisBulan: number
+  defisitPrematurHari: number
+  /** `true` bila usia gestasi diisi tetapi koreksi TIDAK diterapkan karena melewati batas umur. */
+  koreksiPrematurKedaluwarsa: boolean
 
   /** Standar yang berlaku menurut umur: terlentang di bawah 24 bulan, berdiri di atasnya. */
   standarPanjang: StandarPanjang
@@ -107,6 +171,11 @@ export type HasilSkrining = {
 
   /** Menandai kasus yang wajib dirujuk. */
   isRedFlag: boolean
+  /**
+   * Kode alasan rujukan. Pakai INI untuk menyaring dan mengambil keputusan.
+   * `alasanRedFlag` di bawahnya hanya untuk ditampilkan (AGENTS.md 2.3 & 2.4).
+   */
+  kodeRedFlag: KodeRedFlag[]
   alasanRedFlag: string[]
 
   /** `true` bila ada indikator yang tidak dapat dinilai. */
@@ -128,14 +197,36 @@ export type InputVelocity = {
   beratAkhirKg: number
 }
 
+/** Alasan sebuah penilaian velocity tidak dapat dilakukan. Kode, bukan teks. */
+export type AlasanTidakDinilaiVelocity =
+  | 'umur_negatif'
+  | 'urutan_tanggal_salah'
+  | 'jarak_terlalu_rapat'
+  | 'jarak_terlalu_jauh'
+
 export type HasilVelocity = {
   status: StatusVelocity
   selisihHari: number
   kenaikanAktualGram: number
   /** Ambang persentil 5 WHO yang sudah dikurangi delta dan diskalakan ke selisih hari sebenarnya. */
   kenaikanMinimalGram: number | null
-  metode: string
+  /**
+   * Kode metode. Sebelumnya medan ini berisi kalimat siap-tampil yang disusun
+   * di lapisan logika, melanggar AGENTS.md 2.4. Lihat temuan Z-11.
+   */
+  metode: KodeMetodeVelocity
+  /** Angka pendukung untuk menyusun kalimat di lapisan tampilan. */
+  metodeAngka: {
+    interval: IntervalVelocity | null
+    deltaGram: number | null
+    cakupanBulanMin: number | null
+    cakupanBulanMaks: number | null
+  }
+  /** `true` bila ambang WHO pada umur ini bernilai negatif, yaitu kehilangan berat ringan masih dalam batas. */
+  ambangNegatif: boolean
   umurAwalBulan: number
-  /** Diisi bila status `tidak_dapat_dinilai`. */
-  alasan: string | null
+  /** Diisi bila status `tidak_dapat_dinilai`. Kode, bukan teks. */
+  alasan: AlasanTidakDinilaiVelocity | null
+  /** Angka pendukung alasan, untuk menyusun kalimat di lapisan tampilan. */
+  alasanAngka: Record<string, number>
 }

@@ -12,6 +12,14 @@
  *   zscore-2.0.0  Versi Next.js. Enam perubahan perilaku terhadap versi
  *                 Firebase, semuanya terdokumentasi di
  *                 docs/PERBEDAAN_DENGAN_APLIKASI_LAMA.md
+ *   zscore-2.1.0  Perbaikan temuan audit September 2026:
+ *                 Z-3 penjagaan panjang badan dan penandaan Z di luar batas
+ *                       kemasukakalan biologis WHO
+ *                 Z-4 koreksi prematuritas masuk ke mesin, berbatas umur, dan
+ *                       terekam pada hasil
+ *                 Z-7 `statusTBU` diteruskan ke perhitungan kebutuhan gizi
+ *                 Z-18 pita LILA gizi kurang akut sedang dan batas umur 59 bulan
+ *                 AGENTS.md 2.3 `kodeRedFlag` untuk penyaringan berbasis kode
  */
 import {
   LANGKAH_PANJANG_CM,
@@ -23,17 +31,18 @@ import {
 import { bulatkanZ, hitungZ, interpolasiLms } from './lms'
 import { klasifikasiBBTB, klasifikasiBBU, klasifikasiTBU } from './klasifikasi'
 import { hitungKebutuhanGizi } from './gizi'
-import { hitungUmur } from './umur'
+import { BATAS_UMUR_KOREKSI_PREMATUR_BULAN, HARI_PER_BULAN, hitungUmur, hitungUsiaKoreksi } from './umur'
 import type {
   AlasanTidakDinilai,
   HasilIndikator,
   HasilSkrining,
   InputSkrining,
+  KodeRedFlag,
   PosisiUkur,
   StandarPanjang,
 } from './tipe'
 
-export const ENGINE_VERSION = 'zscore-2.0.0'
+export const ENGINE_VERSION = 'zscore-2.1.0'
 
 /** Umur, dalam bulan, tempat standar berpindah dari panjang terlentang ke tinggi berdiri. */
 export const UMUR_PERALIHAN_BULAN = 24
@@ -47,6 +56,49 @@ export const BATAS = {
   beratMaksKg: 40,
   panjangMinCm: 30,
   panjangMaksCm: 140,
+} as const
+
+/**
+ * Batas kemasukakalan biologis nilai Z, mengikuti kriteria penandaan
+ * (flagging) WHO Anthro: TB/U -6..+6, BB/U -6..+5, BB/TB -5..+5.
+ *
+ * ==========================================================================
+ * PENTING: NILAI DI LUAR BATAS INI DITANDAI, TIDAK DIBUANG
+ *
+ * WHO memakai batas ini untuk MEMBERSIHKAN DATA SURVEI populasi. Aplikasi ini
+ * bukan survei, melainkan skrining perorangan, dan di sini membuang nilai
+ * ekstrem justru berbahaya: anak umur 24 bulan dengan tinggi 87 cm dan berat
+ * 8 kg — kasus gizi buruk yang sebenarnya, bukan salah catat — menghasilkan
+ * Z BB/TB sekitar -5,8, yaitu di luar batas WHO. Bila nilai itu dibuang,
+ * penanda rujukan `bbtb_gizi_buruk` ikut hilang dan anak yang paling perlu
+ * dirujuk justru tidak tertandai.
+ *
+ * Karena itu perilakunya: nilai Z dan status gizi TETAP dikembalikan, tetapi
+ * `diLuarRentang` menjadi `true` disertai kode alasan dan catatan yang
+ * menyuruh pengukuran diulang. Pemeriksa melihat angkanya sekaligus tahu
+ * angka itu perlu dikonfirmasi.
+ *
+ * Sebelum perbaikan ini tidak ada penjagaan sama sekali pada panjang badan:
+ * anak umur 24 bulan dengan masukan 45 cm menghasilkan Z TB/U -13,785 yang
+ * disajikan sebagai hasil sahih `diLuarRentang: false` tanpa satu pun
+ * peringatan, dan konstanta `BATAS.panjangMinCm` serta `BATAS.panjangMaksCm`
+ * tidak pernah dipakai di seluruh basis kode. Lihat temuan audit Z-3.
+ * ==========================================================================
+ */
+export const BATAS_Z_WAJAR = {
+  bbu: { min: -6, maks: 5 },
+  tbu: { min: -6, maks: 6 },
+  bbtb: { min: -5, maks: 5 },
+} as const
+
+/** Umur berlakunya penilaian LILA, dalam bulan. */
+export const LILA_UMUR_MIN_BULAN = 6
+export const LILA_UMUR_MAKS_BULAN = 59
+
+/** Ambang LILA dalam sentimeter, sesuai kriteria WHO untuk umur 6-59 bulan. */
+export const LILA_AMBANG_CM = {
+  giziBurukAkut: 11.5,
+  giziKurangAkut: 12.5,
 } as const
 
 /**
@@ -91,8 +143,33 @@ export function koreksiPosisi(
 
 const KOSONG: HasilIndikator = { z: null, keterangan: 'Tidak dapat dinilai' }
 
+/** `true` bila nilai Z berada di luar batas kemasukakalan biologis WHO. */
+function zTidakMasukAkal(z: number | null, batas: { min: number; maks: number }): boolean {
+  if (z === null) return false
+  return z < batas.min || z > batas.maks
+}
+
 export function hitungSkrining(input: InputSkrining): HasilSkrining {
-  const umur = hitungUmur(input.tanggalLahir, input.tanggalPeriksa)
+  // --- Umur: kronologis lalu koreksi prematuritas bila berlaku ---
+  //
+  // Koreksi dihitung DI DALAM mesin, bukan dengan menyuntikkan tanggal lahir
+  // palsu dari lapisan halaman seperti sebelumnya, sehingga hasilnya dapat
+  // diaudit kembali: umur kronologis dan besar defisit ikut dikembalikan.
+  const umurKronologis = hitungUmur(input.tanggalLahir, input.tanggalPeriksa)
+  const koreksi = hitungUsiaKoreksi(
+    input.tanggalLahir,
+    input.tanggalPeriksa,
+    input.usiaGestasiMinggu,
+    BATAS_UMUR_KOREKSI_PREMATUR_BULAN,
+  )
+
+  const umur = koreksi.isPrematur
+    ? {
+        hari: umurKronologis.hari - koreksi.defisitHari,
+        bulan: (umurKronologis.hari - koreksi.defisitHari) / HARI_PER_BULAN,
+      }
+    : { hari: umurKronologis.hari, bulan: umurKronologis.bulan }
+
   const { panjangTerkoreksiCm, koreksiCm, standar } = koreksiPosisi(
     input.panjangCm,
     umur.bulan,
@@ -125,9 +202,26 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     )
   }
 
+  // Penjagaan panjang badan. Konstanta BATAS.panjang* akhirnya dipakai (Z-3).
+  if (
+    !Number.isFinite(input.panjangCm) ||
+    input.panjangCm < BATAS.panjangMinCm ||
+    input.panjangCm > BATAS.panjangMaksCm
+  ) {
+    alasan.push('panjang_di_luar_batas_wajar')
+    catatan.push(
+      `Panjang atau tinggi ${input.panjangCm} cm di luar batas wajar ` +
+        `${BATAS.panjangMinCm}-${BATAS.panjangMaksCm} cm. Periksa kembali angka di alat ukur.`,
+    )
+  }
+
   const umurValid = umur.hari >= 0 && umur.bulan <= UMUR_MAKS_BULAN
   const beratValid =
     input.beratKg >= BATAS.beratMinKg && input.beratKg <= BATAS.beratMaksKg
+  const panjangValid =
+    Number.isFinite(input.panjangCm) &&
+    input.panjangCm >= BATAS.panjangMinCm &&
+    input.panjangCm <= BATAS.panjangMaksCm
 
   // --- BB/U ---
   let bbu: HasilIndikator = KOSONG
@@ -138,16 +232,23 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
       LANGKAH_UMUR_BULAN,
     )
     if (!diLuarRentang) {
-      bbu = {
-        z: bulatkanZ(hitungZ(input.beratKg, lms)),
-        keterangan: `BB/U pada umur ${umur.bulan.toFixed(2)} bulan`,
+      const z = bulatkanZ(hitungZ(input.beratKg, lms))
+      bbu = { z, keterangan: `BB/U pada umur ${umur.bulan.toFixed(2)} bulan` }
+      if (zTidakMasukAkal(z, BATAS_Z_WAJAR.bbu)) {
+        alasan.push('berat_tidak_wajar_untuk_umur')
+        catatan.push(
+          `Z BB/U ${z} berada di luar batas kemasukakalan biologis WHO ` +
+            `(${BATAS_Z_WAJAR.bbu.min} sampai ${BATAS_Z_WAJAR.bbu.maks} SD). ` +
+            'Nilainya tetap ditampilkan, tetapi berat badan dan tanggal lahir wajib ' +
+            'diperiksa ulang sebelum hasil ini dipakai.',
+        )
       }
     }
   }
 
   // --- TB/U ---
   let tbu: HasilIndikator = KOSONG
-  if (umurValid) {
+  if (umurValid && panjangValid) {
     const { lms, diLuarRentang } = interpolasiLms(
       umur.bulan,
       tabelUmur('tbu', input.jenisKelamin),
@@ -155,10 +256,21 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     )
     if (!diLuarRentang) {
       const label = standar === 'terlentang' ? 'PB/U' : 'TB/U'
+      const z = bulatkanZ(hitungZ(panjangTerkoreksiCm, lms))
       tbu = {
-        z: bulatkanZ(hitungZ(panjangTerkoreksiCm, lms)),
+        z,
         keterangan: `${label} pada umur ${umur.bulan.toFixed(2)} bulan, ` +
           `panjang terkoreksi ${panjangTerkoreksiCm} cm`,
+      }
+      if (zTidakMasukAkal(z, BATAS_Z_WAJAR.tbu)) {
+        alasan.push('panjang_tidak_wajar_untuk_umur')
+        catatan.push(
+          `Z ${label} ${z} berada di luar batas kemasukakalan biologis WHO ` +
+            `(${BATAS_Z_WAJAR.tbu.min} sampai ${BATAS_Z_WAJAR.tbu.maks} SD): panjang ` +
+            `${panjangTerkoreksiCm} cm tidak wajar pada umur ${umur.bulan.toFixed(1)} bulan. ` +
+            'Nilainya tetap ditampilkan, tetapi WAJIB diukur ulang sebelum dipakai. ' +
+            'Salah ketik satu angka pada alat ukur menghasilkan pola seperti ini.',
+        )
       }
     }
   }
@@ -176,7 +288,7 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   // untuk 0-60 bulan. Menolak TB/U pada umur 62 bulan tetapi tetap menyajikan
   // BB/TB akan menghasilkan laporan yang setengah sahih, dan itu lebih
   // membingungkan daripada menolak seluruhnya.
-  if (beratValid && umurValid) {
+  if (beratValid && umurValid && panjangValid) {
     let indikator: 'bbpb' | 'bbtb' = standar === 'terlentang' ? 'bbpb' : 'bbtb'
     if (indikator === 'bbpb' && panjangTerkoreksiCm > 110) indikator = 'bbtb'
     if (indikator === 'bbtb' && panjangTerkoreksiCm < 65) indikator = 'bbpb'
@@ -196,11 +308,21 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
           'Indikator BB/PB atau BB/TB tidak dapat dinilai.',
       )
     } else {
+      const z = bulatkanZ(hitungZ(input.beratKg, lms))
       beratIdealKg = Math.round(lms[1] * 100) / 100
       bbtb = {
-        z: bulatkanZ(hitungZ(input.beratKg, lms)),
+        z,
         keterangan:
           `${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} pada ${panjangTerkoreksiCm} cm`,
+      }
+      if (zTidakMasukAkal(z, BATAS_Z_WAJAR.bbtb)) {
+        alasan.push('berat_tidak_wajar_untuk_panjang')
+        catatan.push(
+          `Z ${indikator === 'bbpb' ? 'BB/PB' : 'BB/TB'} ${z} berada di luar batas ` +
+            `kemasukakalan biologis WHO (${BATAS_Z_WAJAR.bbtb.min} sampai ` +
+            `${BATAS_Z_WAJAR.bbtb.maks} SD). Nilainya tetap ditampilkan dan penanda ` +
+            'rujukan tetap berlaku, tetapi berat dan panjang wajib diperiksa ulang.',
+        )
       }
     }
   }
@@ -210,21 +332,58 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   const statusBBTB = klasifikasiBBTB(bbtb.z)
 
   // --- Red flag: kasus yang wajib dirujuk ---
+  //
+  // Dikembalikan sebagai KODE terlebih dahulu. Penyaringan dan pengambilan
+  // keputusan wajib memakai `kodeRedFlag`, tidak pernah mencocokkan teks
+  // (AGENTS.md 2.3). Kalimat pada `alasanRedFlag` hanya untuk ditampilkan.
+  const kodeRedFlag: KodeRedFlag[] = []
   const alasanRedFlag: string[] = []
+
   if (statusTBU === 'sangat_pendek') {
+    kodeRedFlag.push('tbu_sangat_pendek')
     alasanRedFlag.push('Sangat pendek (TB/U di bawah -3 SD)')
   }
   if (statusBBTB === 'gizi_buruk') {
+    kodeRedFlag.push('bbtb_gizi_buruk')
     alasanRedFlag.push('Gizi buruk (BB/TB di bawah -3 SD)')
   }
   if (statusBBU === 'berat_badan_sangat_kurang') {
+    kodeRedFlag.push('bbu_sangat_kurang')
     alasanRedFlag.push('Berat badan sangat kurang (BB/U di bawah -3 SD)')
   }
   if (input.edema === true) {
+    kodeRedFlag.push('edema_bilateral')
     alasanRedFlag.push('Edema bilateral, penanda gizi buruk yang tidak terlihat pada BB/TB')
   }
-  if (input.lilaCm !== undefined && umur.bulan >= 6 && input.lilaCm < 11.5) {
-    alasanRedFlag.push(`LILA ${input.lilaCm} cm di bawah 11,5 cm`)
+
+  // LILA hanya bermakna pada umur 6-59 bulan. Versi sebelumnya tidak memiliki
+  // batas atas umur dan hanya mengenal satu ambang (Z-18).
+  if (
+    input.lilaCm !== undefined &&
+    Number.isFinite(input.lilaCm) &&
+    umur.bulan >= LILA_UMUR_MIN_BULAN &&
+    umur.bulan <= LILA_UMUR_MAKS_BULAN
+  ) {
+    if (input.lilaCm < LILA_AMBANG_CM.giziBurukAkut) {
+      kodeRedFlag.push('lila_gizi_buruk_akut')
+      alasanRedFlag.push(
+        `LILA ${input.lilaCm} cm di bawah ${LILA_AMBANG_CM.giziBurukAkut} cm (gizi buruk akut)`,
+      )
+    } else if (input.lilaCm < LILA_AMBANG_CM.giziKurangAkut) {
+      kodeRedFlag.push('lila_gizi_kurang_akut')
+      alasanRedFlag.push(
+        `LILA ${input.lilaCm} cm berada pada ${LILA_AMBANG_CM.giziBurukAkut}-` +
+          `${LILA_AMBANG_CM.giziKurangAkut} cm (gizi kurang akut sedang)`,
+      )
+    }
+  }
+
+  if (koreksi.koreksiKedaluwarsa) {
+    catatan.push(
+      `Anak lahir prematur pada usia gestasi ${koreksi.usiaGestasiMinggu} minggu, tetapi ` +
+        `umurnya sudah melewati ${BATAS_UMUR_KOREKSI_PREMATUR_BULAN} bulan sehingga koreksi ` +
+        'prematuritas tidak lagi diterapkan. Seluruh indikator memakai umur kronologis.',
+    )
   }
 
   const gizi = hitungKebutuhanGizi({
@@ -234,12 +393,18 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     panjangTerkoreksiCm,
     jenisKelamin: input.jenisKelamin,
     statusBBTB,
+    statusTBU,
   })
 
   return {
     engineVersion: ENGINE_VERSION,
     umurHari: umur.hari,
     umurBulan: Math.round(umur.bulan * 100) / 100,
+    umurDikoreksiPrematur: koreksi.isPrematur,
+    umurKronologisHari: umurKronologis.hari,
+    umurKronologisBulan: Math.round(umurKronologis.bulan * 100) / 100,
+    defisitPrematurHari: koreksi.isPrematur ? koreksi.defisitHari : 0,
+    koreksiPrematurKedaluwarsa: koreksi.koreksiKedaluwarsa,
     standarPanjang: standar,
     panjangTerkoreksiCm,
     koreksiPosisiCm: koreksiCm,
@@ -249,7 +414,8 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     statusBBU,
     statusTBU,
     statusBBTB,
-    isRedFlag: alasanRedFlag.length > 0,
+    isRedFlag: kodeRedFlag.length > 0,
+    kodeRedFlag,
     alasanRedFlag,
     diLuarRentang: alasan.length > 0,
     alasanDiLuarRentang: alasan,
@@ -261,7 +427,19 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
 export * from './tipe'
 export * from './klasifikasi'
 export * from './velocity'
-export { hitungUmur, hitungUmurKalender, hitungUsiaKoreksi, selisihHari, HARI_PER_BULAN, type UmurKalender, type UsiaKoreksiPrematur } from './umur'
+export {
+  hitungUmur,
+  hitungUmurKalender,
+  hitungUsiaKoreksi,
+  selisihHari,
+  HARI_PER_BULAN,
+  BATAS_UMUR_KOREKSI_PREMATUR_BULAN,
+  GESTASI_CUKUP_BULAN_MINGGU,
+  GESTASI_MIN_MINGGU,
+  GESTASI_MAKS_MINGGU,
+  type UmurKalender,
+  type UsiaKoreksiPrematur,
+} from './umur'
 export { hitungZ, nilaiDariLms, interpolasiLms, lmsUntukKurva } from './lms'
 export { hitungKebutuhanGizi, usiaTinggiBulan, rdaKkalPerKg } from './gizi'
 export { apakahPerluPKMK, type InputIndikasiPKMK } from './indikasi-pkmk'

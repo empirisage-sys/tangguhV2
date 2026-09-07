@@ -290,7 +290,7 @@ describe('pemetaan ke baris database', () => {
   it('mengisi seluruh kolom wajib', () => {
     const baris = keBarisSkrining(konteks, hasil)
     expect(baris.client_uuid).toBe(konteks.clientUuid)
-    expect(baris.engine_version).toBe('zscore-2.0.0')
+    expect(baris.engine_version).toBe('zscore-2.1.0')
     expect(baris.dihitung_di).toBe('server')
     expect(baris.status_bbtb).toBe('gizi_buruk')
     expect(baris.is_red_flag).toBe(true)

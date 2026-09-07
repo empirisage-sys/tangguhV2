@@ -31,6 +31,18 @@ export type BarisAsuhanGizi = {
   dietisien_id: string
   puskesmas_id: string
   diagnosis_gizi: string
+  /**
+   * Rujukan uuid ke `produk_pkmk`. WAJIB terisi bila produk berasal dari
+   * master data, karena inilah kolom yang dipakai penjaga integritas saat
+   * admin mencoba menghapus produk.
+   *
+   * Versi sebelumnya hanya mengisi `produk_pkmk_kode` dan meninggalkan kolom
+   * ini NULL pada SETIAP baris, sehingga penjaga penghapusan tidak pernah
+   * menemukan satu pun rekam medis dan produk yang sudah diresepkan dapat
+   * dihapus permanen. Lihat temuan audit T-0b.
+   */
+  produk_pkmk_id: string | null
+  /** Snapshot kode produk untuk audit, termasuk bila produk kelak dihapus. */
   produk_pkmk_kode: string
   mode_takaran: 'dari_takaran' | 'dari_target'
   frekuensi_per_hari: number
@@ -50,6 +62,19 @@ export type BarisAsuhanGizi = {
   catatan: string | null
 }
 
+const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Mengembalikan id produk bila ia benar-benar uuid master data.
+ *
+ * Id daftar cadangan statis berbentuk `pkmk-1`, bukan uuid, dan tidak boleh
+ * dimasukkan ke kolom uuid berkendala kunci asing. Kode tersebut tetap
+ * tersimpan pada `produk_pkmk_kode` sebagai jejak audit.
+ */
+export function idProdukUuid(id: string): string | null {
+  return POLA_UUID.test(id) ? id : null
+}
+
 /**
  * Menyusun baris yang dikirim ke `supabase.from('asuhan_gizi').insert(...)`.
  *
@@ -66,6 +91,7 @@ export function keBarisAsuhanGizi(
     dietisien_id: konteks.dietisienId,
     puskesmas_id: konteks.puskesmasId,
     diagnosis_gizi: konteks.tataLaksana,
+    produk_pkmk_id: idProdukUuid(hasil.produk.id),
     produk_pkmk_kode: hasil.produk.id,
     mode_takaran: hasil.mode,
     frekuensi_per_hari: hasil.frekuensiPerHari,

@@ -1,6 +1,6 @@
 import { wajibPeran } from '@/lib/supabase/penjaga'
 import { createClient } from '@/lib/supabase/server'
-import { PRODUK_PKMK_LIST, petakanProdukDbKeModel, type ProdukPKMK } from '@/lib/db/pkmk'
+import { petakanDaftarProdukDb, type ProdukPKMK } from '@/lib/db/pkmk'
 import { TabelManajemenPKMK } from './TabelManajemenPKMK'
 import { Milk, Flame, CheckCircle2, AlertTriangle, ShieldCheck, Sparkles } from 'lucide-react'
 
@@ -14,6 +14,9 @@ export default async function HalamanAdminProdukPKMK() {
   const supabase = await createClient()
 
   let daftarProduk: ProdukPKMK[] = []
+  let jumlahBarisDitolak = 0
+  let masterTidakTersedia = false
+  let barisMentah: unknown[] = []
 
   try {
     const { data, error } = await supabase
@@ -21,27 +24,44 @@ export default async function HalamanAdminProdukPKMK() {
       .select('*')
       .order('nama', { ascending: true })
 
-    if (!error && data && data.length > 0) {
-      daftarProduk = data.map((row: any) => petakanProdukDbKeModel(row))
-    } else {
-      // Fallback ke master data awal jika tabel belum diisi
-      daftarProduk = PRODUK_PKMK_LIST
-    }
+    if (error) throw error
+
+    barisMentah = data ?? []
+    const hasil = petakanDaftarProdukDb(barisMentah)
+    daftarProduk = hasil.produk
+    jumlahBarisDitolak = hasil.jumlahDitolak
+    masterTidakTersedia = barisMentah.length === 0
   } catch (err) {
-    console.warn('Fallback ke PRODUK_PKMK_LIST lokal:', err)
-    daftarProduk = PRODUK_PKMK_LIST
+    // TIDAK ada lagi cadangan ke PRODUK_PKMK_LIST di sini.
+    //
+    // Versi sebelumnya menampilkan lima produk statis ber-id 'pkmk-1..5' yang
+    // TIDAK ADA di basis data, lengkap dengan tombol Ubah dan Hapus yang pasti
+    // gagal karena id-nya bukan uuid. Admin melihat data yang tampak sah dan
+    // mengelola sesuatu yang tidak ada. Lihat temuan audit T-12.
+    console.warn('Gagal membaca master produk_pkmk:', err)
+    daftarProduk = []
+    masterTidakTersedia = true
   }
 
-  // Statistik Ringkas
+  // --- Statistik Ringkas ---
+  //
+  // Rerata dihitung atas produk AKTIF, bukan seluruh produk. Versi sebelumnya
+  // membagi dengan `totalProduk` sehingga produk yang dinonaktifkan tetap ikut
+  // menarik rerata: menonaktifkan Nutrinidrink membuat angkanya tetap 33,2
+  // padahal seharusnya 34,0 (temuan audit T-7).
   const totalProduk = daftarProduk.length
-  const produkAktif = daftarProduk.filter((p) => p.isActive !== false).length
-  const produkPadatKalori = daftarProduk.filter((p) => p.densitasKkalPerMl > 1.0).length
+  const daftarAktif = daftarProduk.filter((p) => p.isActive !== false)
+  const produkAktif = daftarAktif.length
 
-  // Rata-rata kkal per sendok
+  // Densitas kini SELALU turunan label (kkal_per_saji / ml_per_saji), sehingga
+  // hitungan ini tidak lagi bergantung pada kolom simpanan yang menyimpang.
+  // Pada data seed hasilnya berubah dari 1 menjadi 3 (temuan audit T-4).
+  const produkPadatKalori = daftarAktif.filter((p) => p.densitasKkalPerMl > 1.0).length
+
   const rerataKkalPerSendok =
-    totalProduk > 0
+    produkAktif > 0
       ? (
-          daftarProduk.reduce((acc, p) => acc + (p.kkalPerSendok || 0), 0) / totalProduk
+          daftarAktif.reduce((acc, p) => acc + (p.kkalPerSendok || 0), 0) / produkAktif
         ).toFixed(1)
       : '0.0'
 
@@ -115,6 +135,35 @@ export default async function HalamanAdminProdukPKMK() {
           <p className="font-display mt-2 text-2xl font-extrabold text-karawo-700">{produkPadatKalori}</p>
         </div>
       </div>
+
+      {(masterTidakTersedia || jumlahBarisDitolak > 0) && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 sm:text-sm">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div>
+            {masterTidakTersedia && (
+              <p className="font-bold">
+                Master data produk PKMK belum tersedia di basis data.
+              </p>
+            )}
+            {masterTidakTersedia && (
+              <p className="mt-1">
+                Tidak ada produk yang dapat dikelola maupun diresepkan sampai master data diisi.
+                Jalankan migrasi seed, atau tambahkan produk dengan tombol di bawah. Halaman ini
+                tidak lagi menampilkan produk contoh, karena produk contoh tidak dapat diubah
+                maupun dihapus dan menyesatkan.
+              </p>
+            )}
+            {jumlahBarisDitolak > 0 && (
+              <p className={masterTidakTersedia ? 'mt-2' : 'font-bold'}>
+                {jumlahBarisDitolak} baris produk disingkirkan karena angka labelnya tidak
+                lengkap (kkal per saji, sendok per saji, atau volume per saji kosong). Baris
+                seperti itu tidak dapat dihitung dan tidak ditampilkan agar tidak dipakai
+                meresepkan. Lengkapi datanya lewat basis data.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabel & Form Manajemen Produk */}
       <TabelManajemenPKMK daftarProduk={daftarProduk} />

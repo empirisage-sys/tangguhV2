@@ -7,8 +7,17 @@ import { z } from 'zod'
  * Catatan Klinis (D-5 & S-2):
  * `kkal_per_sendok` dihitung otomatis dari (kkal_per_saji / sendok_per_saji).
  * Nilai sendok_per_saji wajib > 0 agar tidak terjadi pembagian dengan nol.
+ *
+ * PEMERIKSAAN LINTAS MEDAN (temuan audit T-3 dan T-9)
+ * Versi sebelumnya tidak memiliki satu pun `refine`, sehingga lima medan
+ * saling bertentangan dapat tersimpan bersama: densitas 5,0 kkal/ml pada
+ * produk 100 kkal per 90 ml, atau usia maksimal 12 bulan dengan usia minimal
+ * 24 bulan sehingga produk tidak akan cocok untuk umur mana pun. Sekarang
+ * ketiga hubungan berikut ditegakkan pada saat simpan.
  */
-export const skemaProdukPKMKAdmin = z.object({
+const TOLERANSI = { densitasPersen: 5, volumeSajiPersen: 10 } as const
+
+const medanProdukPKMK = z.object({
   id: z.string().optional(),
   nama: z
     .string({ required_error: 'Nama produk susu wajib diisi.' })
@@ -77,4 +86,48 @@ export const skemaProdukPKMKAdmin = z.object({
   isActive: z.coerce.boolean().default(true),
 })
 
-export type InputProdukPKMKAdmin = z.infer<typeof skemaProdukPKMKAdmin>
+export const skemaProdukPKMKAdmin = medanProdukPKMK
+  .superRefine((d, ctx) => {
+    // 1. Usia maksimal tidak boleh mendahului usia minimal.
+    if (d.maksUsiaBulan != null && d.maksUsiaBulan < d.minUsiaBulan) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['maksUsiaBulan'],
+        message:
+          `Usia maksimal (${d.maksUsiaBulan} bulan) tidak boleh lebih kecil daripada ` +
+          `usia minimal (${d.minUsiaBulan} bulan). Produk tidak akan cocok untuk umur mana pun.`,
+      })
+    }
+
+    // 2. Densitas wajib sejalan dengan kkal per saji dibagi volume per saji.
+    if (d.mlPerSaji > 0) {
+      const densitasLabel = d.kkalPerSaji / d.mlPerSaji
+      const selisih = Math.abs((d.densitasKkalPerMl - densitasLabel) / densitasLabel) * 100
+      if (selisih > TOLERANSI.densitasPersen) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['densitasKkalPerMl'],
+          message:
+            `Densitas ${d.densitasKkalPerMl} kkal/ml bertentangan dengan label produk ini: ` +
+            `${d.kkalPerSaji} kkal ÷ ${d.mlPerSaji} ml = ${densitasLabel.toFixed(2)} kkal/ml ` +
+            `(selisih ${selisih.toFixed(0)}%). Perbaiki salah satu angka agar sejalan.`,
+        })
+      }
+    }
+
+    // 3. Volume per saji wajib sejalan dengan sendok x air per sendok.
+    const rekonstruksi = d.sendokPerSaji * d.mlAirPerSendok
+    const selisihVolume = Math.abs((rekonstruksi - d.mlPerSaji) / d.mlPerSaji) * 100
+    if (selisihVolume > TOLERANSI.volumeSajiPersen) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['mlAirPerSendok'],
+        message:
+          `${d.sendokPerSaji} sendok × ${d.mlAirPerSendok} ml air = ${rekonstruksi} ml, ` +
+          `sedangkan volume per saji diisi ${d.mlPerSaji} ml (selisih ${selisihVolume.toFixed(0)}%). ` +
+          'Periksa kembali label kemasan; kedua angka harus menggambarkan saji yang sama.',
+      })
+    }
+  })
+
+export type InputProdukPKMKAdmin = z.infer<typeof medanProdukPKMK>

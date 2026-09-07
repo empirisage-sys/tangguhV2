@@ -32,7 +32,7 @@
 import { LANGKAH_UMUR_BULAN, tabelUmur, UMUR_MAKS_BULAN } from '@/lib/who'
 import type { JenisKelamin } from '@/lib/who'
 import { batasTabel, interpolasiLms } from './lms'
-import type { HasilGizi, MetodeKalori, StatusBBTB } from './tipe'
+import type { HasilGizi, MetodeKalori, StatusBBTB, StatusTBU } from './tipe'
 
 /**
  * Tabel Recommended Dietary Allowance energi, satuan kkal per kg berat badan per hari.
@@ -118,6 +118,25 @@ export type InputGizi = {
   panjangTerkoreksiCm: number
   jenisKelamin: JenisKelamin
   statusBBTB: StatusBBTB | null
+  /**
+   * Status TB/U. Diteruskan agar keputusan tumbuh kejar dapat memperhitungkan
+   * anak yang stunting tanpa wasting.
+   *
+   * ==========================================================================
+   * MENUNGGU KEPUTUSAN KLINIS
+   * Saat ini nilai ini TIDAK mengubah perilaku: target tumbuh kejar tetap
+   * hanya dianjurkan untuk `gizi_kurang` dan `gizi_buruk`, persis seperti
+   * sebelumnya. Anak dengan TB/U di bawah -2 SD tetapi BB/TB normal — profil
+   * stunting kronis yang paling umum pada program ini — masih mendapat metode
+   * `pemeliharaan`.
+   *
+   * Sebelumnya `statusTBU` bahkan tidak sampai ke lapisan ini, sehingga
+   * keputusannya tidak mungkin diambil. Sekarang datanya tersedia; keputusan
+   * apakah stunting tanpa wasting layak target tumbuh kejar menunggu dokter
+   * spesialis anak / nutrisionis. Lihat temuan audit Z-7.
+   * ==========================================================================
+   */
+  statusTBU?: StatusTBU | null
 }
 
 function bulatkanSatuDesimal(n: number): number {

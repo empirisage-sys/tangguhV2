@@ -104,6 +104,12 @@ export type UmurKalender = {
  * Contoh: 2 Tahun 2 Bulan 19 Hari (810 Hari).
  */
 export function hitungUmurKalender(tanggalLahir: string, tanggalPeriksa: string): UmurKalender {
+  // Validasi lebih dulu, dengan penjaga yang sama seperti `keHariEpoch`.
+  // Versi sebelumnya mem-parsing langsung dan hanya terselamatkan karena
+  // `selisihHari` di bawah melempar galat — kebetulan, bukan rancangan (Z-19).
+  keHariEpoch(tanggalLahir, 'Tanggal lahir')
+  keHariEpoch(tanggalPeriksa, 'Tanggal periksa')
+
   const tLahir = new Date(tanggalLahir + 'T00:00:00Z')
   const tPeriksa = new Date(tanggalPeriksa + 'T00:00:00Z')
 
@@ -140,8 +146,38 @@ export function hitungUmurKalender(tanggalLahir: string, tanggalPeriksa: string)
   }
 }
 
+/**
+ * Usia gestasi yang dianggap cukup bulan. Di atas ini tidak ada koreksi.
+ */
+export const GESTASI_CUKUP_BULAN_MINGGU = 37
+
+/** Batas kewajaran usia gestasi yang boleh diterima sebagai masukan. */
+export const GESTASI_MIN_MINGGU = 22
+export const GESTASI_MAKS_MINGGU = 42
+
+/**
+ * Umur (dalam bulan, memakai umur KOREKSI) sampai kapan koreksi prematuritas
+ * masih diterapkan.
+ *
+ * ==========================================================================
+ * MENUNGGU KEPUTUSAN KLINIS
+ * Nilai 24 bulan adalah konvensi yang paling lazim, dan sebagian panduan
+ * memakai 36 bulan untuk prematur ekstrem. Angka ini WAJIB dikonfirmasi dokter
+ * spesialis anak sebelum dipakai di lapangan, lalu catat keputusannya di sini.
+ *
+ * Sebelum perbaikan ini, koreksi diterapkan pada umur BERAPA PUN: anak 5 tahun
+ * yang lahir 24 minggu tetap dikurangi 3,7 bulan. Lihat temuan audit Z-4.
+ * ==========================================================================
+ */
+export const BATAS_UMUR_KOREKSI_PREMATUR_BULAN = 24
+
 export type UsiaKoreksiPrematur = {
   isPrematur: boolean
+  /**
+   * `true` bila anak memang lahir prematur tetapi umurnya sudah melewati
+   * `BATAS_UMUR_KOREKSI_PREMATUR_BULAN`, sehingga koreksi TIDAK diterapkan.
+   */
+  koreksiKedaluwarsa: boolean
   usiaGestasiMinggu: number
   defisitMinggu: number
   defisitHari: number
@@ -150,30 +186,54 @@ export type UsiaKoreksiPrematur = {
   teksKoreksi: string
 }
 
+function tanpaKoreksi(
+  kronologis: UmurKalender,
+  usiaGestasiMinggu: number | undefined,
+  kedaluwarsa: boolean,
+): UsiaKoreksiPrematur {
+  return {
+    isPrematur: false,
+    koreksiKedaluwarsa: kedaluwarsa,
+    usiaGestasiMinggu: usiaGestasiMinggu ?? 40,
+    defisitMinggu: 0,
+    defisitHari: 0,
+    umurKronologis: kronologis,
+    umurKoreksi: kronologis,
+    teksKoreksi: kronologis.teks,
+  }
+}
+
 /**
  * Menghitung usia koreksi bagi bayi lahir prematur (< 37 minggu gestasi).
  * Defisit prematuritas = (40 - usiaGestasi) minggu.
+ *
+ * Koreksi TIDAK diterapkan bila:
+ *   - usia gestasi tidak diisi, atau di luar rentang wajar 22-42 minggu
+ *   - usia gestasi >= 37 minggu (cukup bulan)
+ *   - umur koreksi anak sudah melewati `batasUmurKoreksiBulan`
+ *
+ * Pada kasus terakhir, `koreksiKedaluwarsa` bernilai `true` supaya lapisan
+ * tampilan dapat menjelaskan mengapa umur yang dipakai adalah umur kronologis.
  */
 export function hitungUsiaKoreksi(
   tanggalLahir: string,
   tanggalPeriksa: string,
   usiaGestasiMinggu?: number,
+  batasUmurKoreksiBulan: number = BATAS_UMUR_KOREKSI_PREMATUR_BULAN,
 ): UsiaKoreksiPrematur {
   const kronologis = hitungUmurKalender(tanggalLahir, tanggalPeriksa)
 
-  if (!usiaGestasiMinggu || usiaGestasiMinggu >= 37) {
-    return {
-      isPrematur: false,
-      usiaGestasiMinggu: usiaGestasiMinggu ?? 40,
-      defisitMinggu: 0,
-      defisitHari: 0,
-      umurKronologis: kronologis,
-      umurKoreksi: kronologis,
-      teksKoreksi: kronologis.teks,
-    }
+  const gestasiSah =
+    typeof usiaGestasiMinggu === 'number' &&
+    Number.isFinite(usiaGestasiMinggu) &&
+    usiaGestasiMinggu >= GESTASI_MIN_MINGGU &&
+    usiaGestasiMinggu <= GESTASI_MAKS_MINGGU
+
+  if (!gestasiSah || usiaGestasiMinggu! >= GESTASI_CUKUP_BULAN_MINGGU) {
+    return tanpaKoreksi(kronologis, usiaGestasiMinggu, false)
   }
 
-  const defisitMinggu = Math.max(0, 40 - usiaGestasiMinggu)
+  const defisitMinggu = Math.max(0, 40 - usiaGestasiMinggu!)
   const defisitHari = defisitMinggu * 7
 
   const tLahirMs = new Date(tanggalLahir + 'T00:00:00Z').getTime()
@@ -181,9 +241,15 @@ export function hitungUsiaKoreksi(
 
   const umurKoreksi = hitungUmurKalender(tLahirKoreksi, tanggalPeriksa)
 
+  // Melewati batas umur koreksi: pakai umur kronologis, tetapi tandai.
+  if (umurKoreksi.totalBulanDesimal > batasUmurKoreksiBulan) {
+    return tanpaKoreksi(kronologis, usiaGestasiMinggu, true)
+  }
+
   return {
     isPrematur: true,
-    usiaGestasiMinggu,
+    koreksiKedaluwarsa: false,
+    usiaGestasiMinggu: usiaGestasiMinggu!,
     defisitMinggu,
     defisitHari,
     umurKronologis: kronologis,

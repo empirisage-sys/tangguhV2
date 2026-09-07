@@ -6,7 +6,7 @@ import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { skemaAsuhanGizi, bacaFormAsuhanGizi } from '@/lib/validasi/asuhan-gizi'
 import { keBarisAsuhanGizi, barisAsuhanKonsisten } from '@/lib/db/asuhan-gizi'
 import { hitungTakaran } from '@/lib/pkmk/hitung'
-import { produkById } from '@/lib/pkmk/produk'
+import { bacaProdukPKMKAktifById } from '@/lib/db/pkmk-server'
 import { ringkasanTakaran } from '@/lib/pkmk/teks'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
@@ -52,12 +52,18 @@ export async function simpanAsuhanGizi(formData: FormData): Promise<HasilSimpanA
     }
   }
 
-  const produk = produkById(d.produkId)
+  // Produk dibaca dari MASTER DATA, bukan dari daftar statis. Dengan begitu
+  // perhitungan ulang di server memakai spesifikasi yang sama dengan yang
+  // dikelola admin, dan produk yang sudah dinonaktifkan tidak dapat
+  // diresepkan pada asuhan gizi baru (temuan audit T-0).
+  const produk = await bacaProdukPKMKAktifById(d.produkId)
   if (!produk) {
     return {
       ok: false,
-      pesan: 'Produk PKMK tidak dikenali.',
-      galatMedan: { produkId: 'Pilih produk dari daftar yang tersedia.' },
+      pesan: 'Produk PKMK tidak dikenali atau sudah tidak aktif.',
+      galatMedan: {
+        produkId: 'Pilih produk dari daftar yang tersedia pada master data terbaru.',
+      },
     }
   }
 

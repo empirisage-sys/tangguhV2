@@ -147,6 +147,14 @@ const VELOCITY: Record<StatusVelocity, TampilanStatus> = {
     nada: 'aman',
     ikon: 'circle-check',
   },
+  turun_masih_dalam_batas: {
+    label: 'Turun, masih dalam batas',
+    keterangan:
+      'Berat badan berkurang, tetapi penurunannya masih di dalam sebaran normal ' +
+      'menurut standar WHO pada umur ini. Tetap pantau pada penimbangan berikutnya.',
+    nada: 'waspada',
+    ikon: 'triangle-alert',
+  },
   tidak_naik: {
     label: 'Tidak naik',
     keterangan: 'Berat badan tidak bertambah atau berkurang sejak penimbangan sebelumnya.',

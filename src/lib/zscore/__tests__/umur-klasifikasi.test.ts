@@ -72,17 +72,37 @@ describe('perhitungan umur', () => {
     expect(umur.teks).toBe('2 Tahun 2 Bulan 19 Hari')
   })
 
-  it('menghitung koreksi usia prematuritas', () => {
-    // Lahir 32 minggu (defisit 8 minggu / 56 hari)
-    const koreksi = hitungUsiaKoreksi('2024-06-01', '2026-08-20', 32)
+  it('menghitung koreksi usia prematuritas di dalam batas umur', () => {
+    // Lahir 32 minggu (defisit 8 minggu / 56 hari), diperiksa pada umur ~12 bulan.
+    const koreksi = hitungUsiaKoreksi('2025-06-01', '2026-06-01', 32)
     expect(koreksi.isPrematur).toBe(true)
+    expect(koreksi.koreksiKedaluwarsa).toBe(false)
     expect(koreksi.defisitMinggu).toBe(8)
     expect(koreksi.defisitHari).toBe(56)
-    expect(koreksi.umurKronologis.teks).toBe('2 Tahun 2 Bulan 19 Hari')
-    expect(koreksi.umurKoreksi.tahun).toBe(2)
-    expect(koreksi.umurKoreksi.bulan).toBe(0)
-    expect(koreksi.umurKoreksi.hari).toBe(24)
-    expect(koreksi.umurKoreksi.totalHari).toBe(754)
+    expect(koreksi.umurKronologis.totalHari).toBe(365)
+    expect(koreksi.umurKoreksi.totalHari).toBe(365 - 56)
+  })
+
+  it('berhenti mengoreksi setelah melewati batas umur koreksi', () => {
+    // Anak yang sama pada umur kronologis 2 tahun 2 bulan: umur koreksinya
+    // ~24,8 bulan, sudah melewati BATAS_UMUR_KOREKSI_PREMATUR_BULAN.
+    //
+    // Sebelum perbaikan Z-4 koreksi berlaku pada umur BERAPA PUN, sehingga anak
+    // 5 tahun yang lahir 24 minggu tetap dikurangi 3,7 bulan.
+    const lewat = hitungUsiaKoreksi('2024-06-01', '2026-08-20', 32)
+    expect(lewat.isPrematur).toBe(false)
+    expect(lewat.koreksiKedaluwarsa).toBe(true)
+    expect(lewat.defisitHari).toBe(0)
+    expect(lewat.umurKoreksi.teks).toBe(lewat.umurKronologis.teks)
+    expect(lewat.umurKronologis.teks).toBe('2 Tahun 2 Bulan 19 Hari')
+  })
+
+  it('menolak usia gestasi di luar rentang wajar 22-42 minggu', () => {
+    for (const gestasi of [0, 4, 21, 43, 60, Number.NaN]) {
+      const h = hitungUsiaKoreksi('2025-06-01', '2026-06-01', gestasi)
+      expect(h.isPrematur, `gestasi ${gestasi}`).toBe(false)
+      expect(h.defisitHari, `gestasi ${gestasi}`).toBe(0)
+    }
   })
 
   it('mengabaikan usia koreksi bila usia gestasi >= 37 minggu (aterm)', () => {

@@ -25,11 +25,21 @@ import {
   type TabelLms,
 } from '@/lib/who'
 import { lmsUntukKurva, nilaiDariLms } from '@/lib/zscore/lms'
+import type { Lms } from '@/lib/who'
 import type { StandarPanjang } from '@/lib/zscore/tipe'
 
-/** Garis rujukan yang digambar. */
-export const GARIS_SD = [-3, -2, 0, 2, 3] as const
-export type GarisSd = (typeof GARIS_SD)[number]
+/**
+ * Garis rujukan yang digambar pada kurva.
+ *
+ * Sebelumnya konstanta ini berisi lima garis `[-3, -2, 0, 2, 3]` sementara
+ * `KurvaWHO.tsx` merender tujuh garis termasuk +-1 SD, sehingga spesifikasi dan
+ * implementasi berselisih. Sekarang satu sumber: `GARIS_SD_LENGKAP` adalah
+ * yang benar-benar dihitung dan digambar, `GARIS_SD_UTAMA` adalah lima garis
+ * bentuk cetakan resmi WHO bila suatu saat diperlukan. Lihat temuan Z-10.
+ */
+export const GARIS_SD_LENGKAP = [-3, -2, -1, 0, 1, 2, 3] as const
+export const GARIS_SD_UTAMA = [-3, -2, 0, 2, 3] as const
+export type GarisSd = (typeof GARIS_SD_LENGKAP)[number]
 
 export type TitikRujukan = {
   x: number
@@ -93,18 +103,34 @@ export type KunjunganRiwayat = {
 // Pembantu
 // ---------------------------------------------------------------------------
 
+/**
+ * Nilai pada garis SD tertentu, dibulatkan dua desimal.
+ * `null` bila distribusi LMS tidak mendefinisikan nilai pada z tersebut.
+ */
+function garis(lms: Lms, z: number): number | null {
+  const nilai = nilaiDariLms(lms, z)
+  return nilai === null ? null : Math.round(nilai * 100) / 100
+}
+
 function titikRujukan(x: number, tabel: TabelLms, langkah: number): TitikRujukan | null {
   const lms = lmsUntukKurva(x, tabel, langkah)
   if (!lms) return null
+
+  const nilai = GARIS_SD_LENGKAP.map((z) => garis(lms, z))
+  // Bila ada satu saja garis yang tidak terdefinisi, titik ini tidak digambar.
+  // Mengisinya dengan 0 akan menarik garis rujukan ke sumbu (temuan Z-9).
+  if (nilai.some((n) => n === null)) return null
+  const [n3, n2, n1, z0, p1, p2, p3] = nilai as number[]
+
   return {
     x: Math.round(x * 100) / 100,
-    sd_n3: Math.round(nilaiDariLms(lms, -3) * 100) / 100,
-    sd_n2: Math.round(nilaiDariLms(lms, -2) * 100) / 100,
-    sd_n1: Math.round(nilaiDariLms(lms, -1) * 100) / 100,
-    sd_0: Math.round(nilaiDariLms(lms, 0) * 100) / 100,
-    sd_p1: Math.round(nilaiDariLms(lms, 1) * 100) / 100,
-    sd_p2: Math.round(nilaiDariLms(lms, 2) * 100) / 100,
-    sd_p3: Math.round(nilaiDariLms(lms, 3) * 100) / 100,
+    sd_n3: n3,
+    sd_n2: n2,
+    sd_n1: n1,
+    sd_0: z0,
+    sd_p1: p1,
+    sd_p2: p2,
+    sd_p3: p3,
   }
 }
 
@@ -302,8 +328,9 @@ export function seriBBTB(
   basisPaksa?: IndikatorPanjang,
   rentangKustom?: [number, number],
 ): SeriKurva {
+  // Komparator stabil: mengembalikan 0 untuk tanggal yang sama (Z-16).
   const terakhir = [...riwayat].sort((a, b) =>
-    a.tanggalPeriksa < b.tanggalPeriksa ? -1 : 1,
+    a.tanggalPeriksa === b.tanggalPeriksa ? 0 : a.tanggalPeriksa < b.tanggalPeriksa ? -1 : 1,
   )[riwayat.length - 1]
 
   const basis: IndikatorPanjang =
@@ -364,6 +391,31 @@ export function seriBBTB(
   }
 }
 
+/** Satu titik pengukuran anak sebagaimana digambar pada kurva. */
+export type TitikGambarAnak = {
+  x: number
+  y: number
+  tanggal: string
+  z: number | null
+}
+
+/**
+ * Titik anak yang benar-benar digambar pada kurva.
+ *
+ * Fungsi ini murni supaya dapat diuji. Jumlah keluarannya WAJIB sama dengan
+ * jumlah titik `seri.anak` yang dapat dinilai — termasuk ketika beberapa
+ * kunjungan berada pada sumbu-x yang sama, yang lazim pada kurva BB/TB.
+ *
+ * Versi sebelumnya menggabungkan titik anak ke baris rujukan di dalam komponen
+ * dan kehilangan titik kedua pada x yang sama, tanpa catatan apa pun. Lihat
+ * temuan audit Z-2.
+ */
+export function titikGambarAnak(seri: SeriKurva): TitikGambarAnak[] {
+  return seri.anak
+    .filter((a) => !a.tidakDinilai)
+    .map((a) => ({ x: a.x, y: a.y, tanggal: a.tanggal, z: a.z }))
+}
+
 function catatanUmum(riwayat: KunjunganRiwayat[], anak: TitikAnak[]): string[] {
   const catatan: string[] = []
 
@@ -378,7 +430,7 @@ function catatanUmum(riwayat: KunjunganRiwayat[], anak: TitikAnak[]): string[] {
   if (dibuang > 0) {
     catatan.push(
       `${dibuang} pengukuran tidak tampil pada kurva ini karena berada di luar rentang ` +
-        'standar WHO yang dipakai aplikasi.',
+        'sumbu yang sedang ditampilkan atau di luar cakupan tabel standar WHO.',
     )
   }
 
