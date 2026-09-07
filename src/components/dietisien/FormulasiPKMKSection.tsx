@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Calculator, Info, ShieldAlert, Utensils } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { AlertTriangle, Calculator, CheckCircle2, Info, Printer, ShieldAlert, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import {
   PERINGATAN_DATA_PRODUK,
@@ -42,11 +42,27 @@ export type DataAsuhanGiziPKMK = {
   peringatan: string[]
 }
 
+/** Bentuk balasan Server Action penyimpanan. Sengaja lepas dari modul server. */
+export type BalasanSimpan = {
+  ok: boolean
+  pesan?: string
+  galatMedan?: Record<string, string>
+  ringkasan?: string
+}
+
 export type FormulasiPKMKProps = {
   namaBalita?: string
   umurBulan?: number
   beratKg?: number
   targetEnergiDefaultKkal?: number
+  /** Wajib diisi bila `aksiSimpan` diberikan. */
+  balitaId?: string
+  skriningId?: string
+  /**
+   * Server Action penyimpanan. Komponen hanya mengirim MASUKAN mentah;
+   * seluruh angka hasil dihitung ulang di server.
+   */
+  aksiSimpan?: (formData: FormData) => Promise<BalasanSimpan>
   onSimpan?: (data: DataAsuhanGiziPKMK) => void
 }
 
@@ -64,6 +80,9 @@ export function FormulasiPKMKSection({
   namaBalita = 'Balita',
   umurBulan = 24,
   targetEnergiDefaultKkal = 770,
+  balitaId,
+  skriningId,
+  aksiSimpan,
   onSimpan,
 }: FormulasiPKMKProps) {
   const produkTersedia = useMemo<ProdukPKMK[]>(() => {
@@ -77,6 +96,9 @@ export function FormulasiPKMKSection({
   const [mode, setMode] = useState<ModeTakaran>('dari_takaran')
   const [frekuensi, setFrekuensi] = useState(3)
   const [sendokPerSaji, setSendokPerSaji] = useState(3)
+  const [sedangSimpan, mulaiSimpan] = useTransition()
+  const [balasan, setBalasan] = useState<BalasanSimpan | null>(null)
+  const [sedangCetak, setSedangCetak] = useState(false)
 
   const produk = useMemo(
     () => produkTersedia.find((p) => p.id === produkId) ?? produkTersedia[0]!,
@@ -106,6 +128,37 @@ export function FormulasiPKMKSection({
   )
 
   const handleSimpan = () => {
+    setBalasan(null)
+
+    // Jalur tersimpan sungguhan: kirim MASUKAN mentah saja.
+    // Server menghitung ulang takarannya, sehingga angka yang tersimpan tidak
+    // pernah bergantung pada apa yang dikirim layar ini.
+    if (aksiSimpan && balitaId) {
+      const formData = new FormData()
+      formData.set('balitaId', balitaId)
+      if (skriningId) formData.set('skriningId', skriningId)
+      formData.set('tataLaksana', tataLaksana)
+      formData.set('produkId', produk.id)
+      formData.set('mode', mode)
+      formData.set('targetPersen', String(targetPersen))
+      formData.set('frekuensiPerHari', String(hasil.frekuensiPerHari))
+      if (mode === 'dari_takaran') {
+        formData.set('sendokPerSaji', String(hasil.sendokPerSaji))
+      }
+
+      mulaiSimpan(async () => {
+        try {
+          setBalasan(await aksiSimpan(formData))
+        } catch {
+          setBalasan({
+            ok: false,
+            pesan: 'Asuhan gizi belum tersimpan karena gangguan jaringan. Coba lagi.',
+          })
+        }
+      })
+      return
+    }
+
     const data: DataAsuhanGiziPKMK = {
       tataLaksana,
       produkId: produk.id,
@@ -127,6 +180,7 @@ export function FormulasiPKMKSection({
     }
     if (onSimpan) {
       onSimpan(data)
+      setBalasan({ ok: true, pesan: 'Asuhan gizi tersimpan.', ringkasan: data.ringkasan })
     } else {
       alert(
         `Asuhan gizi ${namaBalita} disimpan.\n\n` +
@@ -134,6 +188,41 @@ export function FormulasiPKMKSection({
           `Energi yang diberikan takaran ini: ${angka(data.kkalDiberikan)} kkal ` +
           `(${angka(data.persenTerhadapTarget)}% dari target ${angka(data.targetKkal)} kkal).`,
       )
+    }
+  }
+
+  /**
+   * Mencetak lembar asuhan gizi.
+   *
+   * Objek `hasil` yang sama dengan yang tampil di layar diteruskan apa adanya ke
+   * pembuat PDF. Tidak ada perhitungan ulang, sehingga lembar yang dibawa pulang
+   * tidak mungkin berbeda dari yang dilihat dietisien.
+   */
+  const handleCetak = async () => {
+    setSedangCetak(true)
+    try {
+      const { buatPdfLembarAsuhanGizi } = await import('@/lib/ekspor/pdf-asuhan-gizi')
+      const berkas = await buatPdfLembarAsuhanGizi(
+        {
+          namaBalita,
+          umurBulan,
+          tataLaksana: tataLaksana || '-',
+          totalKebutuhanKkal: targetEnergiDefaultKkal,
+        },
+        hasil,
+      )
+      const url = URL.createObjectURL(
+        new Blob([berkas as unknown as BlobPart], { type: 'application/pdf' }),
+      )
+      const tautan = document.createElement('a')
+      tautan.href = url
+      tautan.download = `Lembar_Asuhan_Gizi_${namaBalita.replace(/\s+/g, '_')}.pdf`
+      tautan.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setBalasan({ ok: false, pesan: 'Lembar asuhan gizi gagal dibuat. Coba lagi.' })
+    } finally {
+      setSedangCetak(false)
     }
   }
 
@@ -424,10 +513,56 @@ export function FormulasiPKMKSection({
         <span>{PERINGATAN_DATA_PRODUK}</span>
       </div>
 
-      <div className="pt-1">
-        <Button type="button" onClick={handleSimpan} varian="utama" lebarPenuh>
-          Simpan Asuhan Gizi Balita
+      <div className="space-y-2 pt-1">
+        <Button
+          type="button"
+          onClick={handleSimpan}
+          varian="utama"
+          lebarPenuh
+          disabled={sedangSimpan}
+        >
+          {sedangSimpan ? 'Menyimpan...' : 'Simpan Asuhan Gizi Balita'}
         </Button>
+
+        <button
+          type="button"
+          onClick={handleCetak}
+          disabled={sedangCetak}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-laut-300 bg-white text-sm font-bold text-laut-800 transition hover:bg-laut-50 disabled:opacity-60"
+        >
+          <Printer className="size-4" />
+          {sedangCetak ? 'Menyiapkan lembar...' : 'Cetak Lembar Asuhan Gizi (PDF)'}
+        </button>
+
+        {balasan && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`flex items-start gap-2.5 rounded-xl border p-3 text-xs ${
+              balasan.ok
+                ? 'border-emerald-300/60 bg-emerald-50 text-emerald-900'
+                : KELAS_NADA.bahaya
+            }`}
+          >
+            {balasan.ok ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+            ) : (
+              <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+            )}
+            <span>
+              <span className="block font-bold">{balasan.pesan}</span>
+              {balasan.ringkasan && (
+                <span className="mt-0.5 block opacity-90">{balasan.ringkasan}</span>
+              )}
+              {balasan.galatMedan &&
+                Object.values(balasan.galatMedan).map((teks) => (
+                  <span key={teks} className="mt-0.5 block opacity-90">
+                    {teks}
+                  </span>
+                ))}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

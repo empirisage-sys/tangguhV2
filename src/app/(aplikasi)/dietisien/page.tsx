@@ -19,6 +19,7 @@ import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
 import { apakahPerluPKMK } from '@/lib/zscore'
+import { simpanAsuhanGizi } from './actions'
 
 export default function HalamanDietisien() {
   const [balitaTerpilih, setBalitaTerpilih] = useState<BalitaDetail | null>(null)
@@ -204,12 +205,8 @@ export default function HalamanDietisien() {
                 umurBulan={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 24}
                 beratKg={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 8.0}
                 targetEnergiDefaultKkal={770}
-                onSimpan={() => {
-                  alert(
-                    `Formulasi PKMK untuk ${balitaTerpilih.nama} berhasil disimpan ke rekam asuhan gizi.`,
-                  )
-                  setPanelTerbuka(false)
-                }}
+                balitaId={balitaTerpilih.id}
+                aksiSimpan={simpanAsuhanGizi}
               />
             </div>
           </div>
