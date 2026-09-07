@@ -149,15 +149,16 @@ describe('lembar tetap satu halaman', () => {
     let duaHalaman = 0
     for (const produk of PRODUK_PKMK) {
       for (let f = 1; f <= 6; f++) {
-        for (const s of [1, 2, 3, 5, 8, 12, 15]) {
+        for (const s of [1, 3, 8, 15]) {
           for (const masihASI of [true, false]) {
+           for (const umurBulan of [13, 19, 24, 55]) {
             const h = hitungTakaran({
               produk, mode: 'dari_takaran', frekuensiPerHari: f, sendokPerSaji: s, targetKkal: 700,
             })
             const berkas = await buatPdfLembarAsuhanGizi(
               {
                 namaBalita: 'Nama Balita Yang Cukup Panjang',
-                umurBulan: 19,
+                umurBulan,
                 tataLaksana: 'PKMK + observasi 2 minggu',
                 totalKebutuhanKkal: 900,
                 masihASI,
@@ -165,10 +166,11 @@ describe('lembar tetap satu halaman', () => {
               h,
             )
             if (new TextDecoder('latin1').decode(berkas).includes('Halaman 2 dari')) duaHalaman++
+           }
           }
         }
       }
     }
     expect(duaHalaman).toBe(0)
-  })
+  }, 60_000)
 })
