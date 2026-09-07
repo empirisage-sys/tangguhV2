@@ -13,7 +13,7 @@ import {
 import { susunJadwal } from '@/lib/pkmk/jadwal'
 
 /**
- * Lembar Asuhan Gizi PKMK yang dibawa pulang ibu.
+ * Lembar "Tata Laksana Nutrisi Anak" yang dibawa pulang ibu.
  *
  * ATURAN YANG MENGIKAT BERKAS INI
  * -------------------------------
@@ -84,7 +84,7 @@ export async function buatPdfLembarAsuhanGizi(
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.setTextColor(11, 118, 129)
-  doc.text('LEMBAR ASUHAN GIZI — TAKARAN SAJI PKMK', 105, 33, { align: 'center' })
+  doc.text('TATA LAKSANA NUTRISI ANAK', 105, 33, { align: 'center' })
 
   // 2. Identitas
   autoTable(doc, {
