@@ -3,13 +3,63 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { wajibPeran, wilayahUntukMenulis } from '@/lib/supabase/penjaga'
+import { wajibPeran, wilayahUntukMenulis, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { skemaBalita } from '@/lib/validasi/skrining'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
+/**
+ * Peran yang berwenang mendaftarkan balita.
+ *
+ * `admin` sengaja TIDAK termasuk: pendaftaran balita adalah pekerjaan kader dan
+ * nakes di lapangan, dan profil administrator memang tidak memiliki posyandu
+ * sehingga `wilayahUntukMenulis` tidak dapat menentukan wilayahnya.
+ */
+const PERAN_BOLEH_DAFTAR = ['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'] as const
+
 export async function simpanBalita(formData: FormData): Promise<HasilTindakan> {
-  const profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
-  const wilayah = wilayahUntukMenulis(profil)
+  // ==========================================================================
+  // GALAT IZIN WAJIB DIKEMBALIKAN, BUKAN DILEMPAR
+  //
+  // Sebelumnya `wajibPeran` dan `wilayahUntukMenulis` dipanggil tanpa penangkap.
+  // Keduanya melempar `TidakBerwenangError`, dan pada Server Action lemparan itu
+  // menjadi pengecualian server tak tertangani: peramban menerima HTTP 500,
+  // Next.js menyembunyikan pesannya di produksi, dan tombol simpan tinggal mati
+  // selamanya tanpa satu pun keterangan.
+  //
+  // Ditemukan saat mencoba mendaftarkan balita uji memakai akun Administrator.
+  // Dua keadaan yang paling mungkin dialami pengguna sungguhan:
+  //   - administrator membuka formulir ini (peran tidak berwenang)
+  //   - kader yang wilayah kerja pada profilnya belum dilengkapi admin
+  // Keduanya kini menghasilkan pesan yang dapat dibaca dan ditindaklanjuti.
+  //
+  // Empat server action lain di aplikasi ini sudah memakai pola try/catch yang
+  // sama; hanya dua formulir lapangan ini yang terlewat.
+  // ==========================================================================
+  // Kedua sebab ditangkap TERPISAH supaya pesannya tepat sasaran: yang satu
+  // soal peran, yang lain soal wilayah kerja yang belum dilengkapi admin.
+  let profil
+  try {
+    profil = await wajibPeran([...PERAN_BOLEH_DAFTAR])
+  } catch (galat) {
+    if (galat instanceof TidakBerwenangError) {
+      return {
+        ok: false,
+        pesan:
+          `${galat.message} Pendaftaran balita dilakukan oleh akun kader, ` +
+          'dietisien, dokter, atau dokter spesialis anak — bukan akun administrator.',
+      }
+    }
+    throw galat
+  }
+
+  let wilayah
+  try {
+    wilayah = wilayahUntukMenulis(profil)
+  } catch (galat) {
+    // Pesannya sudah menerangkan sendiri: wilayah kerja pada profil belum lengkap.
+    if (galat instanceof TidakBerwenangError) return { ok: false, pesan: galat.message }
+    throw galat
+  }
 
   const hasil = skemaBalita.safeParse({
     nama: formData.get('nama'),
