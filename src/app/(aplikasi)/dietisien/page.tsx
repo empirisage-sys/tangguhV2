@@ -14,7 +14,6 @@ import {
   Utensils,
   X,
 } from 'lucide-react'
-import { PRODUK_PKMK_LIST, type ProdukPKMK } from '@/lib/db/pkmk'
 import { SAMPLE_BALITA_DATABASE, type BalitaDetail } from '@/lib/db/balita-mock'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
