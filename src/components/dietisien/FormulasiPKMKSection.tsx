@@ -1,86 +1,147 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { PRODUK_PKMK_LIST, type ProdukPKMK } from '@/lib/db/pkmk'
-import { Sparkles, Utensils, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, Calculator, Info, ShieldAlert, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import {
+  PERINGATAN_DATA_PRODUK,
+  PRODUK_PKMK,
+  produkUntukUmur,
+  type ProdukPKMK,
+} from '@/lib/pkmk/produk'
+import {
+  BATAS,
+  hitungTakaran,
+  pilihanTakaran,
+  sisaDariMakanan,
+  type ModeTakaran,
+} from '@/lib/pkmk/hitung'
+import {
+  bacaSeluruhPeringatan,
+  keteranganProduk,
+  ringkasanTakaran,
+} from '@/lib/pkmk/teks'
+
+export type DataAsuhanGiziPKMK = {
+  tataLaksana: string
+  produkId: string
+  produkNama: string
+  mode: ModeTakaran
+  targetKaloriPersen: number
+  targetKkal: number
+  frekuensiPerHari: number
+  sendokPerSaji: number
+  sendokPerHari: number
+  kkalDiberikan: number
+  selisihKkal: number
+  persenTerhadapTarget: number
+  mlLarutanPerSaji: number
+  mlLarutanPerHari: number
+  sisaDariMakananKkal: number
+  ringkasan: string
+  peringatan: string[]
+}
 
 export type FormulasiPKMKProps = {
   namaBalita?: string
   umurBulan?: number
   beratKg?: number
   targetEnergiDefaultKkal?: number
-  onSimpan?: (data: {
-    tataLaksana: string
-    targetKaloriPersen: number
-    targetKaloriKkal: number
-    produk: ProdukPKMK
-    frekuensiPerHari: number
-    sendokPerSaji: number
-    mlAirPerSaji: number
-  }) => void
+  onSimpan?: (data: DataAsuhanGiziPKMK) => void
+}
+
+const KELAS_NADA: Record<'waspada' | 'bahaya', string> = {
+  waspada: 'border-waspada-garis/50 bg-waspada-bg text-waspada-teks',
+  bahaya: 'border-bahaya-garis/50 bg-bahaya-bg text-bahaya-teks',
+}
+
+function angka(nilai: number): string {
+  const n = Math.round(nilai * 10) / 10
+  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.', ',')
 }
 
 export function FormulasiPKMKSection({
   namaBalita = 'Balita',
   umurBulan = 24,
-  beratKg = 8.0,
   targetEnergiDefaultKkal = 770,
   onSimpan,
 }: FormulasiPKMKProps) {
-  // 1. Tata Laksana Klinis
-  const [tataLaksana, setTataLaksana] = useState<string>('PKMK + observasi 2 minggu')
+  const produkTersedia = useMemo<ProdukPKMK[]>(() => {
+    const sesuaiUmur = produkUntukUmur(umurBulan)
+    return sesuaiUmur.length > 0 ? sesuaiUmur : PRODUK_PKMK
+  }, [umurBulan])
 
-  // 2. Target Kalori PKMK (0%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%)
-  const [targetPersen, setTargetPersen] = useState<number>(80)
+  const [tataLaksana, setTataLaksana] = useState('PKMK + observasi 2 minggu')
+  const [targetPersen, setTargetPersen] = useState(80)
+  const [produkId, setProdukId] = useState(produkTersedia[0]!.id)
+  const [mode, setMode] = useState<ModeTakaran>('dari_takaran')
+  const [frekuensi, setFrekuensi] = useState(3)
+  const [sendokPerSaji, setSendokPerSaji] = useState(3)
 
-  // 3. Produk PKMK
-  const [produkId, setProdukId] = useState<string>(PRODUK_PKMK_LIST[0]?.id || 'pkmk-1')
+  const produk = useMemo(
+    () => produkTersedia.find((p) => p.id === produkId) ?? produkTersedia[0]!,
+    [produkTersedia, produkId],
+  )
 
-  // 4. Frekuensi / Hari (1x, 2x, 3x, 4x, 5x)
-  const [frekuensi, setFrekuensi] = useState<number>(3)
+  const targetKkal = Math.round((targetEnergiDefaultKkal * targetPersen) / 100)
 
-  // 5. Sendok Takar / Saji (1 sendok, 2 sendok, 3 sendok, 4 sendok, 5 sendok)
-  const [sendokTakar, setSendokTakar] = useState<number>(3)
+  // SATU sumber kebenaran. Setiap angka di layar ini berasal dari objek ini.
+  const hasil = useMemo(
+    () =>
+      hitungTakaran({
+        produk,
+        mode,
+        frekuensiPerHari: frekuensi,
+        sendokPerSaji,
+        targetKkal,
+      }),
+    [produk, mode, frekuensi, sendokPerSaji, targetKkal],
+  )
 
-  const produkDipilih = useMemo(() => {
-    return PRODUK_PKMK_LIST.find((p) => p.id === produkId) || PRODUK_PKMK_LIST[0]!
-  }, [produkId])
-
-  // Perhitungan Kalori
-  const targetKaloriKkal = Math.round((targetEnergiDefaultKkal * targetPersen) / 100)
-  const sisaKaloriMakananASI = Math.max(0, targetEnergiDefaultKkal - targetKaloriKkal)
-
-  // Takaran per saji
-  const mlAirPerSaji = Math.round(sendokTakar * (produkDipilih.mlAirPerSendok || 30))
-  const totalSendokHarian = sendokTakar * frekuensi
-  const kaloriPKMKHarian = Math.round(totalSendokHarian * produkDipilih.kkalPerSendok)
+  const peringatan = bacaSeluruhPeringatan(hasil)
+  const sisaMakanan = sisaDariMakanan(targetEnergiDefaultKkal, hasil)
+  const daftarPilihan = useMemo(
+    () => (mode === 'dari_target' ? pilihanTakaran(produk, targetKkal) : []),
+    [mode, produk, targetKkal],
+  )
 
   const handleSimpan = () => {
+    const data: DataAsuhanGiziPKMK = {
+      tataLaksana,
+      produkId: produk.id,
+      produkNama: produk.nama,
+      mode,
+      targetKaloriPersen: targetPersen,
+      targetKkal: hasil.targetKkal,
+      frekuensiPerHari: hasil.frekuensiPerHari,
+      sendokPerSaji: hasil.sendokPerSaji,
+      sendokPerHari: hasil.sendokPerHari,
+      kkalDiberikan: hasil.kkalDiberikan,
+      selisihKkal: hasil.selisihKkal,
+      persenTerhadapTarget: hasil.persenTerhadapTarget,
+      mlLarutanPerSaji: hasil.mlLarutanPerSaji,
+      mlLarutanPerHari: hasil.mlLarutanPerHari,
+      sisaDariMakananKkal: sisaMakanan,
+      ringkasan: ringkasanTakaran(hasil),
+      peringatan: peringatan.map((p) => p.pesan),
+    }
     if (onSimpan) {
-      onSimpan({
-        tataLaksana,
-        targetKaloriPersen: targetPersen,
-        targetKaloriKkal,
-        produk: produkDipilih,
-        frekuensiPerHari: frekuensi,
-        sendokPerSaji: sendokTakar,
-        mlAirPerSaji,
-      })
+      onSimpan(data)
     } else {
       alert(
-        `Formulasi intervensi gizi untuk ${namaBalita} berhasil disimpan!\n\n` +
-          `• Tata Laksana: ${tataLaksana}\n` +
-          `• Target Kalori PKMK: ${targetPersen}% (${targetKaloriKkal} kkal)\n` +
-          `• Produk: ${produkDipilih.nama}\n` +
-          `• Takaran: ${frekuensi}x sehari, per saji ${sendokTakar} sendok takar dlm ${mlAirPerSaji} ml air hangat.`,
+        `Asuhan gizi ${namaBalita} disimpan.\n\n` +
+          `${data.ringkasan}\n\n` +
+          `Energi yang diberikan takaran ini: ${angka(data.kkalDiberikan)} kkal ` +
+          `(${angka(data.persenTerhadapTarget)}% dari target ${angka(data.targetKkal)} kkal).`,
       )
     }
   }
 
+  const kelasSelect =
+    'mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-bold text-tinta-900 focus:border-laut-500 focus:outline-none'
+
   return (
     <div className="space-y-4 rounded-2xl border border-kabut-200 bg-white p-5 shadow-[var(--shadow-kartu)] sm:p-6">
-      {/* Title seperti di Gambar 2 */}
       <div>
         <h2 className="font-display text-lg font-bold text-laut-800 sm:text-xl">
           Tata Laksana &amp; Rekomendasi Intervensi Gizi
@@ -90,19 +151,16 @@ export function FormulasiPKMKSection({
         </p>
       </div>
 
-      {/* Field: Tata Laksana (Klinis) */}
+      {/* 1. Tata laksana klinis */}
       <div className="rounded-xl border border-kabut-200 bg-kabut-50/70 p-3.5">
-        <label
-          htmlFor="tataLaksanaSelect"
-          className="block text-xs font-semibold text-laut-800"
-        >
+        <label htmlFor="tataLaksanaSelect" className="block text-xs font-semibold text-laut-800">
           Tata Laksana (Klinis)
         </label>
         <select
           id="tataLaksanaSelect"
           value={tataLaksana}
           onChange={(e) => setTataLaksana(e.target.value)}
-          className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
+          className={kelasSelect}
         >
           <option value="">-- Pilih Tata Laksana --</option>
           <option value="PKMK + observasi 2 minggu">PKMK + observasi 2 minggu</option>
@@ -111,21 +169,82 @@ export function FormulasiPKMKSection({
         </select>
       </div>
 
-      {/* 4 Kolom Dropdown Sejajar Seperti Gambar 2 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {/* Kolom 1: Target Kalori PKMK (0%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%) */}
-        <div>
-          <label
-            htmlFor="targetPersenSelect"
-            className="block text-xs font-semibold text-tinta-700"
+      {/* 2. Produk PKMK, beserta angka labelnya agar dapat diperiksa sendiri */}
+      <div className="rounded-xl border border-kabut-200 bg-kabut-50/70 p-3.5">
+        <label htmlFor="produkSelect" className="block text-xs font-semibold text-laut-800">
+          Produk PKMK
+        </label>
+        <select
+          id="produkSelect"
+          value={produk.id}
+          onChange={(e) => setProdukId(e.target.value)}
+          className={kelasSelect}
+        >
+          {produkTersedia.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nama}
+            </option>
+          ))}
+        </select>
+        <p className="angka mt-1.5 text-[11px] font-semibold text-tinta-600">
+          {keteranganProduk(hasil)}
+        </p>
+      </div>
+
+      {/* 3. Cara menyusun takaran */}
+      <div>
+        <p className="text-xs font-semibold text-laut-800">Cara menyusun takaran</p>
+        <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setMode('dari_takaran')}
+            aria-pressed={mode === 'dari_takaran'}
+            className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition ${
+              mode === 'dari_takaran'
+                ? 'border-laut-500 bg-laut-50 ring-1 ring-laut-500'
+                : 'border-kabut-200 bg-white hover:border-laut-300'
+            }`}
           >
+            <Utensils className="mt-0.5 size-4 shrink-0 text-laut-700" />
+            <span>
+              <span className="block text-sm font-bold text-tinta-900">Saya tentukan takarannya</span>
+              <span className="block text-[11px] text-tinta-600">
+                Pilih frekuensi dan sendok per saji. Energinya dihitung aplikasi.
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('dari_target')}
+            aria-pressed={mode === 'dari_target'}
+            className={`flex items-start gap-2.5 rounded-xl border p-3 text-left transition ${
+              mode === 'dari_target'
+                ? 'border-laut-500 bg-laut-50 ring-1 ring-laut-500'
+                : 'border-kabut-200 bg-white hover:border-laut-300'
+            }`}
+          >
+            <Calculator className="mt-0.5 size-4 shrink-0 text-laut-700" />
+            <span>
+              <span className="block text-sm font-bold text-tinta-900">Hitungkan dari target</span>
+              <span className="block text-[11px] text-tinta-600">
+                Pilih target dan frekuensi. Sendok per saji dihitung aplikasi.
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Dropdown masukan, sesuai mode */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div>
+          <label htmlFor="targetPersenSelect" className="block text-xs font-semibold text-tinta-700">
             Target Kalori PKMK
           </label>
           <select
             id="targetPersenSelect"
             value={targetPersen}
             onChange={(e) => setTargetPersen(Number(e.target.value))}
-            className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
+            className={kelasSelect}
           >
             {[0, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) => (
               <option key={pct} value={pct}>
@@ -135,43 +254,17 @@ export function FormulasiPKMKSection({
           </select>
         </div>
 
-        {/* Kolom 2: Produk PKMK */}
         <div>
-          <label
-            htmlFor="produkSelect"
-            className="block text-xs font-semibold text-tinta-700"
-          >
-            Produk PKMK
-          </label>
-          <select
-            id="produkSelect"
-            value={produkId}
-            onChange={(e) => setProdukId(e.target.value)}
-            className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-          >
-            {PRODUK_PKMK_LIST.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nama}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Kolom 3: Frekuensi / Hari (1x, 2x, 3x, 4x, 5x) */}
-        <div>
-          <label
-            htmlFor="frekuensiSelect"
-            className="block text-xs font-semibold text-tinta-700"
-          >
+          <label htmlFor="frekuensiSelect" className="block text-xs font-semibold text-tinta-700">
             Frekuensi/Hari
           </label>
           <select
             id="frekuensiSelect"
             value={frekuensi}
             onChange={(e) => setFrekuensi(Number(e.target.value))}
-            className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
+            className={kelasSelect}
           >
-            {[1, 2, 3, 4, 5].map((f) => (
+            {Array.from({ length: BATAS.frekuensiMaks }, (_, i) => i + 1).map((f) => (
               <option key={f} value={f}>
                 {f}x
               </option>
@@ -179,70 +272,159 @@ export function FormulasiPKMKSection({
           </select>
         </div>
 
-        {/* Kolom 4: Sendok Takar / Saji (1 sendok, 2 sendok, 3 sendok, 4 sendok, 5 sendok) */}
         <div>
-          <label
-            htmlFor="sendokSelect"
-            className="block text-xs font-semibold text-tinta-700"
-          >
+          <label htmlFor="sendokSelect" className="block text-xs font-semibold text-tinta-700">
             Sendok Takar/Saji
           </label>
-          <select
-            id="sendokSelect"
-            value={sendokTakar}
-            onChange={(e) => setSendokTakar(Number(e.target.value))}
-            className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3 text-sm font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
-          >
-            {[1, 2, 3, 4, 5].map((s) => (
-              <option key={s} value={s}>
-                {s} sendok
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Bagian Perhitungan Target Energi & Kotak Hijau Takaran Saji Harian (Seperti Gambar 2) */}
-      <div className="grid gap-3 pt-2 md:grid-cols-12">
-        {/* Kolom Kiri: Breakdown Kalori */}
-        <div className="space-y-2 md:col-span-7">
-          <div className="rounded-xl border border-kabut-200 bg-white p-3 text-xs">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-tinta-400">
-              Target Kebutuhan Energi Anak (Catch-up Growth : {targetEnergiDefaultKkal} kkal)
+          {mode === 'dari_takaran' ? (
+            <select
+              id="sendokSelect"
+              value={sendokPerSaji}
+              onChange={(e) => setSendokPerSaji(Number(e.target.value))}
+              className={kelasSelect}
+            >
+              {Array.from({ length: BATAS.sendokPerSajiMaks }, (_, i) => i + 1).map((s) => (
+                <option key={s} value={s}>
+                  {s} sendok
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p
+              id="sendokSelect"
+              className="angka mt-1 flex h-11 w-full items-center rounded-xl border border-dashed border-laut-300 bg-laut-50 px-3 text-sm font-bold text-laut-800"
+            >
+              {angka(hasil.sendokPerSaji)} sendok (dihitung)
             </p>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-tinta-600">Target Kalori PKMK ({targetPersen}%):</span>
-              <span className="angka text-sm font-bold text-laut-800">
-                {targetKaloriKkal} kkal
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-kabut-200 bg-white p-3 text-xs">
-            <div className="flex items-baseline justify-between">
-              <span className="text-tinta-600">Sisa Kalori dari Makanan Keluarga / ASI:</span>
-              <span className="angka text-sm font-bold text-tinta-900">
-                {sisaKaloriMakananASI} kkal
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Kolom Kanan: Kotak Hijau Takaran Saji Harian (Seperti Gambar 2) */}
-        <div className="flex flex-col justify-center rounded-xl bg-[#E8F8F0] p-4 text-right md:col-span-5">
-          <p className="text-base font-extrabold text-[#1B804B]">Takaran Saji Harian</p>
-          <p className="mt-0.5 text-xs font-bold text-[#1B804B]">{frekuensi}x sehari.</p>
-          <p className="mt-1 text-sm font-black text-[#156E3F]">
-            Per saji: {sendokTakar} takar dlm {mlAirPerSaji} ml air
-          </p>
-          <p className="mt-0.5 text-[11px] text-[#2C955E]">
-            (Total {totalSendokHarian} sendok takar / hari)
-          </p>
+          )}
         </div>
       </div>
 
-      {/* Tombol Simpan Asuhan Gizi */}
-      <div className="pt-2">
+      {/* 4. Kartu hasil — seluruhnya dari satu objek HasilTakaran */}
+      <div className="rounded-xl border border-laut-200 bg-laut-50/60 p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-tinta-500">
+          Target Kebutuhan Energi Anak (Catch-up Growth: {angka(targetEnergiDefaultKkal)} kkal)
+        </p>
+        <p className="mt-2 font-display text-base font-black leading-snug text-laut-900 sm:text-lg">
+          {ringkasanTakaran(hasil)}
+        </p>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl bg-white p-3 ring-1 ring-kabut-200">
+            <p className="text-[11px] font-semibold text-tinta-600">
+              Energi yang diberikan takaran ini
+            </p>
+            <p className="angka text-xl font-black text-laut-800">
+              {angka(hasil.kkalDiberikan)} kkal
+            </p>
+            <p className="angka mt-0.5 text-[11px] text-tinta-600">
+              {angka(hasil.persenTerhadapTarget)}% dari target
+            </p>
+          </div>
+          <div className="rounded-xl bg-white p-3 ring-1 ring-kabut-200">
+            <p className="text-[11px] font-semibold text-tinta-600">
+              Target Kalori PKMK ({targetPersen}%)
+            </p>
+            <p className="angka text-xl font-black text-tinta-900">{angka(hasil.targetKkal)} kkal</p>
+            <p className="angka mt-0.5 text-[11px] text-tinta-600">
+              Selisih {hasil.selisihKkal >= 0 ? '+' : '−'}
+              {angka(Math.abs(hasil.selisihKkal))} kkal
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+          <div className="rounded-xl bg-white p-3 ring-1 ring-kabut-200">
+            <p className="text-[11px] text-tinta-600">Larutan per saji</p>
+            <p className="angka text-sm font-bold text-tinta-900">
+              {angka(hasil.mlLarutanPerSaji)} ml
+            </p>
+          </div>
+          <div className="rounded-xl bg-white p-3 ring-1 ring-kabut-200">
+            <p className="text-[11px] text-tinta-600">Larutan per hari</p>
+            <p className="angka text-sm font-bold text-tinta-900">
+              {angka(hasil.mlLarutanPerHari)} ml
+            </p>
+          </div>
+          <div className="rounded-xl bg-white p-3 ring-1 ring-kabut-200">
+            <p className="text-[11px] text-tinta-600">Sisa dari makanan keluarga / ASI</p>
+            <p className="angka text-sm font-bold text-tinta-900">{angka(sisaMakanan)} kkal</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Peringatan — seluruhnya, tanpa disaring */}
+      {peringatan.length > 0 && (
+        <div className="space-y-2">
+          {peringatan.map((p) => (
+            <div
+              key={p.kode}
+              role="alert"
+              className={`flex items-start gap-2.5 rounded-xl border p-3 text-xs ${KELAS_NADA[p.nada]}`}
+            >
+              {p.nada === 'bahaya' ? (
+                <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+              ) : (
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              )}
+              <span>
+                <span className="block font-bold">{p.pesan}</span>
+                <span className="mt-0.5 block opacity-90">{p.saran}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 6. Tabel pilihan pada mode dari_target */}
+      {mode === 'dari_target' && daftarPilihan.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-kabut-200">
+          <table className="w-full min-w-[520px] text-left text-xs">
+            <caption className="px-3 pt-3 text-left text-[11px] font-semibold text-tinta-600">
+              Pilihan takaran untuk target {angka(targetKkal)} kkal. Tekan satu baris untuk memakainya.
+            </caption>
+            <thead className="text-[11px] uppercase tracking-wide text-tinta-500">
+              <tr>
+                <th scope="col" className="px-3 py-2">Frekuensi</th>
+                <th scope="col" className="px-3 py-2">Sendok/saji</th>
+                <th scope="col" className="px-3 py-2">Energi</th>
+                <th scope="col" className="px-3 py-2">% target</th>
+                <th scope="col" className="px-3 py-2">Volume/saji</th>
+              </tr>
+            </thead>
+            <tbody>
+              {daftarPilihan.map((p) => (
+                <tr
+                  key={p.frekuensiPerHari}
+                  onClick={() => setFrekuensi(p.frekuensiPerHari)}
+                  className={`cursor-pointer border-t border-kabut-200 hover:bg-laut-50 ${
+                    p.frekuensiPerHari === hasil.frekuensiPerHari ? 'bg-laut-50 font-bold' : ''
+                  }`}
+                >
+                  <td className="angka px-3 py-2">{p.frekuensiPerHari}x</td>
+                  <td className="angka px-3 py-2">{angka(p.sendokPerSaji)}</td>
+                  <td className="angka px-3 py-2">{angka(p.kkalDiberikan)} kkal</td>
+                  <td className="angka px-3 py-2">{angka(p.persenTerhadapTarget)}%</td>
+                  <td className="angka px-3 py-2">
+                    {angka(p.mlLarutanPerSaji)} ml{' '}
+                    <span className={p.volumeWajar ? 'text-tinta-500' : 'text-waspada-teks'}>
+                      {p.volumeWajar ? '— wajar' : '— terlalu banyak'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Peringatan data produk, wajib di setiap layar dan setiap cetakan */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-waspada-garis/40 bg-waspada-bg p-3 text-[11px] text-waspada-teks">
+        <Info className="mt-0.5 size-4 shrink-0" />
+        <span>{PERINGATAN_DATA_PRODUK}</span>
+      </div>
+
+      <div className="pt-1">
         <Button type="button" onClick={handleSimpan} varian="utama" lebarPenuh>
           Simpan Asuhan Gizi Balita
         </Button>
