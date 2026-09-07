@@ -49,7 +49,9 @@ export async function buatPdfSkriningBalita(
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
   doc.setTextColor(15, 43, 49) // Tinta-900
-  doc.text('PEMERINTAH PROVINSI GORONTALO', 105, 18, { align: 'center' })
+  doc.text('Aplikasi Tanggulangi Stunting untuk Hulondalo (Tangguh)', 105, 18, {
+    align: 'center',
+  })
   doc.text('FAKULTAS KEDOKTERAN UNIV. MUHAMMADIYAH GORONTALO - FB -', 105, 24, { align: 'center' })
 
   doc.setFont('helvetica', 'normal')

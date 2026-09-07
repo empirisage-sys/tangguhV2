@@ -3,8 +3,14 @@ import autoTable from 'jspdf-autotable'
 import { formatTanggal } from '@/lib/tampilan/format'
 import type { HasilTakaran } from '@/lib/pkmk/hitung'
 import { sisaDariMakanan } from '@/lib/pkmk/hitung'
-import { PERINGATAN_DATA_PRODUK } from '@/lib/pkmk/produk'
-import { bacaSeluruhPeringatan, keteranganProduk, ringkasanTakaran } from '@/lib/pkmk/teks'
+import {
+  bacaSeluruhPeringatan,
+  bacaSlotJadwal,
+  judulJadwal,
+  keteranganProduk,
+  ringkasanTakaran,
+} from '@/lib/pkmk/teks'
+import { susunJadwal } from '@/lib/pkmk/jadwal'
 
 /**
  * Lembar Asuhan Gizi PKMK yang dibawa pulang ibu.
@@ -18,6 +24,11 @@ import { bacaSeluruhPeringatan, keteranganProduk, ringkasanTakaran } from '@/lib
  *
  * Setiap angka di bawah berasal dari satu objek `HasilTakaran`. Tidak ada
  * perhitungan ulang di berkas ini, dan tidak boleh ditambahkan.
+ *
+ * Catatan: peringatan bahwa data produk belum diverifikasi terhadap label
+ * kemasan sengaja TIDAK dicetak pada lembar ini, atas permintaan pemilik
+ * aplikasi. Peringatan itu tetap tampil pada layar dietisien di
+ * `FormulasiPKMKSection`, tempat takaran disusun.
  */
 
 export type IdentitasLembarAsuhan = {
@@ -31,6 +42,8 @@ export type IdentitasLembarAsuhan = {
   /** Total kebutuhan energi tumbuh kejar balita, kkal. */
   totalKebutuhanKkal: number
   namaDietisien?: string | null
+  /** Anak masih mendapat ASI. Menentukan Alternatif 1 atau 2 pada tabel jadwal. */
+  masihASI?: boolean
 }
 
 function angka(nilai: number): string {
@@ -51,35 +64,34 @@ export async function buatPdfLembarAsuhanGizi(
   doc.rect(0, 0, 210, 8, 'F')
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
+  doc.setFontSize(13)
   doc.setTextColor(15, 43, 49)
-  doc.text('PEMERINTAH PROVINSI GORONTALO', 105, 18, { align: 'center' })
+  doc.text('Aplikasi Tanggulangi Stunting untuk Hulondalo (Tangguh)', 105, 16, {
+    align: 'center',
+  })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(74, 107, 114)
-  doc.text(
-    'APLIKASI TANGGUH — Deteksi Dini & Intervensi Stunting Berstandar WHO / Kemenkes RI',
-    105,
-    24,
-    { align: 'center' },
-  )
+  doc.text('Deteksi Dini & Intervensi Stunting Berstandar WHO / Kemenkes RI', 105, 22, {
+    align: 'center',
+  })
 
   doc.setDrawColor(220, 233, 235)
   doc.setLineWidth(0.8)
-  doc.line(15, 28, 195, 28)
+  doc.line(15, 26, 195, 26)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.setTextColor(11, 118, 129)
-  doc.text('LEMBAR ASUHAN GIZI — TAKARAN SAJI PKMK', 105, 36, { align: 'center' })
+  doc.text('LEMBAR ASUHAN GIZI — TAKARAN SAJI PKMK', 105, 33, { align: 'center' })
 
   // 2. Identitas
   autoTable(doc, {
-    startY: 41,
+    startY: 37,
     margin: { left: 15, right: 15 },
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 1.5, textColor: [15, 43, 49] },
+    styles: { fontSize: 9, cellPadding: 1.3, textColor: [15, 43, 49] },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 35, textColor: [74, 107, 114] },
       1: { cellWidth: 55 },
@@ -115,34 +127,49 @@ export async function buatPdfLembarAsuhanGizi(
   })
 
   const posTakaran =
-    ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
 
   // 3. TAKARAN — bagian terpenting, dicetak paling menonjol
+  // Tinggi kotak DIHITUNG dari jumlah baris teks setelah dipotong, bukan dipatok.
+  // Versi sebelumnya memakai tinggi tetap 24 mm, sehingga ringkasan yang memakan
+  // dua baris menabrak keterangan produk di bawahnya.
+  const LEBAR_ISI = 170
+  const TINGGI_BARIS = 5.6
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  const barisRingkasan = doc.splitTextToSize(ringkasanTakaran(hasil), LEBAR_ISI) as string[]
+
+  const yRingkasan = posTakaran + 14
+  const yKeterangan = yRingkasan + (barisRingkasan.length - 1) * TINGGI_BARIS + 6
+  const tinggiKotak = yKeterangan - posTakaran + 4
+
   doc.setFillColor(232, 248, 240)
   doc.setDrawColor(27, 128, 75)
   doc.setLineWidth(0.4)
-  doc.roundedRect(15, posTakaran, 180, 24, 2, 2, 'FD')
+  doc.roundedRect(15, posTakaran, 180, tinggiKotak, 2, 2, 'FD')
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(21, 110, 63)
   doc.text('CARA PEMBERIAN', 20, posTakaran + 7)
 
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.setTextColor(15, 43, 49)
-  doc.text(ringkasanTakaran(hasil), 20, posTakaran + 15, { maxWidth: 170 })
+  doc.text(barisRingkasan, 20, yRingkasan, { lineHeightFactor: 1.15 })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(74, 107, 114)
-  doc.text(`${hasil.produk.nama} — ${keteranganProduk(hasil)}`, 20, posTakaran + 21)
+  doc.text(`${hasil.produk.nama} — ${keteranganProduk(hasil)}`, 20, yKeterangan)
 
   // 4. Rincian energi. Label wajib menyebut "diberikan takaran ini", bukan "target".
   autoTable(doc, {
-    startY: posTakaran + 29,
+    startY: posTakaran + tinggiKotak + 5,
     margin: { left: 15, right: 15 },
     theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 2.5, textColor: [15, 43, 49] },
+    styles: { fontSize: 8.8, cellPadding: 1.9, textColor: [15, 43, 49] },
     headStyles: { fillColor: [14, 150, 161], textColor: [255, 255, 255], fontStyle: 'bold' },
     head: [['Rincian Energi Harian', 'Nilai']],
     body: [
@@ -174,49 +201,101 @@ export async function buatPdfLembarAsuhanGizi(
     },
   })
 
-  let posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+  let posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
 
-  // 5. Peringatan — seluruhnya, tanpa disaring
+  // 5. Jadwal makan harian. Baris PKMK-nya turunan dari takaran yang sama,
+  //    bukan tabel terpisah yang ditulis tangan.
+  const jadwal = susunJadwal({ hasil, masihASI: identitas.masihASI ?? false })
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(11, 118, 129)
+  doc.text(judulJadwal(jadwal), 15, posY)
+
+  autoTable(doc, {
+    startY: posY + 2.5,
+    margin: { left: 15, right: 15 },
+    theme: 'plain',
+    styles: { fontSize: 8.3, cellPadding: 1.4, textColor: [15, 43, 49] },
+    headStyles: {
+      fontStyle: 'bold',
+      textColor: [74, 107, 114],
+      lineWidth: { bottom: 0.3 },
+      lineColor: [15, 43, 49],
+    },
+    bodyStyles: { lineWidth: { bottom: 0.1 }, lineColor: [220, 233, 235] },
+    columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 158 } },
+    head: [['Waktu', 'Jenis nutrisi']],
+    body: jadwal.slot.map((slot) => {
+      const teks = bacaSlotJadwal(slot, hasil.produk.nama)
+      return [slot.jam, `${teks.tebal}${teks.biasa}`]
+    }),
+    didParseCell: (data) => {
+      // Baris PKMK ditebalkan: itu yang membedakannya dari makanan keluarga.
+      if (data.section === 'body' && jadwal.slot[data.row.index]?.jenis === 'pkmk') {
+        data.cell.styles.fontStyle = 'bold'
+      }
+    },
+  })
+
+  posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
+
+  // 6. Peringatan — seluruhnya, tanpa disaring
   if (peringatan.length > 0) {
     autoTable(doc, {
       startY: posY,
       margin: { left: 15, right: 15 },
       theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [15, 43, 49] },
+      styles: { fontSize: 8, cellPadding: 1.8, textColor: [15, 43, 49] },
       headStyles: { fillColor: [255, 246, 224], textColor: [122, 74, 0], fontStyle: 'bold' },
       head: [['Perhatian', 'Saran Tindakan']],
       body: peringatan.map((p) => [p.pesan, p.saran]),
       columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 90 } },
     })
-    posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6
+    posY = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 5
   }
 
-  // 6. Penyangkalan. Peringatan data produk WAJIB ada pada setiap cetakan.
+  // Bila sisa halaman tidak cukup untuk penyangkalan dan tanda tangan,
+  // pindah ke halaman berikutnya daripada menumpuk teks di tepi bawah.
+  // Baris terakhir blok penutup (tanda tangan) jatuh 28 mm di bawah `posY`.
+  // Batas 283 mm menyisakan ruang bagi footer di 287 mm.
+  const TINGGI_PENUTUP = 28
+  if (posY + TINGGI_PENUTUP > 283) {
+    doc.addPage()
+    posY = 25
+  }
+
+  // 7. Penyangkalan klinis.
   doc.setFont('helvetica', 'italic')
   doc.setFontSize(8)
-  doc.setTextColor(122, 74, 0)
-  doc.text(PERINGATAN_DATA_PRODUK, 15, posY, { maxWidth: 180 })
-
   doc.setTextColor(122, 149, 155)
   doc.text(
-    'Penyangkalan Klinis: lembar ini adalah alat bantu asuhan gizi, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.',
+    'lembar ini adalah alat bantu asuhan gizi, bukan pengganti pemeriksaan dan keputusan klinis tenaga kesehatan.',
     15,
-    posY + 8,
+    posY,
     { maxWidth: 180 },
   )
 
-  // 7. Tanda tangan
-  const posTtd = posY + 20
+  // 8. Tanda tangan
+  const posTtd = posY + 8
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(15, 43, 49)
   doc.text(`Dicetak di Gorontalo: ${tglCetak}`, 135, posTtd)
   doc.text('Dietisien / Tenaga Kesehatan,', 135, posTtd + 5)
-  doc.text(`( ${identitas.namaDietisien ?? '.....................................'} )`, 135, posTtd + 26)
+  doc.text(`( ${identitas.namaDietisien ?? '.....................................'} )`, 135, posTtd + 20)
 
-  doc.setFontSize(8)
-  doc.setTextColor(122, 149, 155)
-  doc.text('Aplikasi TANGGUH • Modul PKMK • Standar WHO 2006', 15, 287)
+  const jumlahHalaman = doc.getNumberOfPages()
+  for (let h = 1; h <= jumlahHalaman; h++) {
+    doc.setPage(h)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(122, 149, 155)
+    doc.text('Aplikasi TANGGUH • Modul PKMK • Standar WHO 2006', 15, 287)
+    if (jumlahHalaman > 1) {
+      doc.text(`Halaman ${h} dari ${jumlahHalaman}`, 195, 287, { align: 'right' })
+    }
+  }
 
   return new Uint8Array(doc.output('arraybuffer'))
 }

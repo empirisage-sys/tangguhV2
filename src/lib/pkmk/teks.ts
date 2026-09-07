@@ -6,6 +6,7 @@
  */
 
 import type { HasilTakaran, Peringatan } from './hitung'
+import type { Jadwal, SlotJadwal } from './jadwal'
 
 function angka(nilai: number): string {
   const dibulatkan = Math.round(nilai * 10) / 10
@@ -74,4 +75,36 @@ export function bacaSeluruhPeringatan(hasil: HasilTakaran): PeringatanTerbaca[] 
 /** Keterangan kecil di bawah nama produk, agar dietisien dapat memeriksa sendiri. */
 export function keteranganProduk(hasil: HasilTakaran): string {
   return `${angka(hasil.kkalPerSendok)} kkal dan ${angka(hasil.mlLarutanPerSendok)} ml larutan per sendok takar`
+}
+
+/** Judul tabel jadwal, mengikuti penomoran alternatif pada anjuran. */
+export function judulJadwal(jadwal: Jadwal): string {
+  return jadwal.masihASI
+    ? 'Alternatif 1: Bila anak masih mendapat ASI'
+    : 'Alternatif 2: Bila anak sudah tidak mendapat ASI'
+}
+
+/**
+ * Isi kolom "Jenis nutrisi" untuk satu baris jadwal.
+ *
+ * Bagian yang ditebalkan pada cetakan dikembalikan terpisah, agar lapisan
+ * cetak tidak perlu menebak mana yang penting.
+ */
+export function bacaSlotJadwal(
+  slot: SlotJadwal,
+  namaProduk: string,
+): { tebal: string; biasa: string } {
+  switch (slot.jenis) {
+    case 'pkmk':
+      return {
+        tebal: `Intervensi Nutrisi PDK/PKMK ${angka(slot.kkalPerSaji ?? 0)} kkal`,
+        biasa: ` — ${namaProduk}, ${angka(slot.sendokPerSaji ?? 0)} sendok takar dalam ${angka(slot.mlPerSaji ?? 0)} ml larutan`,
+      }
+    case 'makan_utama':
+      return { tebal: '', biasa: 'Makan mengandung protein hewani min 6 gr protein hewani' }
+    case 'selingan':
+      return { tebal: '', biasa: 'Selingan yang mengandung Protein Hewani' }
+    case 'asi':
+      return { tebal: '', biasa: 'ASI sesuai permintaan anak' }
+  }
 }
