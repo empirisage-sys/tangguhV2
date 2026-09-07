@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { wajibPeran } from '@/lib/supabase/penjaga'
+import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { hitungSkrining } from '@/lib/zscore'
 import { keBarisSkrining } from '@/lib/db/pemetaan'
 import { skemaSkrining, periksaTerhadapBalita } from '@/lib/validasi/skrining'
@@ -11,7 +11,17 @@ import { cariBalitaById } from '@/lib/db/balita-mock'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
 export async function simpanSkrining(formData: FormData): Promise<HasilTindakan> {
-  const profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
+  // Galat izin dikembalikan sebagai pesan, bukan dilempar. Lemparan pada Server
+  // Action menjadi HTTP 500 yang pesannya disembunyikan Next.js di produksi,
+  // sehingga tombol simpan mati tanpa keterangan. Lihat catatan panjang di
+  // `balita/baru/actions.ts`.
+  let profil
+  try {
+    profil = await wajibPeran(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien'])
+  } catch (galat) {
+    if (galat instanceof TidakBerwenangError) return { ok: false, pesan: galat.message }
+    throw galat
+  }
 
   const hasil = skemaSkrining.safeParse({
     balitaId: formData.get('balitaId'),
