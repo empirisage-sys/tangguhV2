@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { wajibPeran, wilayahUntukMenulis, TidakBerwenangError } from '@/lib/supabase/penjaga'
+import { wajibPeran, wilayahUntukMenulisBalita, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { skemaBalita } from '@/lib/validasi/skrining'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
@@ -52,11 +52,30 @@ export async function simpanBalita(formData: FormData): Promise<HasilTindakan> {
     throw galat
   }
 
+  // ==========================================================================
+  // POSYANDU: DARI PROFIL BILA ADA, DARI PILIHAN BILA TIDAK
+  //
+  // Kader terikat satu posyandu, sehingga pilihan dari formulir diabaikan.
+  // Dokter dan dietisien terdaftar di tingkat puskesmas dan membina banyak
+  // posyandu; profil mereka tidak memiliki `posyandu_id` sama sekali, sehingga
+  // sebelum ini mereka SELALU tertahan pada 'wilayah kerja belum lengkap'
+  // walaupun policy RLS `boleh_akses_balita` sudah lama mengizinkan mereka
+  // menulis ke seluruh posyandu di puskesmasnya.
+  //
+  // Pemeriksaan kepemilikan posyandu dikerjakan di dalam fungsi tersebut,
+  // BUKAN di sini, agar tidak ada pemanggil yang lupa melakukannya.
+  // ==========================================================================
+  const posyanduPilihan = formData.get('posyanduId')
+
   let wilayah
   try {
-    wilayah = wilayahUntukMenulis(profil)
+    wilayah = await wilayahUntukMenulisBalita(
+      profil,
+      typeof posyanduPilihan === 'string' ? posyanduPilihan : null,
+    )
   } catch (galat) {
-    // Pesannya sudah menerangkan sendiri: wilayah kerja pada profil belum lengkap.
+    // Pesannya sudah menerangkan sendiri: wilayah belum lengkap, posyandu belum
+    // dipilih, atau posyandu yang dipilih di luar wilayah kerja.
     if (galat instanceof TidakBerwenangError) return { ok: false, pesan: galat.message }
     throw galat
   }

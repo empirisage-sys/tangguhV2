@@ -124,11 +124,7 @@ export async function wajibPeran(peran: Peran[]): Promise<ProfilAktif> {
  * menolaknya, tetapi menolak di sini memberi pesan yang lebih jelas dan
  * menghemat satu perjalanan ke database.
  */
-export function wilayahUntukMenulis(profil: ProfilAktif): {
-  posyanduId: string
-  puskesmasId: string
-  kabupatenId: string
-} {
+export function wilayahUntukMenulis(profil: ProfilAktif): WilayahTulis {
   if (!profil.posyanduId || !profil.puskesmasId || !profil.kabupatenId) {
     throw new TidakBerwenangError(
       'Wilayah kerja pada profil Anda belum lengkap. Hubungi admin untuk melengkapinya.',
@@ -139,4 +135,121 @@ export function wilayahUntukMenulis(profil: ProfilAktif): {
     puskesmasId: profil.puskesmasId,
     kabupatenId: profil.kabupatenId,
   }
+}
+
+export type WilayahTulis = {
+  posyanduId: string
+  puskesmasId: string
+  kabupatenId: string
+}
+
+/**
+ * Pola UUID. Menolak masukan yang jelas bukan uuid SEBELUM menyentuh database,
+ * sehingga string sembarang dari formulir tidak pernah menjadi bagian kueri.
+ */
+const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Apakah peran ini memilih sendiri posyandu tempat balita dicatat.
+ *
+ * Kader terikat pada satu posyandu, sehingga tidak pernah memilih. Dokter dan
+ * dietisien terdaftar di tingkat puskesmas dan membina banyak posyandu; profil
+ * mereka memang tidak memiliki `posyandu_id` (lihat `daftar/actions.ts`, yang
+ * hanya mengisinya untuk kader), sehingga posyandu harus ditentukan saat
+ * pencatatan.
+ */
+export function perluMemilihPosyandu(profil: ProfilAktif): boolean {
+  return !profil.posyanduId
+}
+
+/**
+ * Wilayah yang dipakai saat MENDAFTARKAN BALITA BARU.
+ *
+ * Berbeda dengan `wilayahUntukMenulis`, fungsi ini menerima pilihan posyandu
+ * dari formulir untuk peran yang profilnya tidak terikat satu posyandu.
+ *
+ * TIGA HAL YANG MEMBUAT PENERIMAAN ITU AMAN
+ *
+ *   1. Pilihan DIABAIKAN sepenuhnya bila profil sudah punya `posyandu_id`.
+ *      Seorang kader karena itu tetap tidak dapat menulis ke posyandu lain
+ *      meskipun ia menyisipkan medan `posyanduId` ke dalam kiriman formulir.
+ *
+ *   2. Pilihan diverifikasi ke database: posyandu itu harus benar-benar berada
+ *      di bawah puskesmas pengguna. Tanpa langkah ini ada lubang yang nyata,
+ *      karena `puskesmas_id` pada baris balita diambil dari profil, bukan dari
+ *      posyandu yang dipilih. Sebuah posyandu milik puskesmas lain akan lolos
+ *      policy RLS `boleh_akses_balita`, sebab yang diperiksa policy hanyalah
+ *      kolom `puskesmas_id` — yang sudah terlanjur benar. Baris balita menjadi
+ *      tidak konsisten: posyandu menunjuk ke wilayah A, puskesmas ke wilayah B.
+ *
+ *   3. Kegagalan apa pun keluar sebagai `TidakBerwenangError`, sehingga Server
+ *      Action mengembalikannya sebagai pesan yang dapat dibaca pengguna.
+ */
+export async function wilayahUntukMenulisBalita(
+  profil: ProfilAktif,
+  posyanduIdPilihan: string | null,
+): Promise<WilayahTulis> {
+  if (!profil.puskesmasId || !profil.kabupatenId) {
+    throw new TidakBerwenangError(
+      'Wilayah kerja pada profil Anda belum lengkap. Hubungi admin untuk melengkapinya.',
+    )
+  }
+
+  // Profil yang terikat satu posyandu memakai posyandu itu, titik.
+  if (profil.posyanduId) {
+    return {
+      posyanduId: profil.posyanduId,
+      puskesmasId: profil.puskesmasId,
+      kabupatenId: profil.kabupatenId,
+    }
+  }
+
+  if (!posyanduIdPilihan || !POLA_UUID.test(posyanduIdPilihan)) {
+    throw new TidakBerwenangError(
+      'Pilih dulu posyandu tempat balita ini akan dicatat.',
+    )
+  }
+
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('posyandu')
+    .select('id')
+    .eq('id', posyanduIdPilihan)
+    .eq('puskesmas_id', profil.puskesmasId)
+    .maybeSingle()
+
+  if (!data) {
+    throw new TidakBerwenangError(
+      'Posyandu yang dipilih tidak berada di wilayah kerja Anda.',
+    )
+  }
+
+  return {
+    posyanduId: data.id,
+    puskesmasId: profil.puskesmasId,
+    kabupatenId: profil.kabupatenId,
+  }
+}
+
+/**
+ * Daftar posyandu di bawah puskesmas pengguna, untuk mengisi pilihan di
+ * formulir. Mengembalikan senarai kosong bila profil belum punya puskesmas.
+ */
+export async function daftarPosyanduWilayah(
+  profil: ProfilAktif,
+): Promise<{ id: string; nama: string; desa: string | null }[]> {
+  if (!profil.puskesmasId) return []
+
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('posyandu')
+    .select('id, nama, desa')
+    .eq('puskesmas_id', profil.puskesmasId)
+    .order('nama')
+
+  return (data ?? []).map((p) => ({
+    id: p.id as string,
+    nama: p.nama as string,
+    desa: (p.desa as string | null) ?? null,
+  }))
 }
