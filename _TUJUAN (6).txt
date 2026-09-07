@@ -1,0 +1,5 @@
+Unggah isi folder ini ke: src/components/grafik/
+
+Caranya: buka folder tujuan di GitHub pada branch yang benar, lalu
+Add file -> Upload files, dan seret HANYA berkas-berkas di folder ini
+(jangan folder-nya). Abaikan _TUJUAN.txt, jangan diunggah.
