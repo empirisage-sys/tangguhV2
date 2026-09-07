@@ -99,6 +99,7 @@ export function FormulasiPKMKSection({
   const [sedangSimpan, mulaiSimpan] = useTransition()
   const [balasan, setBalasan] = useState<BalasanSimpan | null>(null)
   const [sedangCetak, setSedangCetak] = useState(false)
+  const [masihASI, setMasihASI] = useState(false)
 
   const produk = useMemo(
     () => produkTersedia.find((p) => p.id === produkId) ?? produkTersedia[0]!,
@@ -208,6 +209,7 @@ export function FormulasiPKMKSection({
           umurBulan,
           tataLaksana: tataLaksana || '-',
           totalKebutuhanKkal: targetEnergiDefaultKkal,
+          masihASI,
         },
         hasil,
       )
@@ -256,6 +258,25 @@ export function FormulasiPKMKSection({
           <option value="PKMK + Observasi 4 minggu">PKMK + Observasi 4 minggu</option>
           <option value="Rujuk Spesialis Anak">Rujuk Spesialis Anak</option>
         </select>
+      </div>
+
+      {/* 1b. Status ASI — menentukan jadwal makan yang dicetak */}
+      <div className="rounded-xl border border-kabut-200 bg-kabut-50/70 p-3.5">
+        <label htmlFor="asiSelect" className="block text-xs font-semibold text-laut-800">
+          Status Pemberian ASI
+        </label>
+        <select
+          id="asiSelect"
+          value={masihASI ? 'ya' : 'tidak'}
+          onChange={(e) => setMasihASI(e.target.value === 'ya')}
+          className={kelasSelect}
+        >
+          <option value="tidak">Sudah tidak mendapat ASI</option>
+          <option value="ya">Masih mendapat ASI</option>
+        </select>
+        <p className="mt-1.5 text-[11px] text-tinta-600">
+          Menentukan jadwal makan yang tercetak pada lembar asuhan gizi.
+        </p>
       </div>
 
       {/* 2. Produk PKMK, beserta angka labelnya agar dapat diperiksa sendiri */}
