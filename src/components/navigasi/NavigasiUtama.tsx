@@ -13,6 +13,7 @@ import {
   User,
   TrendingUp,
   Users,
+  Milk,
 } from 'lucide-react'
 import type { Peran } from '@/lib/tampilan/akses'
 
@@ -79,6 +80,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Manajemen Akun',
     href: '/admin/pengguna',
     icon: Users,
+    peranBoleh: ['admin'],
+  },
+  {
+    id: 'produk-pkmk',
+    label: 'Master PKMK',
+    href: '/admin/produk-pkmk',
+    icon: Milk,
     peranBoleh: ['admin'],
   },
 ]

@@ -32,6 +32,11 @@ export type LabelProdukPKMK = {
   /** Umur minimum pemakaian dalam bulan, menurut label. */
   minUsiaBulan: number
   catatanKlinis: string
+  isActive?: boolean
+  proteinGPer100ml?: number | null
+  gramPerSendokTakar?: number | null
+  maksUsiaBulan?: number | null
+  createdAt?: string
 }
 
 /** Produk beserta seluruh angka turunannya. */
@@ -42,6 +47,10 @@ export type ProdukPKMK = LabelProdukPKMK & {
   mlLarutanPerSendok: number
   /** kkalPerSaji / mlLarutanPerSaji. */
   densitasKkalPerMl: number
+  mlPerSaji?: number
+  mlAirPerSendok?: number
+  kkalPerMl?: number
+  anjuranKlinis?: string
 }
 
 const LABEL_PRODUK: LabelProdukPKMK[] = [
@@ -99,11 +108,19 @@ const LABEL_PRODUK: LabelProdukPKMK[] = [
 ]
 
 function turunkan(label: LabelProdukPKMK): ProdukPKMK {
+  const kkalPerSendok = label.kkalPerSaji / label.sendokPerSaji
+  const mlLarutanPerSendok = label.mlLarutanPerSaji / label.sendokPerSaji
+  const densitasKkalPerMl = label.kkalPerSaji / label.mlLarutanPerSaji
   return {
     ...label,
-    kkalPerSendok: label.kkalPerSaji / label.sendokPerSaji,
-    mlLarutanPerSendok: label.mlLarutanPerSaji / label.sendokPerSaji,
-    densitasKkalPerMl: label.kkalPerSaji / label.mlLarutanPerSaji,
+    kkalPerSendok,
+    mlLarutanPerSendok,
+    densitasKkalPerMl,
+    mlPerSaji: label.mlLarutanPerSaji,
+    mlAirPerSendok: mlLarutanPerSendok,
+    kkalPerMl: densitasKkalPerMl,
+    anjuranKlinis: label.catatanKlinis,
+    isActive: label.isActive ?? true,
   }
 }
 

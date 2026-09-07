@@ -424,7 +424,11 @@ export interface Database {
           densitas_kkal_per_ml: number | null
           kkal_per_sendok: number | null
           min_usia_bulan: number
+          maks_usia_bulan: number | null
+          protein_g_per_100ml: number | null
+          gram_per_sendok_takar: number | null
           anjuran_klinis: string | null
+          is_active: boolean
           created_at: string
         }
         Insert: {
@@ -438,7 +442,11 @@ export interface Database {
           ml_air_per_sendok?: number | null
           densitas_kkal_per_ml?: number | null
           min_usia_bulan?: number
+          maks_usia_bulan?: number | null
+          protein_g_per_100ml?: number | null
+          gram_per_sendok_takar?: number | null
           anjuran_klinis?: string | null
+          is_active?: boolean
           created_at?: string
         }
         Update: {
@@ -452,7 +460,11 @@ export interface Database {
           ml_air_per_sendok?: number | null
           densitas_kkal_per_ml?: number | null
           min_usia_bulan?: number
+          maks_usia_bulan?: number | null
+          protein_g_per_100ml?: number | null
+          gram_per_sendok_takar?: number | null
           anjuran_klinis?: string | null
+          is_active?: boolean
           created_at?: string
         }
         Relationships: []
