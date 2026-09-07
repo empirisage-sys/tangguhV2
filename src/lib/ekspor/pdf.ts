@@ -3,10 +3,36 @@ import autoTable from 'jspdf-autotable'
 import type { BalitaDetail } from '@/lib/db/balita-mock'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
 
+/** Angka gaya Indonesia: pemisah ribuan titik, desimal koma. */
+function angkaId(nilai: number): string {
+  const n = Math.round(nilai * 10) / 10
+  return n.toLocaleString('id-ID', { maximumFractionDigits: 1 })
+}
+
+/**
+ * Kebutuhan gizi balita yang dihitung engine, untuk dicetak apa adanya.
+ *
+ * Bila tidak diberikan, tabel kebutuhan nutrisi mencetak tanda hubung. Versi
+ * lama berkas ini mencetak 800 kkal dan 1.021 kkal untuk SETIAP balita — angka
+ * patokan yang tidak ada hubungannya dengan anak yang bersangkutan. Angka
+ * karangan pada lembar yang dibawa pulang lebih berbahaya daripada kolom kosong.
+ */
+export type GiziUntukCetak = {
+  kaloriPemeliharaanKkal: number
+  proteinPemeliharaanMinGram: number
+  proteinPemeliharaanMaksGram: number
+  kaloriCatchUpKkal: number | null
+  proteinCatchUpMinGram: number | null
+  proteinCatchUpMaksGram: number | null
+}
+
 /**
  * Menghasilkan PDF Laporan Hasil Skrining Antropometri Balita resmi TANGGUH.
  */
-export async function buatPdfSkriningBalita(balita: BalitaDetail): Promise<Uint8Array> {
+export async function buatPdfSkriningBalita(
+  balita: BalitaDetail,
+  gizi?: GiziUntukCetak,
+): Promise<Uint8Array> {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -118,10 +144,36 @@ export async function buatPdfSkriningBalita(balita: BalitaDetail): Promise<Uint8
     headStyles: { fillColor: [237, 243, 245], textColor: [15, 43, 49], fontStyle: 'bold' },
     head: [['Kategori Kebutuhan', 'Estimasi Target Energi', 'Estimasi Kebutuhan Protein']],
     body: [
-      ['Kebutuhan Pemeliharaan (Maintenance)', '800 kkal / hari', '9,6 sampai 12,0 g / hari'],
-      ['Target Tumbuh Kejar (Catch-up Growth)', '1.021 kkal / hari', '15,3 sampai 20,4 g / hari'],
+      [
+        'Kebutuhan Pemeliharaan (Maintenance)',
+        gizi ? `${angkaId(gizi.kaloriPemeliharaanKkal)} kkal / hari` : '-',
+        gizi
+          ? `${angkaId(gizi.proteinPemeliharaanMinGram)} sampai ${angkaId(gizi.proteinPemeliharaanMaksGram)} g / hari`
+          : '-',
+      ],
+      [
+        'Target Tumbuh Kejar (Catch-up Growth)',
+        gizi?.kaloriCatchUpKkal != null ? `${angkaId(gizi.kaloriCatchUpKkal)} kkal / hari` : '-',
+        gizi?.proteinCatchUpMinGram != null && gizi.proteinCatchUpMaksGram != null
+          ? `${angkaId(gizi.proteinCatchUpMinGram)} sampai ${angkaId(gizi.proteinCatchUpMaksGram)} g / hari`
+          : '-',
+      ],
     ],
   })
+
+  if (!gizi) {
+    const posCatatan =
+      ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 3
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(7.5)
+    doc.setTextColor(122, 74, 0)
+    doc.text(
+      'Kebutuhan gizi belum dapat dihitung untuk balita ini, sehingga sengaja dikosongkan. Jangan mengisinya dengan perkiraan.',
+      15,
+      posCatatan,
+      { maxWidth: 180 },
+    )
+  }
 
   // 6. Disclaimer & Tanda Tangan
   const posBawah = ((doc as unknown) as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
