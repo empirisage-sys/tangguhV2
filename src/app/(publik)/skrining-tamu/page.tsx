@@ -642,6 +642,31 @@ export default function HalamanSkriningTamu() {
                 </div>
               </div>
 
+              {/*
+                Peringatan nilai di luar rentang.
+                
+                WAJIB tampil SEBELUM ketiga kartu status. Mesin sudah menandai
+                nilai yang tidak masuk akal secara biologis sejak perbaikan Z-3,
+                tetapi halaman ini punya tampilan hasilnya sendiri dan belum
+                pernah menampilkan `catatanDiLuarRentang` — sehingga salah ketik
+                panjang badan (mis. 45 cm pada anak 24 bulan) tetap tersaji
+                sebagai "Sangat pendek, Z -13,79 SD" tanpa satu pun peringatan.
+                Ditemukan saat uji produksi setelah penerapan.
+              */}
+              {hasil.diLuarRentang && hasil.catatanDiLuarRentang && (
+                <div className="mt-5 flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+                  <div className="text-xs leading-relaxed text-amber-950 sm:text-sm">
+                    <p className="font-bold">Angka hasil ukur perlu diperiksa ulang</p>
+                    <p className="mt-1">{hasil.catatanDiLuarRentang}</p>
+                    <p className="mt-2 font-semibold">
+                      Status gizi di bawah tetap ditampilkan, tetapi jangan dipakai mengambil
+                      keputusan sebelum pengukurannya dikonfirmasi.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* 3 Status Indikator */}
               <div className="mt-5 grid gap-4 sm:grid-cols-3">
                 {[
