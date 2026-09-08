@@ -200,14 +200,179 @@ export const skemaAturUlangSandi = z
 
 export type MasukanAturUlangSandi = z.output<typeof skemaAturUlangSandi>
 
-export const skemaEditPenggunaAdmin = z.object({
-  penggunaId: z.string().min(1, 'ID pengguna wajib diisi'),
-  namaLengkap: z.string().trim().min(3, 'Nama lengkap minimal 3 karakter'),
-  role: z.enum(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien', 'admin']),
-  statusAkun: z.enum(['menunggu', 'disetujui', 'ditolak']),
-  noHp: noHp.optional().or(z.literal('')),
-  noStr: z.string().trim().optional().or(z.literal('')),
-})
+/** Peran yang cakupan datanya ditentukan puskesmas, sehingga wajib berpuskesmas. */
+export const PERAN_WAJIB_PUSKESMAS = ['dokter', 'dietisien'] as const
+
+/** Peran yang wajib memiliki Nomor STR. */
+export const PERAN_WAJIB_STR = ['dokter', 'dietisien', 'dokter_spesialis_anak'] as const
+
+/** Nilai penanda pada dropdown fasilitas: administrator tanpa wilayah. */
+export const TANPA_WILAYAH = '' as const
+
+/** Nilai penanda pada dropdown rumah sakit: nama diketik manual. */
+export const RS_BARU = 'rs_baru' as const
+
+const POLA_UUID_EDIT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const uuidOpsional = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(''))
+  .transform((v) => (v && v.trim() !== '' ? v.trim() : undefined))
+  .refine((v) => v === undefined || POLA_UUID_EDIT.test(v), {
+    message: 'Pilihan wilayah tidak sah',
+  })
+
+/**
+ * Skema edit akun oleh administrator.
+ *
+ * SETIAP `superRefine` di bawah ini adalah cermin dari satu batasan CHECK
+ * di Postgres. Alasannya bukan kerapian, melainkan pengalaman nyata:
+ * sebelum ini formulir edit hanya menyunting nama, peran, status, no HP,
+ * dan no STR, sementara lima batasan database menuntut kolom-kolom yang
+ * TIDAK ADA di formulir itu. Setiap perubahan peran menjadi spesialis anak
+ * karena itu berakhir sebagai pesan mentah dari Postgres di layar
+ * administrator:
+ *
+ *   new row for relation "profiles" violates check constraint
+ *   "chk_spesialis_anak_di_rs"
+ *
+ * Pesan itu tidak dapat ditindaklanjuti siapa pun. Dengan cermin di sini,
+ * penolakan terjadi sebelum menyentuh database dan berbunyi dalam bahasa
+ * yang menyebut medan mana yang harus diisi.
+ *
+ * Peta cermin:
+ *   chk_spesialis_anak_di_rs      -> jenisFaskes wajib 'rumah_sakit'
+ *   chk_spesialis_anak_wajib_faskes -> faskesId atau namaRsBaru wajib ada
+ *   chk_kader_wajib_posyandu      -> posyanduId wajib
+ *   chk_nakes_wajib_puskesmas     -> puskesmasId wajib
+ *   chk_str_nakes                 -> noStr minimal 5 huruf
+ *   chk_tolak_wajib_beralasan     -> alasanTolak minimal 10 huruf
+ *   chk_keputusan_tercatat        -> ditangani Server Action, bukan di sini
+ */
+export const skemaEditPenggunaAdmin = z
+  .object({
+    penggunaId: z.string().min(1, 'ID pengguna wajib diisi'),
+    namaLengkap: z.string().trim().min(3, 'Nama lengkap minimal 3 karakter'),
+    role: z.enum(['kader', 'dokter', 'dokter_spesialis_anak', 'dietisien', 'admin']),
+    statusAkun: z.enum(['menunggu', 'disetujui', 'ditolak']),
+    noHp: noHp.optional().or(z.literal('')),
+    noStr: z.string().trim().optional().or(z.literal('')),
+
+    /** Kosong berarti tidak bertugas di fasilitas mana pun (sah bagi admin). */
+    jenisFaskes: z.enum(JENIS_FASKES).optional().or(z.literal('')),
+    /** Puskesmas tempat bertugas, juga dipakai sebagai puskesmas_id. */
+    puskesmasId: uuidOpsional,
+    /** Rumah sakit tempat bertugas. Bernilai `RS_BARU` bila namanya diketik. */
+    rumahSakitId: z.string().trim().optional().or(z.literal('')),
+    /** Nama rumah sakit baru, dipakai hanya bila rumahSakitId = RS_BARU. */
+    namaRsBaru: z.string().trim().max(150).optional().or(z.literal('')),
+    posyanduId: uuidOpsional,
+    /** Wajib bila status ditolak. */
+    alasanTolak: z.string().trim().max(500).optional().or(z.literal('')),
+  })
+  .superRefine((d, ctx) => {
+    const str = (d.noStr ?? '').trim()
+    const alasan = (d.alasanTolak ?? '').trim()
+    const namaRs = (d.namaRsBaru ?? '').trim()
+
+    // --- chk_spesialis_anak_di_rs -------------------------------------
+    if (d.role === 'dokter_spesialis_anak' && d.jenisFaskes !== 'rumah_sakit') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['jenisFaskes'],
+        message:
+          'Dokter spesialis anak selalu bertugas di rumah sakit. ' +
+          'Ubah Jenis Fasilitas menjadi Rumah Sakit.',
+      })
+    }
+
+    // --- chk_spesialis_anak_wajib_faskes ------------------------------
+    if (d.jenisFaskes === 'rumah_sakit') {
+      if (!d.rumahSakitId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rumahSakitId'],
+          message: 'Pilih rumah sakit tempat bertugas.',
+        })
+      } else if (d.rumahSakitId === RS_BARU) {
+        if (namaRs.length < 3) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['namaRsBaru'],
+            message: 'Tuliskan nama rumah sakit, minimal 3 huruf.',
+          })
+        }
+      } else if (!POLA_UUID_EDIT.test(d.rumahSakitId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rumahSakitId'],
+          message: 'Pilihan rumah sakit tidak sah.',
+        })
+      }
+    }
+
+    // --- chk_nakes_wajib_puskesmas ------------------------------------
+    // Spesialis anak SENGAJA tidak termasuk: sejak migrasi 20260909000000
+    // cakupannya dinilai spesialis_anak_boleh_lihat, bukan puskesmas.
+    if ((PERAN_WAJIB_PUSKESMAS as readonly string[]).includes(d.role)) {
+      if (d.jenisFaskes !== 'puskesmas') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['jenisFaskes'],
+          message:
+            'Dokter umum dan dietisien terdaftar di tingkat puskesmas, ' +
+            'karena cakupan datanya ditentukan puskesmas.',
+        })
+      }
+      if (!d.puskesmasId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['puskesmasId'],
+          message: 'Pilih puskesmas tempat bertugas.',
+        })
+      }
+    }
+
+    // --- chk_kader_wajib_posyandu -------------------------------------
+    if (d.role === 'kader') {
+      if (!d.puskesmasId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['puskesmasId'],
+          message: 'Kader wajib bernaung pada satu puskesmas.',
+        })
+      }
+      if (!d.posyanduId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['posyanduId'],
+          message:
+            'Kader wajib mencantumkan posyandu, karena itulah cakupan datanya.',
+        })
+      }
+    }
+
+    // --- chk_str_nakes ------------------------------------------------
+    if ((PERAN_WAJIB_STR as readonly string[]).includes(d.role) && str.length < 5) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['noStr'],
+        message: 'Nomor STR wajib untuk peran ini, minimal 5 karakter.',
+      })
+    }
+
+    // --- chk_tolak_wajib_beralasan ------------------------------------
+    if (d.statusAkun === 'ditolak' && alasan.length < 10) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['alasanTolak'],
+        message: 'Tuliskan alasan penolakan minimal 10 karakter.',
+      })
+    }
+  })
 
 export type MasukanEditPenggunaAdmin = z.output<typeof skemaEditPenggunaAdmin>
 

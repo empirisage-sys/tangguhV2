@@ -63,8 +63,32 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
 
   if (!data) return null
 
-  const fId = data.faskes_id || data.puskesmas_id
-
+  // ==========================================================================
+  // `puskesmasId` DAN `faskesId` TIDAK BOLEH DISATUKAN
+  //
+  // Sebelumnya keduanya diisi nilai yang sama, yaitu `faskes_id || puskesmas_id`.
+  // Itu keliru, dan akibatnya nyata:
+  //
+  //   - `profiles.puskesmas_id` menunjuk tabel `puskesmas`
+  //   - `profiles.faskes_id`    menunjuk tabel `faskes`, yang juga memuat
+  //                             rumah sakit
+  //
+  // Bagi pengguna yang bertugas di RUMAH SAKIT, `faskes_id` berisi id rumah
+  // sakit. Dengan penyatuan lama, `profil.puskesmasId` pun menjadi id rumah
+  // sakit itu, lalu dituliskan ke `balita.puskesmas_id` dan
+  // `asuhan_gizi.puskesmas_id` — dua kolom yang berkunci-asing ke tabel
+  // `puskesmas`. Penyimpanan pasti gagal, dan seandainya lolos, policy RLS
+  // membandingkannya dengan `my_puskesmas_id()` yang membaca kolom
+  // `puskesmas_id` apa adanya, sehingga hasilnya tidak pernah cocok.
+  //
+  // Sejak sini: `puskesmasId` adalah kolom puskesmas apa adanya, persis
+  // sebagaimana `my_puskesmas_id()` membacanya. `faskesId` tetap memakai
+  // cadangan puskesmas, karena itulah yang dimaksud "fasilitas tempat
+  // bertugas" dan `my_faskes_id()` di Postgres pun berperilaku demikian.
+  //
+  // `src/lib/tampilan/akses.ts` sudah memakai pola `a || b` sendiri pada
+  // kedua medan ini, sehingga pemisahan ini tidak mengubah perilakunya.
+  // ==========================================================================
   return {
     id: data.id,
     namaLengkap: data.nama_lengkap,
@@ -72,8 +96,8 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
     statusAkun: data.status_akun as ProfilAktif['statusAkun'],
     alasanTolak: data.alasan_tolak,
     posyanduId: data.posyandu_id,
-    faskesId: fId,
-    puskesmasId: fId,
+    faskesId: data.faskes_id || data.puskesmas_id,
+    puskesmasId: data.puskesmas_id,
     kabupatenId: data.kabupaten_id,
     provinsiId: data.provinsi_id,
     jenisFaskes: data.jenis_faskes as ProfilAktif['jenisFaskes'],
