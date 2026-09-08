@@ -27,19 +27,54 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { formatTanggal } from '@/lib/tampilan/format'
+import { RUMAH_SAKIT_GORONTALO } from '@/lib/db/wilayah'
+
+export type PeranPengguna =
+  | 'kader'
+  | 'dokter'
+  | 'dokter_spesialis_anak'
+  | 'dietisien'
+  | 'admin'
 
 export type PenggunaItem = {
   id: string
   namaLengkap: string
-  role: 'kader' | 'dokter' | 'dokter_spesialis_anak' | 'dietisien' | 'admin'
+  role: PeranPengguna
   noHp?: string | null
   noStr?: string | null
   statusAkun: 'menunggu' | 'disetujui' | 'ditolak'
+  alasanTolak?: string | null
+  /** `null` berarti tidak bertugas di fasilitas mana pun. Sah bagi administrator. */
+  jenisFaskes?: 'puskesmas' | 'rumah_sakit' | null
+  puskesmasId?: string | null
+  faskesId?: string | null
+  posyanduId?: string | null
   puskesmasNama?: string | null
   kabupatenNama?: string | null
   posyanduNama?: string | null
+  faskesNama?: string | null
+  faskesJenis?: 'puskesmas' | 'rumah_sakit' | null
   createdAt?: string | null
 }
+
+export type OpsiWilayah = { id: string; nama: string }
+export type OpsiPosyandu = {
+  id: string
+  nama: string
+  desa: string | null
+  puskesmasId: string | null
+}
+
+/** Peran yang cakupan datanya ditentukan puskesmas. */
+const PERAN_PUSKESMAS: readonly PeranPengguna[] = ['dokter', 'dietisien']
+/** Peran yang wajib memiliki Nomor STR. */
+const PERAN_STR: readonly PeranPengguna[] = [
+  'dokter',
+  'dietisien',
+  'dokter_spesialis_anak',
+]
+/** Nilai penanda pada dropdown rumah sakit: namanya diketik manual. */
+const RS_BARU = 'rs_baru'
 
 const LABEL_PERAN: Record<string, { label: string; badge: string }> = {
   admin: { label: 'Administrator', badge: 'bg-tinta-900 text-white' },
@@ -58,7 +93,17 @@ const LABEL_STATUS: Record<string, { label: string; badge: string }> = {
   ditolak: { label: 'Ditolak', badge: 'bg-rose-50 text-rose-700 border border-rose-200' },
 }
 
-export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
+export function TabelManajemenPengguna({
+  daftar,
+  daftarPuskesmas = [],
+  daftarRumahSakit = [],
+  daftarPosyandu = [],
+}: {
+  daftar: PenggunaItem[]
+  daftarPuskesmas?: OpsiWilayah[]
+  daftarRumahSakit?: OpsiWilayah[]
+  daftarPosyandu?: OpsiPosyandu[]
+}) {
   const [cari, setCari] = useState('')
   const [filterPeran, setFilterPeran] = useState<string>('semua')
   const [filterStatus, setFilterStatus] = useState<string>('semua')
@@ -76,6 +121,7 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
   // Loading & Toast state
   const [sedangProses, setSedangProses] = useState(false)
   const [toast, setToast] = useState<{ tipe: 'sukses' | 'galat'; pesan: string } | null>(null)
+  const [galatMedan, setGalatMedan] = useState<Record<string, string>>({})
 
   const showToast = (tipe: 'sukses' | 'galat', pesan: string) => {
     setToast({ tipe, pesan })
@@ -101,6 +147,7 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSedangProses(true)
+    setGalatMedan({})
     const formData = new FormData(e.currentTarget)
     const res = await adminEditPengguna(formData)
     setSedangProses(false)
@@ -109,6 +156,10 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
       showToast('sukses', res.pesan ?? 'Profil berhasil diperbarui.')
       setEditTarget(null)
     } else {
+      // Galat per medan ditampilkan tepat di bawah medannya, bukan hanya
+      // sebagai toast yang lewat. Sebelumnya administrator hanya menerima
+      // satu kalimat mengambang tanpa petunjuk medan mana yang salah.
+      setGalatMedan(res.galatMedan ?? {})
       showToast('galat', res.pesan ?? 'Gagal memperbarui profil.')
     }
   }
@@ -400,97 +451,17 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4">
-              <input type="hidden" name="penggunaId" value={editTarget.id} />
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-                  Nama Lengkap &amp; Gelar
-                </label>
-                <input
-                  type="text"
-                  name="namaLengkap"
-                  defaultValue={editTarget.namaLengkap}
-                  required
-                  className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-                    Peran Pengguna
-                  </label>
-                  <select
-                    name="role"
-                    defaultValue={editTarget.role}
-                    className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                  >
-                    <option value="kader">Kader Posyandu</option>
-                    <option value="dokter">Dokter</option>
-                    <option value="dokter_spesialis_anak">Dokter Spesialis Anak (RS)</option>
-                    <option value="dietisien">Dietisien / Nutrisionis</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-                    Status Akun
-                  </label>
-                  <select
-                    name="statusAkun"
-                    defaultValue={editTarget.statusAkun}
-                    className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                  >
-                    <option value="disetujui">Disetujui (Aktif Penuh)</option>
-                    <option value="menunggu">Menunggu Verifikasi</option>
-                    <option value="ditolak">Ditolak</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-                    Nomor WhatsApp / HP
-                  </label>
-                  <input
-                    type="tel"
-                    name="noHp"
-                    defaultValue={editTarget.noHp ?? ''}
-                    placeholder="081234567890"
-                    className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-                    Nomor STR (Khusus Dokter/Nakes)
-                  </label>
-                  <input
-                    type="text"
-                    name="noStr"
-                    defaultValue={editTarget.noStr ?? ''}
-                    placeholder="Nomor STR resmi..."
-                    className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-2.5 pt-4 border-t border-kabut-200">
-                <button
-                  type="button"
-                  onClick={() => setEditTarget(null)}
-                  className="rounded-xl px-4 py-2.5 text-xs font-bold text-tinta-600 hover:bg-kabut-100"
-                >
-                  Batal
-                </button>
-                <Button type="submit" varian="utama" sedangProses={sedangProses}>
-                  Simpan Perubahan
-                </Button>
-              </div>
-            </form>
+            <MedanEditPengguna
+              key={editTarget.id}
+              target={editTarget}
+              daftarPuskesmas={daftarPuskesmas}
+              daftarRumahSakit={daftarRumahSakit}
+              daftarPosyandu={daftarPosyandu}
+              galatMedan={galatMedan}
+              sedangProses={sedangProses}
+              onSubmit={handleEditSubmit}
+              onBatal={() => setEditTarget(null)}
+            />
           </div>
         </div>
       )}
@@ -629,5 +600,356 @@ export function TabelManajemenPengguna({ daftar }: { daftar: PenggunaItem[] }) {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Medan formulir edit akun.
+ *
+ * Dipisahkan menjadi komponen sendiri agar keadaannya (peran, jenis fasilitas,
+ * pilihan wilayah) dapat saling bergantung tanpa penyelarasan manual: pemanggil
+ * memberi `key={target.id}`, sehingga membuka akun lain memulai keadaan yang
+ * bersih. Sebelum ini seluruh medan memakai `defaultValue` tanpa keadaan, yang
+ * tidak mungkin dipakai untuk menyembunyikan atau menyaring medan lain.
+ *
+ * ATURAN YANG DITEGAKKAN DI SINI HANYA URUSAN TAMPILAN. Kebenarannya diperiksa
+ * ulang oleh `skemaEditPenggunaAdmin` di server, lalu oleh batasan CHECK di
+ * Postgres. Menyembunyikan sebuah medan bukan pengamanan.
+ */
+function MedanEditPengguna({
+  target,
+  daftarPuskesmas,
+  daftarRumahSakit,
+  daftarPosyandu,
+  galatMedan,
+  sedangProses,
+  onSubmit,
+  onBatal,
+}: {
+  target: PenggunaItem
+  daftarPuskesmas: OpsiWilayah[]
+  daftarRumahSakit: OpsiWilayah[]
+  daftarPosyandu: OpsiPosyandu[]
+  galatMedan: Record<string, string>
+  sedangProses: boolean
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+  onBatal: () => void
+}) {
+  const [peran, setPeran] = useState<PeranPengguna>(target.role)
+  const [statusAkun, setStatusAkun] = useState(target.statusAkun)
+  const [jenisFaskes, setJenisFaskes] = useState<'' | 'puskesmas' | 'rumah_sakit'>(
+    target.jenisFaskes ?? (target.role === 'admin' ? '' : 'puskesmas'),
+  )
+  const [puskesmasId, setPuskesmasId] = useState(target.puskesmasId ?? '')
+  const [rumahSakitId, setRumahSakitId] = useState(
+    target.faskesJenis === 'rumah_sakit' ? (target.faskesId ?? '') : '',
+  )
+  const [namaRsBaru, setNamaRsBaru] = useState('')
+  const [posyanduId, setPosyanduId] = useState(target.posyanduId ?? '')
+
+  const perluStr = PERAN_STR.includes(peran)
+  const perluPosyandu = peran === 'kader'
+  const bolehTanpaWilayah = peran === 'admin'
+  const wajibRs = peran === 'dokter_spesialis_anak'
+  const wajibPuskesmas = PERAN_PUSKESMAS.includes(peran) || peran === 'kader'
+
+  // Posyandu disaring pada puskesmas yang dipilih, supaya administrator tidak
+  // dapat memasangkan kader ke posyandu di luar puskesmasnya.
+  const posyanduTersaring = puskesmasId
+    ? daftarPosyandu.filter((p) => p.puskesmasId === puskesmasId)
+    : daftarPosyandu
+
+  /**
+   * Mengubah peran ikut menentukan jenis fasilitas, karena database menuntutnya:
+   * spesialis anak selalu rumah sakit, dokter/dietisien/kader selalu puskesmas.
+   * Administrator satu-satunya yang boleh tanpa wilayah.
+   */
+  const ubahPeran = (nilai: PeranPengguna) => {
+    setPeran(nilai)
+    if (nilai === 'dokter_spesialis_anak') setJenisFaskes('rumah_sakit')
+    else if (nilai === 'admin') setJenisFaskes(target.jenisFaskes ?? '')
+    else setJenisFaskes('puskesmas')
+    if (nilai !== 'kader') setPosyanduId('')
+  }
+
+  const kelasMedan =
+    'mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none'
+  const kelasLabel =
+    'block text-xs font-bold uppercase tracking-wider text-tinta-700'
+
+  const Galat = ({ medan }: { medan: string }) =>
+    galatMedan[medan] ? (
+      <p className="mt-1 text-[11px] font-semibold text-bahaya-teks">
+        {galatMedan[medan]}
+      </p>
+    ) : null
+
+  return (
+    <form onSubmit={onSubmit} className="mt-5 space-y-4">
+      <input type="hidden" name="penggunaId" value={target.id} />
+
+      <div>
+        <label className={kelasLabel}>Nama Lengkap &amp; Gelar</label>
+        <input
+          type="text"
+          name="namaLengkap"
+          defaultValue={target.namaLengkap}
+          required
+          className={kelasMedan}
+        />
+        <Galat medan="namaLengkap" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={kelasLabel}>Peran Pengguna</label>
+          <select
+            name="role"
+            value={peran}
+            onChange={(e) => ubahPeran(e.target.value as PeranPengguna)}
+            className={kelasMedan}
+          >
+            <option value="kader">Kader Posyandu</option>
+            <option value="dokter">Dokter</option>
+            <option value="dokter_spesialis_anak">Dokter Spesialis Anak (RS)</option>
+            <option value="dietisien">Dietisien / Nutrisionis</option>
+            <option value="admin">Administrator</option>
+          </select>
+          <Galat medan="role" />
+        </div>
+
+        <div>
+          <label className={kelasLabel}>Status Akun</label>
+          <select
+            name="statusAkun"
+            value={statusAkun}
+            onChange={(e) => setStatusAkun(e.target.value as PenggunaItem['statusAkun'])}
+            className={kelasMedan}
+          >
+            <option value="disetujui">Disetujui (Aktif Penuh)</option>
+            <option value="menunggu">Menunggu Verifikasi</option>
+            <option value="ditolak">Ditolak</option>
+          </select>
+          <Galat medan="statusAkun" />
+        </div>
+      </div>
+
+      {statusAkun === 'ditolak' && (
+        <div>
+          <label className={kelasLabel}>
+            Alasan Penolakan <span className="text-bahaya-teks">*</span>
+          </label>
+          <textarea
+            name="alasanTolak"
+            rows={2}
+            defaultValue={target.alasanTolak ?? ''}
+            placeholder="Minimal 10 karakter, agar pendaftar tahu apa yang harus diperbaiki..."
+            className="mt-1.5 w-full rounded-xl border border-kabut-200 bg-white p-3 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
+          />
+          <Galat medan="alasanTolak" />
+        </div>
+      )}
+
+      {/* ===================== WILAYAH TEMPAT BERTUGAS ===================== */}
+      <div className="rounded-xl bg-kabut-50 p-4 ring-1 ring-kabut-200">
+        <div className="flex items-center gap-2">
+          <Building2 className="size-4 text-laut-600" />
+          <h4 className="text-xs font-bold uppercase tracking-wider text-tinta-700">
+            Wilayah Tempat Bertugas
+          </h4>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className={kelasLabel}>Jenis Fasilitas</label>
+            <select
+              name="jenisFaskes"
+              value={jenisFaskes}
+              disabled={wajibRs}
+              onChange={(e) =>
+                setJenisFaskes(e.target.value as '' | 'puskesmas' | 'rumah_sakit')
+              }
+              className={`${kelasMedan} disabled:bg-kabut-100 disabled:text-tinta-500`}
+            >
+              {bolehTanpaWilayah && (
+                <option value="">Tidak bertugas di wilayah mana pun</option>
+              )}
+              {!wajibRs && <option value="puskesmas">Puskesmas</option>}
+              <option value="rumah_sakit">Rumah Sakit</option>
+            </select>
+            {wajibRs && (
+              <p className="mt-1 text-[11px] text-tinta-600">
+                Dokter spesialis anak berada di ujung rantai rujukan Posyandu →
+                Puskesmas → Rumah Sakit, sehingga jenis fasilitasnya tidak dapat
+                diubah.
+              </p>
+            )}
+            {bolehTanpaWilayah && jenisFaskes === '' && (
+              <p className="mt-1 text-[11px] text-tinta-600">
+                Administrator melihat seluruh data tanpa batas wilayah, sehingga
+                puskesmas dan posyandu tidak perlu diisi.
+              </p>
+            )}
+            <Galat medan="jenisFaskes" />
+          </div>
+
+          {jenisFaskes === 'rumah_sakit' && (
+            <>
+              <div>
+                <label className={kelasLabel}>
+                  Rumah Sakit <span className="text-bahaya-teks">*</span>
+                </label>
+                <select
+                  name="rumahSakitId"
+                  value={rumahSakitId}
+                  onChange={(e) => setRumahSakitId(e.target.value)}
+                  className={kelasMedan}
+                >
+                  <option value="">— Pilih rumah sakit —</option>
+                  {daftarRumahSakit.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.nama}
+                    </option>
+                  ))}
+                  <option value={RS_BARU}>Rumah sakit lain — ketik namanya</option>
+                </select>
+                {daftarRumahSakit.length === 0 && (
+                  <p className="mt-1 text-[11px] text-tinta-600">
+                    Belum ada rumah sakit terdaftar. Pilih &quot;Rumah sakit lain&quot;
+                    lalu tuliskan namanya; data itu langsung tersimpan sebagai
+                    fasilitas baru.
+                  </p>
+                )}
+                <Galat medan="rumahSakitId" />
+              </div>
+
+              {rumahSakitId === RS_BARU && (
+                <div>
+                  <label className={kelasLabel}>
+                    Nama Rumah Sakit <span className="text-bahaya-teks">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="namaRsBaru"
+                    list="saran-rumah-sakit"
+                    value={namaRsBaru}
+                    onChange={(e) => setNamaRsBaru(e.target.value)}
+                    placeholder="Ketik atau pilih dari saran..."
+                    className={kelasMedan}
+                  />
+                  {/*
+                    Saran diambil dari RUMAH_SAKIT_GORONTALO di
+                    src/lib/db/wilayah.ts, yaitu daftar yang sudah ada di
+                    dalam proyek ini. Tidak ada satu pun nama yang
+                    ditanamkan ke database sampai administrator memilihnya
+                    dan menyimpan.
+                  */}
+                  <datalist id="saran-rumah-sakit">
+                    {RUMAH_SAKIT_GORONTALO.map((r) => (
+                      <option key={r.id} value={r.nama} />
+                    ))}
+                  </datalist>
+                  <Galat medan="namaRsBaru" />
+                </div>
+              )}
+            </>
+          )}
+
+          {(jenisFaskes === 'puskesmas' || wajibPuskesmas) && (
+            <div>
+              <label className={kelasLabel}>
+                Puskesmas{' '}
+                {wajibPuskesmas && <span className="text-bahaya-teks">*</span>}
+              </label>
+              <select
+                name="puskesmasId"
+                value={puskesmasId}
+                onChange={(e) => {
+                  setPuskesmasId(e.target.value)
+                  setPosyanduId('')
+                }}
+                className={kelasMedan}
+              >
+                <option value="">— Pilih puskesmas —</option>
+                {daftarPuskesmas.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nama}
+                  </option>
+                ))}
+              </select>
+              <Galat medan="puskesmasId" />
+            </div>
+          )}
+
+          {perluPosyandu && (
+            <div>
+              <label className={kelasLabel}>
+                Posyandu <span className="text-bahaya-teks">*</span>
+              </label>
+              <select
+                name="posyanduId"
+                value={posyanduId}
+                onChange={(e) => setPosyanduId(e.target.value)}
+                className={kelasMedan}
+              >
+                <option value="">— Pilih posyandu —</option>
+                {posyanduTersaring.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.desa ? `${p.nama} — ${p.desa}` : p.nama}
+                  </option>
+                ))}
+              </select>
+              {puskesmasId && posyanduTersaring.length === 0 && (
+                <p className="mt-1 text-[11px] text-tinta-600">
+                  Belum ada posyandu di bawah puskesmas ini.
+                </p>
+              )}
+              <Galat medan="posyanduId" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={kelasLabel}>Nomor WhatsApp / HP</label>
+          <input
+            type="tel"
+            name="noHp"
+            defaultValue={target.noHp ?? ''}
+            placeholder="081234567890"
+            className={kelasMedan}
+          />
+          <Galat medan="noHp" />
+        </div>
+
+        <div>
+          <label className={kelasLabel}>
+            Nomor STR {perluStr && <span className="text-bahaya-teks">*</span>}
+          </label>
+          <input
+            type="text"
+            name="noStr"
+            defaultValue={target.noStr ?? ''}
+            placeholder={perluStr ? 'Wajib, minimal 5 karakter' : 'Tidak wajib untuk peran ini'}
+            className={kelasMedan}
+          />
+          <Galat medan="noStr" />
+        </div>
+      </div>
+
+      <div className="mt-6 flex justify-end gap-2.5 border-t border-kabut-200 pt-4">
+        <button
+          type="button"
+          onClick={onBatal}
+          className="rounded-xl px-4 py-2.5 text-xs font-bold text-tinta-600 hover:bg-kabut-100"
+        >
+          Batal
+        </button>
+        <Button type="submit" varian="utama" sedangProses={sedangProses}>
+          Simpan Perubahan
+        </Button>
+      </div>
+    </form>
   )
 }
