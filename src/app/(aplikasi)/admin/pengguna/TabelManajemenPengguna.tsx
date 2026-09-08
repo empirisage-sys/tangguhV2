@@ -343,9 +343,32 @@ export function TabelManajemenPengguna({
                         <div className="flex items-start gap-1.5">
                           <Building2 className="mt-0.5 size-3.5 shrink-0 text-tinta-400" />
                           <div>
-                            <p className="font-semibold text-tinta-800">
-                              {item.puskesmasNama || 'Fasilitas Terdaftar'}
-                            </p>
+                            {/*
+                              Dua keadaan di bawah ini dahulu tidak terjangkau,
+                              karena setiap pendaftar selalu memperoleh sebuah
+                              puskesmas cadangan. Keduanya menjadi nyata setelah
+                              administrator boleh tanpa wilayah dan spesialis
+                              anak bertugas di rumah sakit — dan sel ini
+                              menampilkan 'Fasilitas Terdaftar', sebuah kalimat
+                              yang tidak berarti apa-apa. Terlihat saat
+                              pengujian otomatis Uji B.
+                            */}
+                            {item.jenisFaskes === 'rumah_sakit' && item.faskesNama ? (
+                              <>
+                                <p className="font-semibold text-tinta-800">
+                                  {item.faskesNama}
+                                </p>
+                                <p className="text-[11px] text-indigo-700">Rumah Sakit</p>
+                              </>
+                            ) : item.puskesmasNama ? (
+                              <p className="font-semibold text-tinta-800">
+                                {item.puskesmasNama}
+                              </p>
+                            ) : (
+                              <p className="italic text-tinta-400">
+                                Tidak bertugas di wilayah tertentu
+                              </p>
+                            )}
                             {item.posyanduNama && (
                               <p className="text-[11px] text-tinta-500">
                                 Posyandu: {item.posyanduNama}
@@ -762,8 +785,23 @@ function MedanEditPengguna({
         <div className="mt-3 space-y-3">
           <div>
             <label className={kelasLabel}>Jenis Fasilitas</label>
+            {/*
+              MEDAN YANG DINONAKTIFKAN TIDAK IKUT TERKIRIM.
+
+              Ditemukan saat pengujian otomatis pada produksi: mengubah peran
+              menjadi Dokter Spesialis Anak membuat medan ini terbaca
+              'Rumah Sakit' di layar, namun `formData.get('jenisFaskes')`
+              mengembalikan kosong, sehingga validasi justru meminta
+              administrator "ubah Jenis Fasilitas menjadi Rumah Sakit" atas
+              medan yang SUDAH bernilai itu. Penyebabnya aturan HTML: kontrol
+              dengan atribut `disabled` tidak disertakan dalam pengiriman
+              formulir.
+
+              Tampilannya tetap terkunci, tetapi nilainya dititipkan pada
+              medan tersembunyi di bawah ini.
+            */}
             <select
-              name="jenisFaskes"
+              name={wajibRs ? undefined : 'jenisFaskes'}
               value={jenisFaskes}
               disabled={wajibRs}
               onChange={(e) =>
@@ -777,6 +815,7 @@ function MedanEditPengguna({
               {!wajibRs && <option value="puskesmas">Puskesmas</option>}
               <option value="rumah_sakit">Rumah Sakit</option>
             </select>
+            {wajibRs && <input type="hidden" name="jenisFaskes" value={jenisFaskes} />}
             {wajibRs && (
               <p className="mt-1 text-[11px] text-tinta-600">
                 Dokter spesialis anak berada di ujung rantai rujukan Posyandu →
