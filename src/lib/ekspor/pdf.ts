@@ -1,7 +1,7 @@
 import { ENGINE_VERSION } from '@/lib/zscore'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { BalitaDetail } from '@/lib/db/balita-mock'
+import type { BalitaDetail } from '@/lib/db/balita'
 import { formatTanggal, formatZ } from '@/lib/tampilan/format'
 
 /** Angka gaya Indonesia: pemisah ribuan titik, desimal koma. */

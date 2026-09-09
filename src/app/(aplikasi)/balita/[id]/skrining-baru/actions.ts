@@ -7,7 +7,6 @@ import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { hitungSkrining } from '@/lib/zscore'
 import { keBarisSkrining } from '@/lib/db/pemetaan'
 import { skemaSkrining, periksaTerhadapBalita } from '@/lib/validasi/skrining'
-import { cariBalitaById } from '@/lib/db/balita-mock'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
 
 export async function simpanSkrining(formData: FormData): Promise<HasilTindakan> {
@@ -58,36 +57,44 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
     kabupaten_id: string
   } | null = null
 
-  try {
-    const { data, error: balitaErr } = await supabase
-      .from('balita')
-      .select('id, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id')
-      .eq('id', d.balitaId)
-      .single()
+  // ======================================================================
+  // TAHAP 2a: CADANGAN DATA CONTOH DIHAPUS
+  //
+  // Bentuk lama membaca Supabase di dalam try/catch, lalu bila gagal jatuh ke
+  // `cariBalitaById` pada senarai kosong. Dua akibatnya: galat database tidak
+  // pernah terlihat, dan pesan yang sampai ke kader adalah "Data balita tidak
+  // ditemukan di sistem" — padahal balitanya ada, yang gagal justru
+  // pembacaannya. Kader lalu mendaftarkan balita itu lagi.
+  //
+  // Sekarang galat pembacaan dilaporkan sebagai galat pembacaan, dan balita
+  // yang benar-benar tidak ada dilaporkan sebagai tidak ada. Wilayahnya
+  // ditegakkan RLS: baris di luar cakupan penulis tidak akan terbaca.
+  // ======================================================================
+  const { data: dataBalita, error: galatBalita } = await supabase
+    .from('balita')
+    .select('id, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id')
+    .eq('id', d.balitaId)
+    .maybeSingle()
 
-    if (!balitaErr && data) {
-      balita = data
+  if (galatBalita) {
+    return {
+      ok: false,
+      pesan:
+        `Data balita gagal dibaca dari server: ${galatBalita.message}. ` +
+        'Jangan mendaftarkan ulang balita ini — coba lagi setelah jaringan pulih.',
+      simpanKeOutbox: true,
     }
-  } catch {
-    // Database Supabase belum aktif di sesi lokal
   }
 
-  if (!balita) {
-    const mock = cariBalitaById(d.balitaId)
-    if (mock) {
-      balita = {
-        id: mock.id,
-        tanggal_lahir: mock.tanggalLahir,
-        jenis_kelamin: mock.jenisKelamin,
-        posyandu_id: mock.posyanduId,
-        puskesmas_id: mock.puskesmasId,
-        kabupaten_id: mock.kabupatenId,
-      }
-    }
-  }
+  balita = dataBalita
 
   if (!balita) {
-    return { ok: false, pesan: 'Data balita tidak ditemukan di sistem.' }
+    return {
+      ok: false,
+      pesan:
+        'Data balita tidak ditemukan, atau berada di luar wilayah binaan Anda. ' +
+        'Periksa kembali dari halaman Data Balita.',
+    }
   }
 
   const validasiTanggal = periksaTerhadapBalita(d, balita.tanggal_lahir)
