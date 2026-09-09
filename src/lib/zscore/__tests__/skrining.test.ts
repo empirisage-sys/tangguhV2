@@ -83,8 +83,8 @@ describe('batas 24 bulan menurut konvensi hari per bulan', () => {
 
 describe('versi engine', () => {
   it('mencatat versi 2 karena perilakunya berbeda dari aplikasi lama', () => {
-    expect(ENGINE_VERSION).toBe('zscore-2.1.0')
-    expect(hitungSkrining(input()).engineVersion).toBe('zscore-2.1.0')
+    expect(ENGINE_VERSION).toMatch(/^zscore-2\.\d+\.\d+$/)
+    expect(hitungSkrining(input()).engineVersion).toBe(ENGINE_VERSION)
   })
 })
 

@@ -32,7 +32,13 @@
 import { LANGKAH_UMUR_BULAN, tabelUmur, UMUR_MAKS_BULAN } from '@/lib/who'
 import type { JenisKelamin } from '@/lib/who'
 import { batasTabel, interpolasiLms } from './lms'
-import type { HasilGizi, MetodeKalori, StatusBBTB, StatusTBU } from './tipe'
+import type {
+  AlasanCatchUpKosong,
+  HasilGizi,
+  MetodeKalori,
+  StatusBBTB,
+  StatusTBU,
+} from './tipe'
 
 /**
  * Tabel Recommended Dietary Allowance energi, satuan kkal per kg berat badan per hari.
@@ -64,6 +70,24 @@ export function rdaKkalPerKg(umurBulan: number): number {
 }
 
 /**
+ * Di mana panjang atau tinggi anak berada relatif terhadap rentang median TB/U.
+ *
+ * Dibutuhkan karena usia-tinggi TIDAK TERDEFINISI di luar rentang itu, dan
+ * arah keluarnya menentukan apakah RDA masih dapat ditetapkan.
+ */
+export type PosisiUsiaTinggi =
+  | 'dalam_tabel'
+  /** Lebih pendek dari median lahir, misalnya bayi prematur. */
+  | 'di_bawah_median_lahir'
+  /** Lebih tinggi dari median umur 60 bulan. */
+  | 'di_atas_median_60_bulan'
+
+export type HasilUsiaTinggi = {
+  bulan: number | null
+  posisi: PosisiUsiaTinggi
+}
+
+/**
  * Mencari usia-tinggi (height-age): umur yang mediannya setara panjang atau
  * tinggi badan anak, menurut tabel TB/U.
  *
@@ -76,10 +100,7 @@ export function rdaKkalPerKg(umurBulan: number): number {
  * Mengembalikan `null` bila panjang atau tinggi berada di luar rentang median
  * tabel, misalnya bayi prematur yang lebih pendek dari median lahir.
  */
-export function usiaTinggiBulan(
-  panjangCm: number,
-  seks: JenisKelamin,
-): number | null {
+export function cariUsiaTinggi(panjangCm: number, seks: JenisKelamin): HasilUsiaTinggi {
   const tabel = tabelUmur('tbu', seks)
   const { min, maks } = batasTabel(tabel)
 
@@ -90,10 +111,12 @@ export function usiaTinggiBulan(
 
   const medianMin = medianPada(min)
   const medianMaks = medianPada(maks)
-  if (medianMin === null || medianMaks === null) return null
+  if (medianMin === null || medianMaks === null) {
+    return { bulan: null, posisi: 'dalam_tabel' }
+  }
 
-  if (panjangCm < medianMin) return null
-  if (panjangCm > medianMaks) return null
+  if (panjangCm < medianMin) return { bulan: null, posisi: 'di_bawah_median_lahir' }
+  if (panjangCm > medianMaks) return { bulan: null, posisi: 'di_atas_median_60_bulan' }
 
   // Pencarian biner pada fungsi median yang monoton naik.
   let bawah = min
@@ -101,12 +124,66 @@ export function usiaTinggiBulan(
   for (let i = 0; i < 60; i += 1) {
     const tengah = (bawah + atas) / 2
     const m = medianPada(tengah)
-    if (m === null) return null
+    if (m === null) return { bulan: null, posisi: 'dalam_tabel' }
     if (m < panjangCm) bawah = tengah
     else atas = tengah
   }
 
-  return Math.round(((bawah + atas) / 2) * 100) / 100
+  return {
+    bulan: Math.round(((bawah + atas) / 2) * 100) / 100,
+    posisi: 'dalam_tabel',
+  }
+}
+
+/** Bentuk lama yang hanya mengembalikan angka. Dipertahankan untuk pemanggil lama. */
+export function usiaTinggiBulan(panjangCm: number, seks: JenisKelamin): number | null {
+  return cariUsiaTinggi(panjangCm, seks).bulan
+}
+
+/**
+ * RDA untuk target tumbuh kejar, termasuk ketika usia-tinggi tidak terdefinisi.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT K-1: TARGET TUMBUH KEJAR HILANG PADA ANAK PALING SAKIT
+ *
+ * Sebelum perbaikan ini, `usiaTinggiBulan` mengembalikan `null` begitu tinggi
+ * anak melewati median TB/U umur 60 bulan (109,96 cm laki-laki). Akibatnya
+ * SELURUH target tumbuh kejar dibuang, dan `metode` jatuh ke 'pemeliharaan'
+ * tanpa satu pun catatan — `diLuarRentang` tetap `false` dan daftar alasannya
+ * kosong. Anak laki-laki umur 58 bulan, 110 cm, 12,5 kg dengan BB/TB -4,54 SD
+ * — gizi buruk — dianjurkan 1.125 kkal alih-alih sekitar 1.667 kkal, dan tidak
+ * ada apa pun di layar yang memberi tahu dietisien bahwa angka tumbuh kejarnya
+ * tidak terhitung.
+ *
+ * Perbaikannya tidak menebak nilai klinis apa pun. Alasannya aritmetika:
+ * `TABEL_RDA` berbentuk tangga, dan kedua wilayah di luar tabel jatuh
+ * SELURUHNYA di dalam satu anak tangga yang sama.
+ *
+ *   - Anak yang lebih tinggi dari median 60 bulan pasti berusia-tinggi di atas
+ *     60 bulan, dan seluruh nilai di atas 36 bulan bernilai sama.
+ *   - Anak yang lebih pendek dari median lahir berusia-tinggi di bawah 0 bulan,
+ *     dan seluruh nilai sampai 12 bulan bernilai sama.
+ *
+ * Karena itu RDA-nya tertentu meskipun usia-tinggi tepatnya tidak diketahui.
+ * Kesetaraan tangga itu DIPERIKSA saat berjalan, bukan diasumsikan: bila suatu
+ * saat `TABEL_RDA` diubah sehingga anak tangganya tidak lagi seragam, fungsi
+ * ini mengembalikan `null` alih-alih angka yang tidak sah.
+ * ==========================================================================
+ */
+export function rdaCatchUpKkalPerKg(usiaTinggi: HasilUsiaTinggi): number | null {
+  if (usiaTinggi.posisi === 'dalam_tabel') {
+    return usiaTinggi.bulan === null ? null : rdaKkalPerKg(usiaTinggi.bulan)
+  }
+
+  if (usiaTinggi.posisi === 'di_atas_median_60_bulan') {
+    const diTepi = rdaKkalPerKg(UMUR_MAKS_BULAN)
+    const diTakHingga = rdaKkalPerKg(Number.POSITIVE_INFINITY)
+    return diTepi === diTakHingga ? diTepi : null
+  }
+
+  const diNol = rdaKkalPerKg(0)
+  const diMinusTakHingga = rdaKkalPerKg(Number.NEGATIVE_INFINITY)
+  return diNol === diMinusTakHingga ? diNol : null
 }
 
 export type InputGizi = {
@@ -153,19 +230,24 @@ export function hitungKebutuhanGizi(input: InputGizi): HasilGizi {
   const proteinPemeliharaanMaks = bulatkanSatuDesimal(PROTEIN_PEMELIHARAAN.maks * beratKg)
 
   // --- 2. Target tumbuh kejar ---
-  const usiaTinggi =
-    umurBulan <= UMUR_MAKS_BULAN ? usiaTinggiBulan(panjangTerkoreksiCm, jenisKelamin) : null
+  const usiaTinggi: HasilUsiaTinggi =
+    umurBulan <= UMUR_MAKS_BULAN
+      ? cariUsiaTinggi(panjangTerkoreksiCm, jenisKelamin)
+      : { bulan: null, posisi: 'dalam_tabel' }
 
   let rdaCatchUp: number | null = null
   let kaloriCatchUp: number | null = null
   let proteinCatchUpMin: number | null = null
   let proteinCatchUpMaks: number | null = null
 
-  if (usiaTinggi !== null && beratIdealKg !== null && beratIdealKg > 0) {
-    rdaCatchUp = rdaKkalPerKg(usiaTinggi)
-    kaloriCatchUp = Math.round(rdaCatchUp * beratIdealKg)
-    proteinCatchUpMin = bulatkanSatuDesimal(PROTEIN_CATCH_UP.min * beratIdealKg)
-    proteinCatchUpMaks = bulatkanSatuDesimal(PROTEIN_CATCH_UP.maks * beratIdealKg)
+  const beratIdealAda = beratIdealKg !== null && beratIdealKg > 0
+  if (beratIdealAda) {
+    rdaCatchUp = rdaCatchUpKkalPerKg(usiaTinggi)
+    if (rdaCatchUp !== null) {
+      kaloriCatchUp = Math.round(rdaCatchUp * (beratIdealKg as number))
+      proteinCatchUpMin = bulatkanSatuDesimal(PROTEIN_CATCH_UP.min * (beratIdealKg as number))
+      proteinCatchUpMaks = bulatkanSatuDesimal(PROTEIN_CATCH_UP.maks * (beratIdealKg as number))
+    }
   }
 
   // --- 3. Metode yang dianjurkan ditampilkan sebagai target utama ---
@@ -173,9 +255,20 @@ export function hitungKebutuhanGizi(input: InputGizi): HasilGizi {
   const metode: MetodeKalori =
     perluCatchUp && kaloriCatchUp !== null ? 'catch_up' : 'pemeliharaan'
 
+  // Bila tumbuh kejar DIBUTUHKAN tetapi tidak dapat dihitung, alasannya wajib
+  // ikut keluar. Inilah yang dahulu hilang tanpa jejak (temuan K-1).
+  const alasanCatchUpKosong: AlasanCatchUpKosong =
+    perluCatchUp && kaloriCatchUp === null
+      ? !beratIdealAda
+        ? 'berat_ideal_tidak_ada'
+        : 'rda_tidak_tentu'
+      : null
+
   return {
     beratIdealKg,
-    usiaTinggiBulan: usiaTinggi,
+    usiaTinggiBulan: usiaTinggi.bulan,
+    posisiUsiaTinggi: usiaTinggi.posisi,
+    alasanCatchUpKosong,
     rdaPemeliharaanKkalPerKg: rdaPemeliharaan,
     kaloriPemeliharaanKkal: kaloriPemeliharaan,
     proteinPemeliharaanMinGram: proteinPemeliharaanMin,

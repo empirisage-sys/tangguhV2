@@ -115,11 +115,31 @@ export type HasilIndikator = {
   keterangan: string
 }
 
+/**
+ * Mengapa target tumbuh kejar kosong padahal status gizi membutuhkannya.
+ * `null` berarti tidak ada masalah: entah tumbuh kejar terhitung, entah
+ * memang tidak dibutuhkan. Lihat temuan audit K-1.
+ */
+export type AlasanCatchUpKosong =
+  /** Panjang atau tinggi di luar tabel BB/PB dan BB/TB, sehingga berat ideal tak ada. */
+  | 'berat_ideal_tidak_ada'
+  /** Tabel RDA tidak lagi seragam pada wilayah di luar tabel usia-tinggi. */
+  | 'rda_tidak_tentu'
+  | null
+
 export type HasilGizi = {
   /** Berat badan ideal menurut panjang atau tinggi badan, yaitu median tabel BB/PB atau BB/TB. */
   beratIdealKg: number | null
   /** Umur yang mediannya setara panjang/tinggi anak, hasil interpolasi tabel TB/U. */
   usiaTinggiBulan: number | null
+  /**
+   * Posisi anak terhadap rentang median TB/U. Bernilai bukan 'dalam_tabel'
+   * berarti `usiaTinggiBulan` null KARENA di luar rentang, bukan karena galat —
+   * dan RDA tumbuh kejar tetap tertentu. Lihat temuan audit K-1.
+   */
+  posisiUsiaTinggi: 'dalam_tabel' | 'di_bawah_median_lahir' | 'di_atas_median_60_bulan'
+  /** Terisi hanya bila tumbuh kejar dibutuhkan tetapi tidak dapat dihitung. */
+  alasanCatchUpKosong: AlasanCatchUpKosong
 
   /** Kebutuhan pemeliharaan: RDA menurut umur kronologis dikali berat aktual. */
   rdaPemeliharaanKkalPerKg: number

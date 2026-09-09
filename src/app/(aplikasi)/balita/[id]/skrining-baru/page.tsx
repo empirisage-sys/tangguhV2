@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/Button'
 import { KartuHasil } from '@/components/skrining/KartuHasil'
 import { simpanKeOutbox } from '@/lib/offline/outbox'
 import { simpanSkrining } from './actions'
-import { formatTanggal } from '@/lib/tampilan/format'
+import { formatTanggal, formatGramBertanda } from '@/lib/tampilan/format'
+import { sumberAmbangVelocity } from '@/lib/tampilan/status'
 
 export default function HalamanSkriningBaru({
   params,
@@ -543,9 +544,11 @@ export default function HalamanSkriningBaru({
                     </div>
 
                     <div className="rounded-lg bg-white/90 px-3 py-1.5 ring-1 ring-black/5 text-center">
-                      <span className="text-[10px] text-tinta-500 block">Target Min (P5)</span>
+                      <span className="text-[10px] text-tinta-500 block">
+                        {sumberAmbangVelocity(vel.metode).judul}
+                      </span>
                       <span className="angka font-black text-laut-700">
-                        {vel.kenaikanMinimalGram !== null ? `+${vel.kenaikanMinimalGram} g` : '-'}
+                        {formatGramBertanda(vel.kenaikanMinimalGram)}
                       </span>
                     </div>
                   </div>
@@ -555,7 +558,12 @@ export default function HalamanSkriningBaru({
                   <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-amber-100/90 p-2 text-xs text-amber-900">
                     <AlertTriangle className="size-4 shrink-0 text-amber-700 mt-0.5" />
                     <span>
-                      <strong>Growth Faltering:</strong> Kenaikan berat (+{vel.kenaikanAktualGram} g) belum memenuhi standar minimal WHO (+{vel.kenaikanMinimalGram} g). Waspadai risiko gagal tumbuh.
+                      <strong>Growth Faltering:</strong> Kenaikan berat ({formatGramBertanda(vel.kenaikanAktualGram)}) belum memenuhi {sumberAmbangVelocity(vel.metode).dalamKalimat} ({formatGramBertanda(vel.kenaikanMinimalGram)}). Waspadai risiko gagal tumbuh.
+                      {sumberAmbangVelocity(vel.metode).perkiraan && (
+                        <span className="mt-1 block font-semibold">
+                          {sumberAmbangVelocity(vel.metode).keterangan}
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}

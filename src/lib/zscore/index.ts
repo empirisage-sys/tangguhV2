@@ -20,6 +20,17 @@
  *                 Z-7 `statusTBU` diteruskan ke perhitungan kebutuhan gizi
  *                 Z-18 pita LILA gizi kurang akut sedang dan batas umur 59 bulan
  *                 AGENTS.md 2.3 `kodeRedFlag` untuk penyaringan berbasis kode
+ *   zscore-2.2.0  Perbaikan temuan audit K-1:
+ *                 target tumbuh kejar tidak lagi hilang tanpa keterangan pada
+ *                 anak yang lebih tinggi daripada median TB/U umur 60 bulan
+ *                 atau lebih pendek daripada median panjang lahir.
+ *
+ *                 NOMOR VERSI WAJIB NAIK. Kolom `engine_version` pada tabel
+ *                 `skrining` menjadi satu-satunya cara membedakan baris yang
+ *                 dihitung sebelum dan sesudah perbaikan ini. Baris berlabel
+ *                 zscore-2.1.0 dengan `kalori_metode = 'pemeliharaan'` pada
+ *                 anak berstatus gizi buruk patut ditinjau ulang: sebagian
+ *                 kemungkinan seharusnya bertarget tumbuh kejar.
  */
 import {
   LANGKAH_PANJANG_CM,
@@ -42,7 +53,7 @@ import type {
   StandarPanjang,
 } from './tipe'
 
-export const ENGINE_VERSION = 'zscore-2.1.0'
+export const ENGINE_VERSION = 'zscore-2.2.0'
 
 /** Umur, dalam bulan, tempat standar berpindah dari panjang terlentang ke tinggi berdiri. */
 export const UMUR_PERALIHAN_BULAN = 24
@@ -407,6 +418,38 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
     statusTBU,
   })
 
+  // --- Keterbukaan perhitungan tumbuh kejar (temuan audit K-1) ---
+  //
+  // Dahulu kedua keadaan di bawah tidak menghasilkan apa pun di layar: target
+  // tumbuh kejar sekadar hilang dan metode jatuh ke pemeliharaan, pada anak
+  // yang justru berstatus gizi buruk.
+  if (gizi.posisiUsiaTinggi !== 'dalam_tabel' && gizi.kaloriCatchUpKkal !== null) {
+    catatan.push(
+      gizi.posisiUsiaTinggi === 'di_atas_median_60_bulan'
+        ? `Tinggi ${angkaId(panjangTerkoreksiCm, 1)} cm melebihi median TB/U umur 60 bulan, ` +
+            'sehingga usia-tinggi tidak dapat ditentukan. Target tumbuh kejar tetap dihitung ' +
+            `memakai RDA ${gizi.rdaCatchUpKkalPerKg} kkal/kg, yang berlaku sama untuk seluruh ` +
+            'usia-tinggi di atas 36 bulan.'
+        : `Panjang ${angkaId(panjangTerkoreksiCm, 1)} cm lebih pendek dari median panjang lahir, ` +
+            'sehingga usia-tinggi tidak dapat ditentukan. Target tumbuh kejar tetap dihitung ' +
+            `memakai RDA ${gizi.rdaCatchUpKkalPerKg} kkal/kg, yang berlaku sama untuk seluruh ` +
+            'usia-tinggi di bawah 12 bulan.',
+    )
+  }
+
+  if (gizi.alasanCatchUpKosong !== null) {
+    catatan.push(
+      gizi.alasanCatchUpKosong === 'berat_ideal_tidak_ada'
+        ? 'Status gizi anak ini membutuhkan target tumbuh kejar, tetapi berat badan ideal ' +
+            'tidak dapat dihitung karena panjang atau tinggi berada di luar tabel BB/PB dan ' +
+            'BB/TB. Angka yang ditampilkan adalah kebutuhan PEMELIHARAAN, bukan tumbuh kejar. ' +
+            'Tentukan targetnya secara manual bersama dietisien.'
+        : 'Status gizi anak ini membutuhkan target tumbuh kejar, tetapi RDA usia-tinggi tidak ' +
+            'dapat ditetapkan. Angka yang ditampilkan adalah kebutuhan PEMELIHARAAN, bukan ' +
+            'tumbuh kejar. Tentukan targetnya secara manual bersama dietisien.',
+    )
+  }
+
   return {
     engineVersion: ENGINE_VERSION,
     umurHari: umur.hari,
@@ -452,5 +495,13 @@ export {
   type UsiaKoreksiPrematur,
 } from './umur'
 export { hitungZ, nilaiDariLms, interpolasiLms, lmsUntukKurva } from './lms'
-export { hitungKebutuhanGizi, usiaTinggiBulan, rdaKkalPerKg } from './gizi'
+export {
+  hitungKebutuhanGizi,
+  usiaTinggiBulan,
+  cariUsiaTinggi,
+  rdaKkalPerKg,
+  rdaCatchUpKkalPerKg,
+  type HasilUsiaTinggi,
+  type PosisiUsiaTinggi,
+} from './gizi'
 export { apakahPerluPKMK, type InputIndikasiPKMK } from './indikasi-pkmk'
