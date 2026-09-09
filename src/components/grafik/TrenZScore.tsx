@@ -72,9 +72,19 @@ export function TrenZScore({ seri, tinggi = 280 }: { seri: SeriTrenZ; tinggi?: n
             <ReferenceLine y={-2} stroke="var(--color-tinta-600)" strokeDasharray="4 3" />
             <ReferenceLine y={-3} stroke="var(--color-bahaya-teks)" strokeDasharray="4 3" />
 
-            <Line dataKey="bbu" name="BB/U" stroke={WARNA.bbu} strokeWidth={2.2} dot={{ r: 3.6 }} connectNulls />
-            <Line dataKey="tbu" name="TB/U" stroke={WARNA.tbu} strokeWidth={2.2} dot={{ r: 3.6 }} connectNulls />
-            <Line dataKey="bbtb" name="BB/TB" stroke={WARNA.bbtb} strokeWidth={2.2} dot={{ r: 3.6 }} connectNulls />
+            {/*
+              TEMUAN AUDIT K-3: `connectNulls` DIHAPUS.
+
+              Dengan `connectNulls`, kunjungan yang indikatornya tidak dapat
+              dinilai dilompati dengan GARIS LURUS dari titik sebelum ke titik
+              sesudahnya. Garis itu menggambarkan perjalanan nilai Z yang tidak
+              pernah diukur, tepat pada grafik yang gunanya membaca arah. Lubang
+              yang tampak sebagai lubang lebih jujur daripada garis yang
+              dikarang.
+            */}
+            <Line dataKey="bbu" name="BB/U" stroke={WARNA.bbu} strokeWidth={2.2} dot={{ r: 3.6 }} />
+            <Line dataKey="tbu" name="TB/U" stroke={WARNA.tbu} strokeWidth={2.2} dot={{ r: 3.6 }} />
+            <Line dataKey="bbtb" name="BB/TB" stroke={WARNA.bbtb} strokeWidth={2.2} dot={{ r: 3.6 }} />
 
             <Legend verticalAlign="top" height={26} iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
 

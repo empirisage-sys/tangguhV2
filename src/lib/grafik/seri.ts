@@ -362,6 +362,17 @@ export function seriBBTB(
 
   const catatan = catatanUmum(riwayat, anak)
 
+  const diLuarJendela = riwayat.length - anak.length
+  if (diLuarJendela > 0) {
+    catatan.push(
+      `Garis rujukan mengikuti standar pada pemeriksaan TERAKHIR, yaitu ${
+        basis === 'bbpb' ? 'BB/PB 45-110 cm' : 'BB/TB 65-120 cm'
+      }. ${diLuarJendela} pengukuran berada di luar rentang itu sehingga tidak dapat ` +
+        'digambar bersama garis ini. Nilai Z pengukuran tersebut tetap sah dan tetap ' +
+        'tampil pada tabel riwayat.',
+    )
+  }
+
   const jumlahBeda = anak.filter((t) => t.standar !== standarBasis).length
   if (jumlahBeda > 0) {
     catatan.push(
@@ -434,11 +445,21 @@ function catatanUmum(riwayat: KunjunganRiwayat[], anak: TitikAnak[]): string[] {
     )
   }
 
+  // ========================================================================
+  // TEMUAN AUDIT K-1: CATATAN INI DAHULU BERTENTANGAN DENGAN GAMBARNYA
+  //
+  // Bunyinya "N titik DIGAMBAR tanpa nilai Z", padahal `titikGambarAnak`
+  // justru MENYARING keluar titik yang `tidakDinilai`. Jadi titik itu tidak
+  // ada di layar, sementara keterangannya menyatakan ada — pembaca akan
+  // mencari titik yang tidak pernah digambar, atau menganggap kunjungan itu
+  // sudah terwakili pada kurva.
+  // ========================================================================
   const tidakDinilai = anak.filter((t) => t.tidakDinilai).length
   if (tidakDinilai > 0) {
     catatan.push(
-      `${tidakDinilai} titik digambar tanpa nilai Z, karena indikator ini tidak dapat ` +
-        'dinilai pada pemeriksaan tersebut.',
+      `${tidakDinilai} pengukuran TIDAK digambar pada kurva ini karena indikatornya ` +
+        'tidak dapat dinilai pada pemeriksaan tersebut. Angkanya tetap ada pada tabel ' +
+        'riwayat.',
     )
   }
 
@@ -493,6 +514,24 @@ export function seriTrenZ(riwayat: KunjunganRiwayat[]): SeriTrenZ {
 
   if (titik.length < 2) {
     catatan.push('Tren memerlukan minimal dua kali pengukuran.')
+  }
+
+  // ========================================================================
+  // TEMUAN AUDIT K-2: TITIK DI LUAR SUMBU HILANG TANPA KETERANGAN
+  //
+  // `jendelaUmur` menjepit batas atas ke 60 bulan, sedangkan `titik` memuat
+  // SELURUH kunjungan. Kunjungan pada umur 62 bulan karena itu berada di luar
+  // sumbu dan tidak digambar Recharts — diam-diam, tanpa satu pun catatan.
+  // Kurva tren dipakai dokter untuk melihat arah, dan arah yang titik
+  // terakhirnya hilang adalah arah yang keliru.
+  // ========================================================================
+  const diLuarSumbu = titik.filter((t) => t.umurBulan < dari || t.umurBulan > sampai).length
+  if (diLuarSumbu > 0) {
+    catatan.push(
+      `${diLuarSumbu} pengukuran berada di luar sumbu umur ${dari}-${sampai} bulan ` +
+        'sehingga tidak tergambar. Standar WHO yang dipakai aplikasi ini berlaku sampai ' +
+        '60 bulan.',
+    )
   }
 
   return {

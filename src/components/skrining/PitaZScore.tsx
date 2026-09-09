@@ -1,4 +1,4 @@
-import { garisUkur, posisiPenanda, segmenUntuk, TITIK_LABEL, zKePersen } from '@/lib/tampilan/pita'
+import { garisUkur, posisiPenanda, segmenUntuk, titikLabelUntuk, zKePersen } from '@/lib/tampilan/pita'
 import { formatZ } from '@/lib/tampilan/format'
 
 /**
@@ -83,7 +83,7 @@ export function PitaZScore({ indikator, z, label }: Props) {
 
       {/* Angka penunjuk skala */}
       <div className="relative h-4">
-        {TITIK_LABEL.map((t) => (
+        {titikLabelUntuk(indikator).map((t) => (
           <span
             key={t}
             style={{ left: `${zKePersen(t)}%` }}
