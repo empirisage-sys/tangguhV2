@@ -485,6 +485,7 @@ export {
   hitungUmur,
   hitungUmurKalender,
   hitungUsiaKoreksi,
+  tanggalLahirEfektif,
   selisihHari,
   HARI_PER_BULAN,
   BATAS_UMUR_KOREKSI_PREMATUR_BULAN,

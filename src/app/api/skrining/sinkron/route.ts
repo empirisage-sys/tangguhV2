@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     // Ambil data balita untuk validasi tanggal lahir dan jenis kelamin
     const { data: balita, error: balitaErr } = await supabase
       .from('balita')
-      .select('id, nama, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id')
+      .select('id, nama, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id, usia_gestasi_minggu')
       .eq('id', masukan.balitaId)
       .single()
 
@@ -47,6 +47,9 @@ export async function POST(request: Request) {
       posisiUkur: masukan.posisiUkur,
       lilaCm: masukan.lilaCm,
       edema: masukan.edema,
+      // Lihat temuan audit T-2. Tanpa ini, hasil hitung ulang server berbeda
+      // dari hasil perangkat pada setiap bayi prematur.
+      usiaGestasiMinggu: balita.usia_gestasi_minggu ?? undefined,
     })
 
     if (body.hasilKlien) {
@@ -70,6 +73,7 @@ export async function POST(request: Request) {
         lilaCm: masukan.lilaCm,
         lingkarKepalaCm: masukan.lingkarKepalaCm,
         edema: masukan.edema,
+        usiaGestasiMinggu: balita.usia_gestasi_minggu ?? undefined,
         catatan: masukan.catatan,
         createdBy: profil.id,
         posyanduId: balita.posyandu_id,

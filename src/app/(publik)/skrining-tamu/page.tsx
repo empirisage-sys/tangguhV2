@@ -18,6 +18,7 @@ import {
   hitungSkrining,
   hitungUsiaKoreksi,
   hitungVelocity,
+  tanggalLahirEfektif,
   apakahPerluPKMK,
   type HasilSkrining,
   type HasilVelocity,
@@ -56,16 +57,6 @@ function formatUmurKalender(tanggalLahir: string, tanggalPeriksa: string): strin
     return `${parts.join(' ')} (${totalHari} Hari)`
   } catch {
     return '—'
-  }
-}
-
-/* ─── Helper: hitung tanggal lahir koreksi ───────────────────────────────── */
-function tanggalLahirKoreksi(tanggalLahir: string, defisitHari: number): string {
-  try {
-    const ms = new Date(tanggalLahir + 'T00:00:00Z').getTime()
-    return new Date(ms + defisitHari * 86_400_000).toISOString().slice(0, 10)
-  } catch {
-    return tanggalLahir
   }
 }
 
@@ -120,13 +111,37 @@ export default function HalamanSkriningTamu() {
     ? formatUmurKalender(tanggalLahir, tanggalPeriksa)
     : '—'
 
-  // Umur koreksi (untuk tampilan di step 1)
-  const tglEfektif = isPrematur && defisitHari > 0
-    ? tanggalLahirKoreksi(tanggalLahir, defisitHari)
-    : tanggalLahir
-  const teksUmurKoreksi = tanggalLahir && tanggalPeriksa && isPrematur
-    ? formatUmurKalender(tglEfektif, tanggalPeriksa)
-    : null
+  // Umur koreksi untuk tampilan langkah 1.
+  //
+  // Memakai ATURAN MESIN, bukan aturan sendiri. Bentuk lama menghitungnya
+  // dengan rumus lokal tanpa batas umur, sehingga layar menjanjikan umur
+  // koreksi pada anak 30 bulan padahal perhitungannya nanti memakai umur
+  // kronologis — layar dan hasil berselisih tanpa ada yang menyebutkannya.
+  const koreksiTampilan =
+    tanggalLahir && tanggalPeriksa
+      ? hitungUsiaKoreksi(
+          tanggalLahir,
+          tanggalPeriksa,
+          isPrematur ? usiaGestasiMinggu : undefined,
+        )
+      : null
+
+  const tglEfektif =
+    tanggalLahir && tanggalPeriksa
+      ? tanggalLahirEfektif(
+          tanggalLahir,
+          tanggalPeriksa,
+          isPrematur ? usiaGestasiMinggu : undefined,
+        )
+      : tanggalLahir
+
+  const teksUmurKoreksi =
+    koreksiTampilan?.isPrematur && tanggalLahir && tanggalPeriksa
+      ? formatUmurKalender(tglEfektif, tanggalPeriksa)
+      : null
+
+  /** `true` bila anak memang prematur tetapi umurnya sudah melewati batas koreksi. */
+  const koreksiKedaluwarsa = koreksiTampilan?.koreksiKedaluwarsa === true
 
   const pindahLangkah = useCallback((target: 1 | 2 | 3) => {
     setError(null)
@@ -147,14 +162,35 @@ export default function HalamanSkriningTamu() {
     if (!beratKg || isNaN(bb) || bb <= 0) { setError('Masukkan berat badan yang valid (contoh: 9.2)'); return }
     if (!panjangCm || isNaN(tb) || tb <= 0) { setError('Masukkan panjang/tinggi badan yang valid (contoh: 78.5)'); return }
 
-    // Hitung tanggal efektif (dengan koreksi prematur jika berlaku)
-    const tglLahirEfektif = isPrematur && defisitHari > 0
-      ? tanggalLahirKoreksi(tanggalLahir, defisitHari)
-      : tanggalLahir
+    // ======================================================================
+    // TEMUAN AUDIT T-1: HALAMAN INI MENYUNTIKKAN TANGGAL LAHIR PALSU
+    //
+    // Bentuk lama menggeser tanggal lahir sebesar defisit prematuritas lalu
+    // menyerahkannya ke mesin sebagai tanggal lahir sungguhan — persis pola
+    // yang temuan Z-4 hapus dari mesin. Dua akibatnya:
+    //
+    //   1. Batas 24 bulan tidak ditegakkan. Anak 30 bulan yang lahir 32 minggu
+    //      tetap dikurangi 56 hari: Z TB/U -1,077 padahal seharusnya -1,454.
+    //      Selisih 0,38 SD, dan selalu ke arah yang tampak lebih sehat.
+    //   2. Jejaknya hilang: hasilnya melaporkan `umurDikoreksiPrematur: false`
+    //      dan `defisitPrematurHari: 0`, sehingga tidak dapat diaudit kembali.
+    //
+    // Sekarang usia gestasi diserahkan apa adanya. Mesin yang memutuskan
+    // apakah koreksi berlaku, seberapa besar, dan sampai umur berapa.
+    // ======================================================================
+    const gestasiUntukMesin = isPrematur ? usiaGestasiMinggu : undefined
+
+    // Hanya untuk `hitungVelocity`, yang memang hanya menerima tanggal lahir.
+    // Aturannya sama dengan mesin, termasuk batas umurnya.
+    const tglLahirEfektif = tanggalLahirEfektif(
+      tanggalLahir,
+      tanggalPeriksa,
+      gestasiUntukMesin,
+    )
 
     try {
       const res = hitungSkrining({
-        tanggalLahir: tglLahirEfektif,
+        tanggalLahir,
         tanggalPeriksa,
         jenisKelamin,
         beratKg: bb,
@@ -162,6 +198,7 @@ export default function HalamanSkriningTamu() {
         posisiUkur,
         lilaCm: lilaCm ? parseFloat(lilaCm.replace(',', '.')) : undefined,
         edema,
+        usiaGestasiMinggu: gestasiUntukMesin,
       })
 
       setHasil(res)
@@ -214,7 +251,7 @@ export default function HalamanSkriningTamu() {
     lilaCm,
     edema,
     isPrematur,
-    defisitHari,
+    usiaGestasiMinggu,
     sertakanVelocity,
     tanggalSebelumnya,
     beratSebelumnyaKg,
@@ -409,14 +446,26 @@ export default function HalamanSkriningTamu() {
                   <span className="font-semibold text-laut-800">Umur Kronologis:</span>
                   <span className="angka font-black text-laut-900">{teksUmurKronologis}</span>
                 </div>
-                {isPrematur && teksUmurKoreksi && (
+                {teksUmurKoreksi && (
                   <div className="flex flex-col justify-between gap-1 text-xs border-t border-laut-200 pt-2 sm:flex-row sm:items-center">
                     <span className="font-bold text-amber-800">Usia Koreksi (untuk Z-Score WHO):</span>
                     <span className="angka font-black text-amber-900">{teksUmurKoreksi}</span>
                   </div>
                 )}
+                {/*
+                  Keadaan ini dahulu tidak pernah tampil: layar menjanjikan usia
+                  koreksi pada anak berapa pun, sementara perhitungannya kelak
+                  memakai umur kronologis. Sekarang alasannya dinyatakan.
+                */}
+                {koreksiKedaluwarsa && (
+                  <div className="border-t border-laut-200 pt-2 text-[11px] font-semibold text-amber-900">
+                    Anak lahir prematur, tetapi umurnya sudah melewati 24 bulan sehingga
+                    koreksi prematuritas TIDAK diterapkan. Seluruh nilai Z di bawah memakai
+                    umur kronologis.
+                  </div>
+                )}
                 <p className="text-[11px] text-laut-700">
-                  {isPrematur
+                  {teksUmurKoreksi
                     ? 'Z-Score & kurva pertumbuhan dievaluasi berdasarkan Usia Koreksi sesuai standar WHO/IDAI hingga usia 2 tahun.'
                     : 'Standar WHO 2006 berlaku untuk balita usia 0 hingga 60 bulan.'}
                 </p>
