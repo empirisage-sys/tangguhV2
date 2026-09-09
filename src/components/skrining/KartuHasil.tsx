@@ -74,9 +74,21 @@ export function KartuHasil({ hasil, namaBalita }: Props) {
         </div>
       )}
 
-      {hasil.diLuarRentang && hasil.catatanDiLuarRentang && (
+      {/*
+        Catatan ditampilkan setiap kali ADA, tidak lagi hanya ketika
+        `diLuarRentang` bernilai true. Mesin dapat menghasilkan catatan penting
+        pada pengukuran yang sepenuhnya sahih — misalnya keterangan bahwa
+        usia-tinggi tidak terdefinisi sehingga RDA tumbuh kejar diambil dari
+        anak tangga yang datar. Penjagaan lama menelan catatan seperti itu.
+        Lihat temuan audit K-1.
+      */}
+      {hasil.catatanDiLuarRentang && (
         <div className="rounded-xl bg-netral-bg p-4 ring-1 ring-netral-garis">
-          <p className="font-semibold text-netral-teks">Sebagian indikator tidak dapat dinilai</p>
+          <p className="font-semibold text-netral-teks">
+            {hasil.diLuarRentang
+              ? 'Sebagian indikator tidak dapat dinilai'
+              : 'Catatan perhitungan'}
+          </p>
           <p className="mt-1 text-sm text-netral-teks">{hasil.catatanDiLuarRentang}</p>
         </div>
       )}

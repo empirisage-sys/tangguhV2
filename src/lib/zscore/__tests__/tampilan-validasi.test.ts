@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hitungSkrining } from '@/lib/zscore'
+import { ENGINE_VERSION, hitungSkrining } from '@/lib/zscore'
 import {
   NAMA_INDIKATOR,
   PENYANGKALAN_KLINIS,
@@ -290,7 +290,7 @@ describe('pemetaan ke baris database', () => {
   it('mengisi seluruh kolom wajib', () => {
     const baris = keBarisSkrining(konteks, hasil)
     expect(baris.client_uuid).toBe(konteks.clientUuid)
-    expect(baris.engine_version).toBe('zscore-2.1.0')
+    expect(baris.engine_version).toBe(ENGINE_VERSION)
     expect(baris.dihitung_di).toBe('server')
     expect(baris.status_bbtb).toBe('gizi_buruk')
     expect(baris.is_red_flag).toBe(true)

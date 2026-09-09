@@ -7,8 +7,14 @@ import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { semuaKurva } from '@/lib/grafik/seri'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
-import { tampilanBBTB, tampilanBBU, tampilanTBU, tampilanVelocity } from '@/lib/tampilan/status'
-import { formatTanggal, formatZ } from '@/lib/tampilan/format'
+import {
+  tampilanBBTB,
+  tampilanBBU,
+  tampilanTBU,
+  tampilanVelocity,
+  sumberAmbangVelocity,
+} from '@/lib/tampilan/status'
+import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
 import { hitungVelocity, apakahPerluPKMK, ENGINE_VERSION } from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
@@ -293,11 +299,11 @@ export default async function HalamanDetailBalita({
               </div>
 
               <div className="rounded-xl bg-white/80 px-3.5 py-2 ring-1 ring-black/5 text-center">
-                <span className="text-tinta-500 block text-[11px]">Target Min (P5)</span>
+                <span className="text-tinta-500 block text-[11px]">
+                  {sumberAmbangVelocity(evaluasiVelocity.metode).judul}
+                </span>
                 <span className="angka text-sm font-black text-laut-700">
-                  {evaluasiVelocity.kenaikanMinimalGram !== null
-                    ? `+${evaluasiVelocity.kenaikanMinimalGram} g`
-                    : '-'}
+                  {formatGramBertanda(evaluasiVelocity.kenaikanMinimalGram)}
                 </span>
               </div>
 
@@ -314,7 +320,12 @@ export default async function HalamanDetailBalita({
             <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-100/90 p-2.5 text-xs text-amber-900">
               <AlertTriangle className="size-4 shrink-0 text-amber-700 mt-0.5" />
               <span>
-                <strong>Peringatan Dini:</strong> Kenaikan berat badan anak (+{evaluasiVelocity.kenaikanAktualGram} g) masih di bawah batas minimal baku WHO (+{evaluasiVelocity.kenaikanMinimalGram} g). Segera lakukan konseling asupan gizi dan evaluasi faktor infeksi sebelum berlanjut ke wasting/stunting.
+                <strong>Peringatan Dini:</strong> Kenaikan berat badan anak ({formatGramBertanda(evaluasiVelocity.kenaikanAktualGram)}) masih di bawah {sumberAmbangVelocity(evaluasiVelocity.metode).dalamKalimat} ({formatGramBertanda(evaluasiVelocity.kenaikanMinimalGram)}). Segera lakukan konseling asupan gizi dan evaluasi faktor infeksi sebelum berlanjut ke wasting/stunting.
+                {sumberAmbangVelocity(evaluasiVelocity.metode).perkiraan && (
+                  <span className="mt-1 block font-semibold">
+                    {sumberAmbangVelocity(evaluasiVelocity.metode).keterangan}
+                  </span>
+                )}
               </span>
             </div>
           )}

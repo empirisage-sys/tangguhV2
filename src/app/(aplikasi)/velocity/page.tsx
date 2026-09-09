@@ -17,8 +17,12 @@ import {
 } from 'lucide-react'
 import { hitungVelocity, selisihHari, hitungUmurKalender } from '@/lib/zscore'
 import type { InputVelocity, HasilVelocity } from '@/lib/zscore/tipe'
-import { tampilanVelocity } from '@/lib/tampilan/status'
-import { formatTanggal } from '@/lib/tampilan/format'
+import { tampilanVelocity, sumberAmbangVelocity } from '@/lib/tampilan/status'
+import {
+  formatTanggal,
+  formatGramBertanda,
+  formatKiloBertanda,
+} from '@/lib/tampilan/format'
 import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
 
 export default function HalamanWeightIncrement() {
@@ -91,6 +95,9 @@ export default function HalamanWeightIncrement() {
   ])
 
   const tampilan = hasil ? tampilanVelocity(hasil.status) : null
+  // Sumber ambang WAJIB ikut ditampilkan. Angka jalur cadangan tidak boleh
+  // tersaji sebagai angka WHO (temuan audit W-3).
+  const sumberAmbang = hasil ? sumberAmbangVelocity(hasil.metode) : null
 
   return (
     <div className="space-y-6">
@@ -462,17 +469,22 @@ export default function HalamanWeightIncrement() {
 
                 {/* 2. Target Minimal P5 */}
                 <div className="rounded-2xl bg-white p-4 shadow-[var(--shadow-kartu)]">
-                  <p className="text-xs text-tinta-500 font-semibold">Target Minimal (WHO P5)</p>
+                  <p className="text-xs text-tinta-500 font-semibold">
+                    {sumberAmbang?.judul ?? 'Target minimal'}
+                  </p>
                   <p className="angka mt-1 text-2xl font-black text-laut-700">
-                    {hasil.kenaikanMinimalGram !== null
-                      ? `+${hasil.kenaikanMinimalGram} g`
-                      : '-'}
+                    {formatGramBertanda(hasil.kenaikanMinimalGram)}
                   </p>
                   <p className="text-[11px] text-tinta-400 mt-0.5">
                     {hasil.kenaikanMinimalGram !== null
-                      ? `Min ${(hasil.kenaikanMinimalGram / 1000).toFixed(2)} kg`
+                      ? `Min ${formatKiloBertanda(hasil.kenaikanMinimalGram)}`
                       : 'Di luar rentang'}
                   </p>
+                  {sumberAmbang?.perkiraan && (
+                    <p className="mt-1.5 rounded-lg bg-amber-50 p-1.5 text-[10px] font-semibold leading-snug text-amber-900">
+                      {sumberAmbang.keterangan}
+                    </p>
+                  )}
                 </div>
 
                 {/* 3. Selisih Hari Antara Pengukuran */}
@@ -506,7 +518,7 @@ export default function HalamanWeightIncrement() {
                   <div className="rounded-xl bg-amber-50 p-3.5 text-xs text-amber-900 space-y-1.5">
                     <p className="font-bold">⚠️ Deteksi Dini Growth Faltering (T):</p>
                     <p className="leading-relaxed">
-                      Berat badan balita bertambah namun tidak mencapai ambang persentil 5 baku WHO (+{hasil.kenaikanMinimalGram} g). Ini merupakan indikator awal gagal tumbuh sebelum stunting.
+                      Berat badan balita bertambah namun tidak mencapai {sumberAmbang?.dalamKalimat ?? 'ambang kenaikan berat'} ({formatGramBertanda(hasil.kenaikanMinimalGram)}). Ini merupakan indikator awal gagal tumbuh sebelum stunting.
                     </p>
                     <p className="font-semibold text-amber-800">
                       Tindakan: Lakukan konseling gizi dan evaluasi asupan makan (MPASI/ASI), cek riwayat sakit atau infeksi berulang, dan jadwalkan evaluasi ulang dalam 2 minggu.

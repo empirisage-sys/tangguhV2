@@ -16,6 +16,7 @@
  *   - Penyaringan dan penghitungan statistik memakai kode, tidak pernah teks.
  */
 import type {
+  KodeMetodeVelocity,
   StatusBBTB,
   StatusBBU,
   StatusTBU,
@@ -184,6 +185,67 @@ export function tampilanBBTB(status: StatusBBTB | null): TampilanStatus {
 
 export function tampilanVelocity(status: StatusVelocity | null): TampilanStatus {
   return status ? VELOCITY[status] : TIDAK_DINILAI
+}
+
+/**
+ * Dari mana ambang kenaikan berat itu sebenarnya berasal.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT W-3: ANGKA BUKAN WHO DILABELI WHO
+ *
+ * Mesin sudah lama mengembalikan `metode`, tetapi medan itu TIDAK PERNAH
+ * ditampilkan di satu tempat pun. Sebaliknya empat halaman menuliskan angkanya
+ * sebagai "Target Minimal (WHO P5)", "standar minimal WHO", dan "batas minimal
+ * baku WHO" — termasuk ketika metodenya `kbm_perkiraan`, yang di dalam
+ * `velocity.ts` sendiri diberi tajuk "JALUR CADANGAN, BUKAN STANDAR WHO"
+ * berikut catatan "TODO VERIFIKASI".
+ *
+ * Ini bukan kasus tepi. Tabel velocity WHO interval 1 bulan hanya mencakup umur
+ * awal 0-11 bulan, sedangkan posyandu menimbang bulanan. Artinya hampir SETIAP
+ * balita umur 12-60 bulan dinilai dengan jalur cadangan, dan angka yang
+ * dilabeli WHO di layar bukan angka WHO.
+ *
+ * Selisihnya besar, bukan sekadar salah label: pada umur 15 bulan dengan jarak
+ * timbang 90 hari, ambang WHO 38 g sementara jalur cadangan 720 g.
+ * ==========================================================================
+ */
+export type SumberAmbangVelocity = {
+  /** Judul di atas angka, pada kartu ringkasan. */
+  judul: string
+  /** Sebutan sumber ketika disisipkan ke dalam kalimat. */
+  dalamKalimat: string
+  /** Keterangan satu baris. Wajib tampil di dekat angkanya. */
+  keterangan: string
+  /** `true` bila angkanya BUKAN standar WHO dan tidak boleh dilabeli demikian. */
+  perkiraan: boolean
+}
+
+const SUMBER_AMBANG: Record<KodeMetodeVelocity, SumberAmbangVelocity> = {
+  who_velocity: {
+    judul: 'Target minimal (WHO P5)',
+    dalamKalimat: 'ambang persentil 5 WHO Weight Velocity',
+    keterangan: 'Sumber: tabel WHO Weight Velocity, persentil 5.',
+    perkiraan: false,
+  },
+  kbm_perkiraan: {
+    judul: 'Target minimal (perkiraan KBM)',
+    dalamKalimat: 'perkiraan kenaikan berat minimal',
+    keterangan:
+      'Bukan standar WHO. Tabel velocity WHO tidak mencakup umur atau jarak ' +
+      'timbang ini, sehingga dipakai perkiraan kenaikan berat minimal yang ' +
+      'belum diverifikasi nutrisionis. Pakai sebagai isyarat, bukan diagnosis.',
+    perkiraan: true,
+  },
+  tidak_ada: {
+    judul: 'Target minimal',
+    dalamKalimat: 'ambang kenaikan berat',
+    keterangan: 'Tidak dapat dinilai pada data ini.',
+    perkiraan: true,
+  },
+}
+
+export function sumberAmbangVelocity(metode: KodeMetodeVelocity): SumberAmbangVelocity {
+  return SUMBER_AMBANG[metode] ?? SUMBER_AMBANG.tidak_ada
 }
 
 /** Nama indikator yang dipakai di kartu hasil dan laporan. */

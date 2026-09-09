@@ -40,6 +40,34 @@ export function formatGram(gram: number | null): string {
   return `${Math.round(gram).toLocaleString(ID)} g`
 }
 
+/**
+ * Gram dengan tanda yang benar, termasuk untuk angka negatif.
+ *
+ * TEMUAN AUDIT W-3b. Empat halaman menuliskan ambang kenaikan sebagai
+ * `+${ambang} g` tanpa syarat, sehingga ambang persentil 5 WHO yang bernilai
+ * negatif tersaji sebagai "+-105 g" dan "Min -0.11 kg". Ambang WHO memang
+ * negatif pada 33 dari 114 kombinasi umur, interval, dan jenis kelamin —
+ * artinya sebaran normal masih mencakup penurunan berat pada umur itu — jadi
+ * bentuk rusak itu sering terlihat, bukan kasus tepi.
+ */
+export function formatGramBertanda(gram: number | null): string {
+  if (gram === null || !Number.isFinite(gram)) return '-'
+  const bulat = Math.round(gram)
+  const tanda = bulat > 0 ? '+' : ''
+  return `${tanda}${bulat.toLocaleString(ID)} g`
+}
+
+/** Kilogram dengan tanda yang benar, dua desimal. Pasangan `formatGramBertanda`. */
+export function formatKiloBertanda(gram: number | null): string {
+  if (gram === null || !Number.isFinite(gram)) return '-'
+  const kg = Math.round(gram) / 1000
+  const tanda = kg > 0 ? '+' : ''
+  return `${tanda}${kg.toLocaleString(ID, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} kg`
+}
+
 export function formatRentangProtein(min: number | null, maks: number | null): string {
   if (min === null || maks === null) return '-'
   const f = (n: number) =>

@@ -349,7 +349,12 @@ describe('batas sendok takar per saji', () => {
 // =========================================================================
 describe('versi engine', () => {
   it('ENGINE_VERSION adalah satu-satunya sumber nomor versi', () => {
-    expect(ENGINE_VERSION).toBe('zscore-2.1.0')
+    // Bentuknya yang diuji, bukan angkanya. Nomor versi WAJIB naik setiap kali
+    // perilaku mesin berubah, dan uji yang memaku satu angka justru menghukum
+    // kenaikan yang benar. Sebelumnya baris ini memaku 'zscore-2.1.0', sehingga
+    // perbaikan temuan K-1 membuatnya gagal padahal kenaikan versinya tepat.
+    expect(ENGINE_VERSION).toMatch(/^zscore-\d+\.\d+\.\d+$/)
+    expect(hitungSkrining({ ...dasar }).engineVersion).toBe(ENGINE_VERSION)
   })
 })
 

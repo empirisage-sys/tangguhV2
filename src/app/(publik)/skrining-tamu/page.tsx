@@ -23,12 +23,18 @@ import {
   type HasilVelocity,
   type PosisiUkur,
 } from '@/lib/zscore'
-import { tampilanBBTB, tampilanBBU, tampilanTBU, tampilanVelocity } from '@/lib/tampilan/status'
+import {
+  tampilanBBTB,
+  tampilanBBU,
+  tampilanTBU,
+  tampilanVelocity,
+  sumberAmbangVelocity,
+} from '@/lib/tampilan/status'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { PitaZScore } from '@/components/skrining/PitaZScore'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
-import { formatTanggal, formatZ } from '@/lib/tampilan/format'
+import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
 import { Button } from '@/components/ui/Button'
 import type { KunjunganRiwayat } from '@/lib/grafik/seri'
 
@@ -653,16 +659,36 @@ export default function HalamanSkriningTamu() {
                 sebagai "Sangat pendek, Z -13,79 SD" tanpa satu pun peringatan.
                 Ditemukan saat uji produksi setelah penerapan.
               */}
-              {hasil.diLuarRentang && hasil.catatanDiLuarRentang && (
-                <div className="mt-5 flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
-                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
-                  <div className="text-xs leading-relaxed text-amber-950 sm:text-sm">
-                    <p className="font-bold">Angka hasil ukur perlu diperiksa ulang</p>
-                    <p className="mt-1">{hasil.catatanDiLuarRentang}</p>
-                    <p className="mt-2 font-semibold">
-                      Status gizi di bawah tetap ditampilkan, tetapi jangan dipakai mengambil
-                      keputusan sebelum pengukurannya dikonfirmasi.
+              {hasil.catatanDiLuarRentang && (
+                <div
+                  className={`mt-5 flex items-start gap-3 rounded-2xl border-2 p-4 ${
+                    hasil.diLuarRentang
+                      ? 'border-amber-400 bg-amber-50'
+                      : 'border-kabut-200 bg-kabut-50'
+                  }`}
+                >
+                  <AlertTriangle
+                    className={`mt-0.5 size-5 shrink-0 ${
+                      hasil.diLuarRentang ? 'text-amber-600' : 'text-tinta-400'
+                    }`}
+                  />
+                  <div
+                    className={`text-xs leading-relaxed sm:text-sm ${
+                      hasil.diLuarRentang ? 'text-amber-950' : 'text-tinta-700'
+                    }`}
+                  >
+                    <p className="font-bold">
+                      {hasil.diLuarRentang
+                        ? 'Angka hasil ukur perlu diperiksa ulang'
+                        : 'Catatan perhitungan'}
                     </p>
+                    <p className="mt-1">{hasil.catatanDiLuarRentang}</p>
+                    {hasil.diLuarRentang && (
+                      <p className="mt-2 font-semibold">
+                        Status gizi di bawah tetap ditampilkan, tetapi jangan dipakai mengambil
+                        keputusan sebelum pengukurannya dikonfirmasi.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -768,9 +794,11 @@ export default function HalamanSkriningTamu() {
                     </div>
 
                     <div className="rounded-xl bg-white/90 px-3.5 py-2 ring-1 ring-black/5 text-center">
-                      <span className="text-[11px] text-tinta-500 block">Target Min (P5)</span>
+                      <span className="text-[11px] text-tinta-500 block">
+                        {sumberAmbangVelocity(hasilVelocity.metode).judul}
+                      </span>
                       <span className="angka text-sm font-black text-laut-700">
-                        {hasilVelocity.kenaikanMinimalGram !== null ? `+${hasilVelocity.kenaikanMinimalGram} g` : '-'}
+                        {formatGramBertanda(hasilVelocity.kenaikanMinimalGram)}
                       </span>
                     </div>
 
@@ -787,7 +815,12 @@ export default function HalamanSkriningTamu() {
                   <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-100/90 p-2.5 text-xs text-amber-900">
                     <AlertTriangle className="size-4 shrink-0 text-amber-700 mt-0.5" />
                     <span>
-                      <strong>Peringatan Dini:</strong> Kenaikan berat badan (+{hasilVelocity.kenaikanAktualGram} g) masih di bawah batas minimal baku WHO (+{hasilVelocity.kenaikanMinimalGram} g). Waspadai tanda awal gagal tumbuh sebelum berlanjut ke wasting atau stunting.
+                      <strong>Peringatan Dini:</strong> Kenaikan berat badan ({formatGramBertanda(hasilVelocity.kenaikanAktualGram)}) masih di bawah {sumberAmbangVelocity(hasilVelocity.metode).dalamKalimat} ({formatGramBertanda(hasilVelocity.kenaikanMinimalGram)}). Waspadai tanda awal gagal tumbuh sebelum berlanjut ke wasting atau stunting.
+                      {sumberAmbangVelocity(hasilVelocity.metode).perkiraan && (
+                        <span className="mt-1 block font-semibold">
+                          {sumberAmbangVelocity(hasilVelocity.metode).keterangan}
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}
