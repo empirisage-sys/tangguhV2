@@ -1,17 +1,30 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { verifikasiPengguna, sahkanUsulanFaskesAction } from './actions'
-import { AlertCircle, Check, CheckCircle2, Link2, PlusCircle, ShieldAlert, X } from 'lucide-react'
-import { cariFaskesMiripLokal, type FaskesData } from '@/lib/db/wilayah'
+import { verifikasiPengguna } from './actions'
+import { AlertCircle, Check, CheckCircle2, X } from 'lucide-react'
+import { KotakUsulanWilayah } from './KotakUsulanWilayah'
+
+type Status = 'master' | 'usulan'
 
 /**
- * Komponen Verifikasi Pendaftaran oleh Admin.
+ * Verifikasi pendaftaran oleh admin, beserta normalisasi wilayah usulan.
  *
- * Mendukung normalisasi fasilitas usulan:
- * 1. Tautkan ke fasilitas master yang sudah ada
- * 2. Sahkan sebagai fasilitas master baru
- * 3. Tolak pendaftaran disertai alasan minimal 10 karakter
+ * TIGA JENIS WILAYAH, BUKAN SATU
+ *
+ * Bentuk lama komponen ini hanya mengenal fasilitas (`faskes`). Kotak
+ * normalisasinya pun tidak pernah muncul, karena `v_antrean_verifikasi` tidak
+ * memuat kolom `status_faskes` sehingga nilainya selalu jatuh ke bawaan
+ * 'master'. Lihat temuan audit R-8.
+ *
+ * Medan `namaPosyandu` dan `statusPosyandu` bahkan sudah diterima sebagai
+ * prop, tetapi tidak dipakai satu kali pun di dalam badan komponen.
+ *
+ * Sejak migrasi 20260910000000, nama puskesmas dan posyandu yang diketik
+ * pendaftar benar-benar tersimpan sebagai baris usulan. Karena itu ketiganya
+ * kini ditangani, dan persetujuan akun ditahan sampai TIDAK ADA lagi wilayah
+ * yang berstatus usulan — sebab menyetujui akun yang wilayahnya belum
+ * dinormalkan berarti mengunci pengguna itu pada data yang belum sah.
  */
 export function FormulirVerifikasi({
   penggunaId,
@@ -19,39 +32,61 @@ export function FormulirVerifikasi({
   faskesId,
   namaFaskes,
   statusFaskes = 'master',
-  kabupatenId,
   jenisFaskes = 'puskesmas',
+  puskesmasId,
+  namaPuskesmas,
+  statusPuskesmas = 'master',
+  posyanduId,
   namaPosyandu,
+  desa,
   statusPosyandu = 'master',
 }: {
   penggunaId: string
   nama: string
   faskesId?: string
   namaFaskes?: string
-  statusFaskes?: 'master' | 'usulan'
-  kabupatenId?: string
+  statusFaskes?: Status
   jenisFaskes?: 'puskesmas' | 'rumah_sakit'
+  puskesmasId?: string
+  namaPuskesmas?: string
+  statusPuskesmas?: Status
+  posyanduId?: string
   namaPosyandu?: string
-  statusPosyandu?: 'master' | 'usulan'
+  desa?: string
+  statusPosyandu?: Status
 }) {
   const [modeTolak, setModeTolak] = useState(false)
   const [alasan, setAlasan] = useState('')
   const [pesan, setPesan] = useState<{ ok: boolean; teks: string } | null>(null)
-  const [statusFaskesState, setStatusFaskesState] = useState<'master' | 'usulan'>(statusFaskes)
-  const [namaFaskesState, setNamaFaskesState] = useState<string>(namaFaskes || '')
   const [sedangProses, mulai] = useTransition()
 
-  // Cari faskes master yang mirip jika faskes berstatus usulan
-  const saranMirip: FaskesData[] =
-    statusFaskesState === 'usulan' && namaFaskesState
-      ? cariFaskesMiripLokal(namaFaskesState, kabupatenId, jenisFaskes)
-      : []
+  // Keadaan tiap wilayah disimpan terpisah agar normalisasi satu jenis tidak
+  // menghapus penanda jenis lain yang masih menunggu.
+  const [stFaskes, setStFaskes] = useState<Status>(statusFaskes)
+  const [stPuskesmas, setStPuskesmas] = useState<Status>(statusPuskesmas)
+  const [stPosyandu, setStPosyandu] = useState<Status>(statusPosyandu)
+  const [nmFaskes, setNmFaskes] = useState(namaFaskes ?? '')
+  const [nmPuskesmas, setNmPuskesmas] = useState(namaPuskesmas ?? '')
+  const [nmPosyandu, setNmPosyandu] = useState(namaPosyandu ?? '')
+
+  // Fasilitas hanya perlu kotaknya sendiri bila ia BUKAN puskesmas. Untuk
+  // peran puskesmas, `faskes_id` dan `puskesmas_id` menunjuk baris dengan id
+  // yang sama, sehingga menampilkan dua kotak untuk satu unit hanya
+  // membingungkan — dan menormalkan salah satunya sudah mengurus keduanya.
+  const faskesTerpisah = jenisFaskes === 'rumah_sakit' && faskesId !== puskesmasId
+
+  const usulanFaskes = faskesTerpisah && stFaskes === 'usulan' && Boolean(faskesId)
+  const usulanPuskesmas = stPuskesmas === 'usulan' && Boolean(puskesmasId)
+  const usulanPosyandu = stPosyandu === 'usulan' && Boolean(posyanduId)
+  const adaUsulan = usulanFaskes || usulanPuskesmas || usulanPosyandu
 
   function kirim(setujui: boolean) {
-    if (setujui && statusFaskesState === 'usulan') {
+    if (setujui && adaUsulan) {
       setPesan({
         ok: false,
-        teks: 'Fasilitas kesehatan masih berstatus USULAN. Harap tautkan ke master atau sahkan terlebih dahulu sebelum menyetujui akun.',
+        teks:
+          'Masih ada wilayah berstatus usulan. Normalkan dulu semuanya, ' +
+          'agar akun ini tidak terkunci pada data yang belum sah.',
       })
       return
     }
@@ -71,29 +106,9 @@ export function FormulirVerifikasi({
     })
   }
 
-  function handleSahkanFaskes(masterId?: string, namaMaster?: string) {
-    if (!faskesId) return
-
-    mulai(async () => {
-      const res = await sahkanUsulanFaskesAction(faskesId, masterId)
-      if (res.ok) {
-        setStatusFaskesState('master')
-        if (namaMaster) setNamaFaskesState(namaMaster)
-        setPesan({
-          ok: true,
-          teks: masterId
-            ? `Fasilitas berhasil ditautkan ke master: ${namaMaster}`
-            : 'Fasilitas usulan berhasil disahkan menjadi master baru.',
-        })
-      } else {
-        setPesan({ ok: false, teks: res.pesan || 'Gagal mengesahkan fasilitas.' })
-      }
-    })
-  }
-
-  if (pesan?.ok && !modeTolak) {
+  if (pesan?.ok && !modeTolak && !adaUsulan) {
     return (
-      <div className="rounded-xl bg-aman-bg p-3.5 text-xs font-semibold text-aman-teks ring-1 ring-aman-garis flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-xl bg-aman-bg p-3.5 text-xs font-semibold text-aman-teks ring-1 ring-aman-garis">
         <CheckCircle2 className="size-4" />
         <span>{pesan.teks}</span>
       </div>
@@ -103,91 +118,71 @@ export function FormulirVerifikasi({
   return (
     <div className="space-y-4 text-xs">
       {pesan && !pesan.ok && (
-        <div role="alert" className="rounded-xl bg-bahaya-bg p-3 font-semibold text-bahaya-teks ring-1 ring-bahaya-garis flex items-start gap-2">
-          <AlertCircle className="size-4 shrink-0 mt-0.5" />
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-xl bg-bahaya-bg p-3 font-semibold text-bahaya-teks ring-1 ring-bahaya-garis"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>{pesan.teks}</span>
         </div>
       )}
 
-      {/* Kotak Fasilitas yang Diusulkan Manual */}
-      {statusFaskesState === 'usulan' && (
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-amber-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
-                Fasilitas Usulan Manual
-              </span>
-              <span className="font-bold text-amber-950 text-sm">
-                &ldquo;{namaFaskesState}&rdquo;
-              </span>
-            </div>
-            <span className="text-[11px] text-amber-800 font-semibold">
-              Perlu Dinormalkan Admin
-            </span>
-          </div>
-
-          <p className="text-[11px] text-amber-800">
-            Pendaftar mengetik nama fasilitas secara manual. Pilih salah satu opsi normalisasi di bawah ini:
-          </p>
-
-          {/* Daftar Saran Fasilitas Master yang Mirip */}
-          {saranMirip.length > 0 ? (
-            <div className="space-y-2">
-              <p className="font-bold text-amber-950 text-[11px]">
-                Fasilitas Master yang Mirip Ditemukan:
-              </p>
-              <div className="space-y-1.5">
-                {saranMirip.map((saran) => (
-                  <div
-                    key={saran.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-white p-2.5 shadow-sm ring-1 ring-amber-200"
-                  >
-                    <div>
-                      <p className="font-bold text-tinta-900">{saran.nama}</p>
-                      <p className="text-[10px] text-tinta-500 capitalize">{saran.jenis} • Master Resmi</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSahkanFaskes(saran.id, saran.nama)}
-                      disabled={sedangProses}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-laut-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-laut-700 transition-colors disabled:opacity-50"
-                    >
-                      <Link2 className="size-3.5" />
-                      Tautkan ke fasilitas ini
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-[11px] italic text-amber-800">
-              Tidak ada fasilitas master yang mirip di kabupaten ini.
-            </p>
-          )}
-
-          {/* Opsi Sahkan Menjadi Master Baru */}
-          <div className="border-t border-amber-200 pt-2 flex items-center justify-between">
-            <span className="text-[11px] text-amber-900 font-medium">
-              Bila fasilitas ini memang unit baru:
-            </span>
-            <button
-              type="button"
-              onClick={() => handleSahkanFaskes(undefined, namaFaskesState)}
-              disabled={sedangProses}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
-            >
-              <PlusCircle className="size-3.5 text-amber-700" />
-              Sahkan sebagai fasilitas baru
-            </button>
-          </div>
+      {pesan?.ok && adaUsulan && (
+        <div className="flex items-start gap-2 rounded-xl bg-aman-bg p-3 font-semibold text-aman-teks ring-1 ring-aman-garis">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+          <span>{pesan.teks}</span>
         </div>
       )}
 
-      {/* Mode Penolakan vs Persetujuan */}
+      {usulanPuskesmas && (
+        <KotakUsulanWilayah
+          jenis="puskesmas"
+          usulanId={puskesmasId as string}
+          nama={nmPuskesmas}
+          onSelesai={(baru) => {
+            setNmPuskesmas(baru)
+            setStPuskesmas('master')
+            // Untuk peran puskesmas, barisnya sama dengan faskes.
+            if (!faskesTerpisah) setStFaskes('master')
+            setPesan({ ok: true, teks: `Puskesmas dinormalkan menjadi "${baru}".` })
+          }}
+        />
+      )}
+
+      {usulanFaskes && (
+        <KotakUsulanWilayah
+          jenis="faskes"
+          usulanId={faskesId as string}
+          nama={nmFaskes}
+          onSelesai={(baru) => {
+            setNmFaskes(baru)
+            setStFaskes('master')
+            setPesan({ ok: true, teks: `Rumah sakit dinormalkan menjadi "${baru}".` })
+          }}
+        />
+      )}
+
+      {usulanPosyandu && (
+        <KotakUsulanWilayah
+          jenis="posyandu"
+          usulanId={posyanduId as string}
+          nama={nmPosyandu}
+          keterangan={desa ? `Desa ${desa}` : undefined}
+          onSelesai={(baru) => {
+            setNmPosyandu(baru)
+            setStPosyandu('master')
+            setPesan({ ok: true, teks: `Posyandu dinormalkan menjadi "${baru}".` })
+          }}
+        />
+      )}
+
       {modeTolak ? (
         <div className="space-y-3 rounded-xl bg-kabut-50 p-4 ring-1 ring-kabut-200">
-          <label htmlFor={`alasan-${penggunaId}`} className="block text-xs font-bold uppercase tracking-wider text-tinta-700">
-            Alasan Penolakan Pendaftaran <span className="text-red-500">*</span>
+          <label
+            htmlFor={`alasan-${penggunaId}`}
+            className="block text-xs font-bold uppercase tracking-wider text-tinta-700"
+          >
+            Alasan Penolakan Pendaftaran <span className="text-bahaya-teks">*</span>
             <span className="ml-1 font-normal lowercase text-tinta-400">
               (ditampilkan kepada pendaftar {nama.split(' ')[0]})
             </span>
@@ -198,8 +193,8 @@ export function FormulirVerifikasi({
             onChange={(e) => setAlasan(e.target.value)}
             rows={3}
             maxLength={500}
-            placeholder="Contoh: Nomor STR tidak valid pada pangkalan data Kemenkes, atau wilayah posyandu tidak sesuai pembagian desa."
-            className="w-full rounded-xl bg-white p-3 text-xs font-medium ring-1 ring-kabut-200 outline-none focus:ring-2 focus:ring-laut-500 leading-relaxed"
+            placeholder="Contoh: Nomor STR tidak ditemukan pada pangkalan data resmi, atau posyandu yang disebut tidak berada di wilayah puskesmas tersebut."
+            className="w-full rounded-xl bg-white p-3 text-xs font-medium leading-relaxed ring-1 ring-kabut-200 outline-none focus:ring-2 focus:ring-laut-500"
           />
           <p className="text-[11px] text-tinta-400">
             {alasan.trim().length < 10
@@ -211,7 +206,7 @@ export function FormulirVerifikasi({
               type="button"
               onClick={() => kirim(false)}
               disabled={sedangProses || alasan.trim().length < 10}
-              className="min-h-10 rounded-xl bg-bahaya-teks px-4 font-bold text-white disabled:opacity-50 hover:bg-red-700 transition-colors"
+              className="min-h-10 rounded-xl bg-bahaya-teks px-4 font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
             >
               {sedangProses ? 'Menyimpan...' : 'Kirim Penolakan'}
             </button>
@@ -219,7 +214,7 @@ export function FormulirVerifikasi({
               type="button"
               onClick={() => setModeTolak(false)}
               disabled={sedangProses}
-              className="min-h-10 rounded-xl px-4 font-bold text-tinta-600 hover:bg-kabut-200 transition-colors"
+              className="min-h-10 rounded-xl px-4 font-bold text-tinta-600 transition-colors hover:bg-kabut-200"
             >
               Batal
             </button>
@@ -230,11 +225,11 @@ export function FormulirVerifikasi({
           <button
             type="button"
             onClick={() => kirim(true)}
-            disabled={sedangProses || statusFaskesState === 'usulan'}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-aman-teks px-5 text-xs font-bold text-white shadow-md shadow-aman-teks/20 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            disabled={sedangProses || adaUsulan}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-aman-teks px-5 text-xs font-bold text-white shadow-md shadow-aman-teks/20 transition-all hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
             title={
-              statusFaskesState === 'usulan'
-                ? 'Normalkan fasilitas usulan terlebih dahulu sebelum menyetujui akun'
+              adaUsulan
+                ? 'Normalkan seluruh wilayah usulan terlebih dahulu'
                 : 'Setujui pendaftaran akun'
             }
           >
@@ -246,7 +241,7 @@ export function FormulirVerifikasi({
             type="button"
             onClick={() => setModeTolak(true)}
             disabled={sedangProses}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-kabut-200 bg-white px-4 text-xs font-bold text-bahaya-teks hover:bg-red-50 transition-colors"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-kabut-200 bg-white px-4 text-xs font-bold text-bahaya-teks transition-colors hover:bg-red-50"
           >
             <X className="size-4" />
             Tolak Pendaftaran
