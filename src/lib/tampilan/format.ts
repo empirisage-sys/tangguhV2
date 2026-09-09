@@ -87,8 +87,17 @@ export function formatUmur(tahun: number, bulanSisa: number): string {
   return bagian.join(' ')
 }
 
-export function formatUmurBulan(bulan: number): string {
-  return `${bulan} bulan`
+/**
+ * Umur dalam bulan dengan pemisah desimal Indonesia.
+ *
+ * TEMUAN AUDIT R-3. Bentuk lama menyisipkan angka apa adanya, sehingga tabel
+ * riwayat menampilkan "23.98 bulan" dengan TITIK sementara seluruh aplikasi
+ * memakai KOMA lewat `formatZ` dan `angka`. Dua gaya angka pada satu baris
+ * tabel membuat pembacanya ragu apakah keduanya berasal dari sumber yang sama.
+ */
+export function formatUmurBulan(bulan: number | null): string {
+  if (bulan === null || !Number.isFinite(bulan)) return '-'
+  return `${bulan.toLocaleString(ID, { maximumFractionDigits: 1 })} bulan`
 }
 
 const BULAN_ID = [

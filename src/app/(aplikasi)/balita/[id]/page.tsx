@@ -14,7 +14,14 @@ import {
   tampilanVelocity,
   sumberAmbangVelocity,
 } from '@/lib/tampilan/status'
-import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
+import {
+  formatTanggal,
+  formatZ,
+  formatGramBertanda,
+  formatBerat,
+  formatPanjang,
+  formatUmurBulan,
+} from '@/lib/tampilan/format'
 import {
   hitungVelocity,
   apakahPerluPKMK,
@@ -439,10 +446,25 @@ export default async function HalamanDetailBalita({
                 return (
                   <tr key={i} className="hover:bg-kabut-50">
                     <td className="p-3 font-semibold text-tinta-900">{formatTanggal(r.tanggal)}</td>
-                    <td className="angka p-3">{r.umurBulan} bulan</td>
-                    <td className="angka p-3 font-bold text-tinta-900">{r.beratKg}</td>
+                    <td className="angka p-3">{formatUmurBulan(r.umurBulan)}</td>
+                    <td className="angka p-3 font-bold text-tinta-900">{formatBerat(r.beratKg)}</td>
+                    {/*
+                      TEMUAN AUDIT R-2: LENCANA N/T MEMVONIS YANG TIDAK DIVONIS
+
+                      Pemetaan lama hanya mengenal dua cabang: 'naik' menjadi N
+                      hijau, 'growth_faltering' menjadi T kuning, dan SEGALA
+                      yang lain menjadi T merah. Padahal `StatusVelocity` punya
+                      lima nilai. Akibatnya `tidak_dapat_dinilai` — jarak timbang
+                      di bawah 21 hari atau di atas 110 hari, keadaan yang mesin
+                      TOLAK untuk dinilai — tersaji sebagai "T" merah, yaitu
+                      vonis gagal tumbuh pada KMS. Mesin berkata tidak tahu,
+                      layar berkata tidak naik.
+
+                      Sekarang kodenya diterjemahkan `tampilanVelocity`, satu
+                      tempat yang sama dengan seluruh aplikasi (AGENTS.md 2.4).
+                    */}
                     <td className="p-3">
-                      {vel ? (
+                      {vel && vel.status !== 'tidak_dapat_dinilai' ? (
                         <div className="flex items-center gap-1.5">
                           <span
                             className={[
@@ -454,14 +476,15 @@ export default async function HalamanDetailBalita({
                                   : 'text-rose-700',
                             ].join(' ')}
                           >
-                            {vel.kenaikanAktualGram > 0 ? `+${vel.kenaikanAktualGram}` : vel.kenaikanAktualGram} g
+                            {formatGramBertanda(vel.kenaikanAktualGram)}
                           </span>
                           <span
+                            title={tampilanVelocity(vel.status).label}
                             className={[
-                              'rounded px-1.5 py-0.2 text-[10px] font-black uppercase',
-                              vel.status === 'naik'
+                              'rounded px-1.5 py-0.5 text-[10px] font-black uppercase',
+                              tampilanVelocity(vel.status).nada === 'aman'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : vel.status === 'growth_faltering'
+                                : tampilanVelocity(vel.status).nada === 'waspada'
                                   ? 'bg-amber-100 text-amber-800'
                                   : 'bg-rose-100 text-rose-800',
                             ].join(' ')}
@@ -469,18 +492,58 @@ export default async function HalamanDetailBalita({
                             {vel.status === 'naik' ? 'N' : 'T'}
                           </span>
                         </div>
+                      ) : vel ? (
+                        <span className="text-tinta-400 text-[11px]" title="Jarak antar penimbangan di luar rentang yang dapat dinilai">
+                          Tidak dapat dinilai
+                        </span>
                       ) : (
                         <span className="text-tinta-400 text-[11px]">- (Titik Awal)</span>
                       )}
                     </td>
-                    <td className="angka p-3 font-bold text-tinta-900">{r.panjangCm}</td>
+                    {/*
+                      TEMUAN AUDIT R-4: kolom ini dahulu menampilkan panjang
+                      MENTAH, sementara ketiga nilai Z di sebelahnya dihitung
+                      dari panjang TERKOREKSI. Satu baris memuat dua angka yang
+                      tidak saling bersesuaian: "78,0 cm" di samping Z yang
+                      berasal dari 78,7 cm. Yang ditampilkan sekarang adalah
+                      angka yang benar-benar dipakai menghitung; angka mentahnya
+                      tetap dapat dibaca lewat keterangan pada sel.
+                    */}
+                    <td
+                      className="angka p-3 font-bold text-tinta-900"
+                      title={
+                        Math.abs(r.panjangTerkoreksiCm - r.panjangCm) > 0.01
+                          ? `Terukur ${formatPanjang(r.panjangCm)}, dikoreksi posisi menjadi ${formatPanjang(r.panjangTerkoreksiCm)}`
+                          : undefined
+                      }
+                    >
+                      {formatPanjang(r.panjangTerkoreksiCm)}
+                      {Math.abs(r.panjangTerkoreksiCm - r.panjangCm) > 0.01 && (
+                        <span className="ml-1 text-[10px] font-semibold text-tinta-400">
+                          (terkoreksi)
+                        </span>
+                      )}
+                    </td>
                     <td className="angka p-3">{formatZ(r.z_bbu)}</td>
                     <td className="angka p-3">{formatZ(r.z_tbu)}</td>
                     <td className="angka p-3">{formatZ(r.z_bbtb)}</td>
+                    {/*
+                      TEMUAN AUDIT R-1: TEKS DITURUNKAN DARI KODE, WARNA HILANG
+
+                      Bentuk lama menyusun label dengan `replace(/_/g, ' ')` lalu
+                      `capitalize` — menurunkan teks yang dibaca pengguna dari
+                      KODE kategori, persis yang dilarang tajuk `status.ts`. Dan
+                      karena lencananya selalu kelabu, "gizi buruk" tampil dalam
+                      pil yang sama persis dengan "gizi baik". Pada tabel yang
+                      dibaca dokter untuk mencari kasus, satu-satunya kolom yang
+                      menyebut status justru tidak membedakan yang parah.
+                    */}
                     <td className="p-3">
-                      <span className="inline-block rounded-full bg-kabut-100 px-2.5 py-0.5 text-[11px] font-semibold text-tinta-900 capitalize">
-                        {r.statusBBTB?.replace(/_/g, ' ') ?? '-'}
-                      </span>
+                      {r.statusBBTB ? (
+                        <LencanaStatus status={tampilanBBTB(r.statusBBTB)} ukuran="kecil" />
+                      ) : (
+                        <span className="text-[11px] text-tinta-400">Tidak dinilai</span>
+                      )}
                     </td>
                   </tr>
                 )

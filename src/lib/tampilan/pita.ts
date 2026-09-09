@@ -15,8 +15,43 @@ import type { NadaKlinis } from './status'
 export const Z_MIN = -4
 export const Z_MAKS = 4
 
-/** Titik yang diberi angka pada pita. */
+/**
+ * Titik yang diberi angka pada pita.
+ *
+ * Dipertahankan untuk pemanggil lama. Pakai `titikLabelUntuk()` agar setiap
+ * batas warna benar-benar berangka.
+ */
 export const TITIK_LABEL = [-3, -2, 0, 2, 3] as const
+
+/**
+ * Angka penunjuk skala untuk satu indikator.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT P-1: BATAS WARNA YANG TIDAK BERANGKA
+ *
+ * Satu daftar label dipakai untuk ketiga indikator: -3, -2, 0, +2, +3. Padahal
+ * batas warnanya berbeda-beda. Pada BB/U dan BB/TB, pita berubah dari hijau ke
+ * kuning tepat di +1 SD — dan +1 TIDAK ADA pada daftar label, sementara +2 yang
+ * berangka justru berada di TENGAH pita kuning BB/U.
+ *
+ * Akibatnya kader membaca pita berwarna tanpa dapat mengetahui di angka berapa
+ * "risiko berat badan lebih" dimulai. Pita ini satu-satunya elemen yang boleh
+ * menonjol secara visual di aplikasi ini; batas yang tidak berangka membuatnya
+ * indah tetapi tidak terbaca.
+ *
+ * Sekarang setiap batas segmen berangka, dan hanya batas yang memang berlaku
+ * untuk indikator itu yang ditampilkan.
+ * ==========================================================================
+ */
+export function titikLabelUntuk(indikator: 'bbu' | 'tbu' | 'bbtb'): number[] {
+  const batas = new Set<number>([0])
+  for (const s of segmenUntuk(indikator)) {
+    const z = persenKeZ(s.dariPersen)
+    // Tepi pita tidak diberi angka: yang bermakna adalah batas klinisnya.
+    if (z > Z_MIN + 1e-9 && z < Z_MAKS - 1e-9) batas.add(z)
+  }
+  return [...batas].sort((a, b) => a - b)
+}
 
 export type SegmenPita = {
   /** Batas kiri dan kanan segmen dalam satuan persen lebar pita. */
@@ -40,6 +75,12 @@ export type PosisiPenanda = {
 export function zKePersen(z: number): number {
   const p = ((z - Z_MIN) / (Z_MAKS - Z_MIN)) * 100
   return Math.min(100, Math.max(0, p))
+}
+
+/** Kebalikan `zKePersen`, untuk menurunkan angka label dari batas segmen. */
+export function persenKeZ(persen: number): number {
+  const z = (persen / 100) * (Z_MAKS - Z_MIN) + Z_MIN
+  return Math.round(z * 100) / 100
 }
 
 export function posisiPenanda(z: number | null): PosisiPenanda | null {
