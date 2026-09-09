@@ -14,7 +14,7 @@ import {
   Stethoscope,
   Utensils,
 } from 'lucide-react'
-import type { BalitaDetail } from '@/lib/db/balita-mock'
+import type { BalitaDetail } from '@/lib/db/balita'
 import {
   cariRujukanByBalitaId,
   type RujukanDetail,

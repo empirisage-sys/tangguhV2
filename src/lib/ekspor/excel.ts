@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import type { BalitaDetail } from '@/lib/db/balita-mock'
+import type { BalitaDetail } from '@/lib/db/balita'
 
 /**
  * Menghasilkan berkas Excel Rekapitulasi Stunting TANGGUH sesuai spesifikasi Sprint 9:

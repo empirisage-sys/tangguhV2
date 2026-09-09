@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ambilProfil } from '@/lib/supabase/penjaga'
-import { cariBalitaById, SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { bacaBalitaById } from '@/lib/db/balita-server'
 import { ambilSemuaRujukan } from '@/lib/db/rujukan'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { semuaKurva } from '@/lib/grafik/seri'
@@ -25,7 +25,27 @@ export default async function HalamanDetailBalita({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const balita = cariBalitaById(id)
+
+  // ==========================================================================
+  // TAHAP 2a: RINCIAN BALITA DIBACA DARI SUPABASE
+  //
+  // Inilah halaman yang paling nyata rusak sebelum patch ini. Setelah kader
+  // berhasil mendaftarkan balita, `balita/baru/actions.ts` mengalihkan ke
+  // `/balita/{id}` — dan halaman ini memanggil `cariBalitaById` pada senarai
+  // kosong lalu memanggil `notFound()`. Pendaftaran berhasil, layarnya 404.
+  //
+  // Kegagalan pembacaan dibedakan dari balita yang tidak ada: yang pertama
+  // dilempar sebagai galat supaya terlihat, yang kedua 404 sebagaimana mestinya.
+  // Menjadikan keduanya 404 berarti gangguan database tampak seperti data yang
+  // tidak pernah ada.
+  // ==========================================================================
+  const hasilBaca = await bacaBalitaById(id)
+
+  if (!hasilBaca.ok) {
+    throw new Error(`Gagal membaca data balita: ${hasilBaca.pesan}`)
+  }
+
+  const balita = hasilBaca.data
 
   if (!balita) {
     notFound()

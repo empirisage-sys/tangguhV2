@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Hospital, Lock, Send, ShieldAlert, X } from 'lucide-react'
 import { RUMAH_SAKIT_GORONTALO } from '@/lib/db/wilayah'
 import { tambahRujukan, type RujukanDetail } from '@/lib/db/rujukan'
-import type { BalitaDetail } from '@/lib/db/balita-mock'
+import type { BalitaDetail } from '@/lib/db/balita'
 import { Button } from '@/components/ui/Button'
 
 type Props = {

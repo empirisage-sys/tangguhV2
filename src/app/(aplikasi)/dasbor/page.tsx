@@ -1,7 +1,7 @@
 import { ENGINE_VERSION } from '@/lib/zscore'
 import Link from 'next/link'
 import { ambilProfil } from '@/lib/supabase/penjaga'
-import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { bacaDaftarBalita } from '@/lib/db/balita-server'
 import { ambilSemuaRujukan } from '@/lib/db/rujukan'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import {
@@ -30,8 +30,20 @@ export default async function DasborPage() {
   const nama = profil?.namaLengkap ?? 'Pengguna TANGGUH'
   const jenisFaskes = profil?.jenisFaskes ?? 'puskesmas'
 
-  // Filter balita sesuai hak akses klinis
-  const balitaList = SAMPLE_BALITA_DATABASE.filter((b) => {
+  // ==========================================================================
+  // TAHAP 2a: ANGKA DASBOR DIBACA DARI SUPABASE
+  //
+  // Seluruh angka di halaman ini — total balita, ditimbang bulan ini, stunting,
+  // penanda rujukan — dahulu dihitung dari `SAMPLE_BALITA_DATABASE` yang isinya
+  // `[]`. Jadi dasbor SELALU menunjukkan nol, apa pun yang ada di database.
+  // Nol yang tampak seperti kabar baik padahal sebenarnya buta.
+  //
+  // Cakupan wilayah ditegakkan RLS. `bolehLihatBalita` tetap dipakai sebagai
+  // lapisan tampilan, sama seperti sebelumnya.
+  // ==========================================================================
+  const hasilBaca = await bacaDaftarBalita()
+  const galatBaca = hasilBaca.ok ? null : hasilBaca.pesan
+  const balitaList = (hasilBaca.ok ? hasilBaca.data : []).filter((b) => {
     if (profil && !bolehLihatBalita(b, profil, daftarRujukan)) return false
     return true
   })
@@ -86,6 +98,25 @@ export default async function DasborPage() {
 
   return (
     <div className="space-y-6">
+      {/*
+        Angka nol karena database menolak TIDAK BOLEH tampak seperti angka nol
+        karena memang belum ada data. Yang pertama perlu ditindaklanjuti, yang
+        kedua kabar baik.
+      */}
+      {galatBaca && (
+        <div className="flex items-start gap-3 rounded-2xl border-2 border-bahaya-garis bg-bahaya-bg p-4 text-xs text-bahaya-teks">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-bold">Angka di halaman ini tidak dapat dipercaya saat ini.</p>
+            <p className="mt-0.5 leading-relaxed">
+              Data balita gagal dibaca dari server: {galatBaca} Seluruh angka di bawah
+              dihitung dari data yang tidak lengkap. Muat ulang halaman sebelum memakainya
+              untuk laporan.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-laut-700 via-laut-600 to-laut-500 p-6 text-white shadow-lg shadow-laut-600/15 sm:p-8">
         <div className="relative z-10 flex flex-col justify-between gap-4 md:flex-row md:items-center">

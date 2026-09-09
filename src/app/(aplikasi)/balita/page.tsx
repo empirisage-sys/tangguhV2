@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Plus, Search, UserPlus, ChevronRight, Filter, Stethoscope } from 'lucide-react'
-import { SAMPLE_BALITA_DATABASE } from '@/lib/db/balita-mock'
+import { bacaDaftarBalita } from '@/lib/db/balita-server'
 import { ambilSemuaRujukan } from '@/lib/db/rujukan'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
@@ -22,7 +22,22 @@ export default async function HalamanDaftarBalita({
   const { q, status } = await searchParams
   const kueri = (q ?? '').toLowerCase()
 
-  const balitaList = SAMPLE_BALITA_DATABASE.filter((b) => {
+  // ==========================================================================
+  // TAHAP 2a: DAFTAR BALITA DIBACA DARI SUPABASE
+  //
+  // Sebelumnya baris ini menyaring `SAMPLE_BALITA_DATABASE`, yang isinya `[]`.
+  // Jalur TULIS sudah lama tersambung — `balita/baru/actions.ts` benar-benar
+  // menyimpan ke Postgres — sehingga halaman ini selalu berkata "Belum Ada Data
+  // Balita" tepat setelah kader berhasil mendaftarkan balita.
+  //
+  // Cakupan wilayah ditegakkan RLS di database. `bolehLihatBalita` di bawah
+  // dipertahankan sebagai lapisan kedua untuk TAMPILAN, bukan keamanan.
+  // ==========================================================================
+  const hasilBaca = await bacaDaftarBalita()
+  const semuaBalita = hasilBaca.ok ? hasilBaca.data : []
+  const galatBaca = hasilBaca.ok ? null : hasilBaca.pesan
+
+  const balitaList = semuaBalita.filter((b) => {
     // Terapkan filter hak akses peran klinis
     if (profil && !bolehLihatBalita(b, profil, daftarRujukan)) {
       return false
@@ -79,6 +94,25 @@ export default async function HalamanDaftarBalita({
         </div>
       )}
 
+      {/*
+        Kegagalan pembacaan ditampilkan tegas. Tanpa ini, database yang menolak
+        tampak sama dengan wilayah yang memang belum punya balita — dan kader
+        akan mencatat ulang data yang sebenarnya sudah ada.
+      */}
+      {galatBaca && (
+        <div className="flex items-start gap-3 rounded-2xl border-2 border-bahaya-garis bg-bahaya-bg p-4 text-xs text-bahaya-teks">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-bold">Data balita gagal dibaca dari server.</p>
+            <p className="mt-0.5 leading-relaxed">
+              {galatBaca} Daftar di bawah BUKAN berarti kosong — muat ulang halaman ini
+              sebelum menyimpulkan tidak ada data, dan jangan mencatat ulang balita yang
+              mungkin sudah terdaftar.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <form className="relative flex-1">
@@ -100,7 +134,7 @@ export default async function HalamanDaftarBalita({
               !status ? 'bg-laut-600 text-white' : 'bg-white text-tinta-600 ring-1 ring-kabut-200 hover:bg-kabut-50',
             ].join(' ')}
           >
-            Semua ({SAMPLE_BALITA_DATABASE.length})
+            Semua ({semuaBalita.length})
           </Link>
           <Link
             href="/balita?status=stunting"
