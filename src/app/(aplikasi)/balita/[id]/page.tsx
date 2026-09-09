@@ -15,7 +15,12 @@ import {
   sumberAmbangVelocity,
 } from '@/lib/tampilan/status'
 import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
-import { hitungVelocity, apakahPerluPKMK, ENGINE_VERSION } from '@/lib/zscore'
+import {
+  hitungVelocity,
+  apakahPerluPKMK,
+  tanggalLahirEfektif,
+  ENGINE_VERSION,
+} from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
 
@@ -71,8 +76,14 @@ export default async function HalamanDetailBalita({
   const statusBBUVal = skriningTerakhir ? tampilanBBU(skriningTerakhir.statusBBU) : null
 
   // Evaluasi kenaikan berat badan terkini
+  // `hitungVelocity` hanya menerima tanggal lahir, jadi koreksi prematuritas
+  // disalurkan lewat tanggal lahir efektif — dengan aturan mesin, termasuk
+  // batas umurnya. Lihat temuan audit T-2.
+  const tglLahirVelocity = (tanggalAcuan: string) =>
+    tanggalLahirEfektif(balita.tanggalLahir, tanggalAcuan, balita.usiaGestasiMinggu)
+
   const evaluasiVelocity = skriningSebelumnya && skriningTerakhir ? hitungVelocity({
-    tanggalLahir: balita.tanggalLahir,
+    tanggalLahir: tglLahirVelocity(skriningSebelumnya.tanggal),
     jenisKelamin: jenisKelaminEngine,
     tanggalAwal: skriningSebelumnya.tanggal,
     beratAwalKg: skriningSebelumnya.beratKg,
@@ -417,7 +428,7 @@ export default async function HalamanDetailBalita({
               {balita.riwayat.map((r, i) => {
                 const prev = i > 0 ? balita.riwayat[i - 1] : null
                 const vel = prev ? hitungVelocity({
-                  tanggalLahir: balita.tanggalLahir,
+                  tanggalLahir: tglLahirVelocity(prev.tanggal),
                   jenisKelamin: jenisKelaminEngine,
                   tanggalAwal: prev.tanggal,
                   beratAwalKg: prev.beratKg,

@@ -55,6 +55,7 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
     posyandu_id: string
     puskesmas_id: string
     kabupaten_id: string
+    usia_gestasi_minggu: number | null
   } | null = null
 
   // ======================================================================
@@ -72,7 +73,7 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
   // ======================================================================
   const { data: dataBalita, error: galatBalita } = await supabase
     .from('balita')
-    .select('id, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id')
+    .select('id, tanggal_lahir, jenis_kelamin, posyandu_id, puskesmas_id, kabupaten_id, usia_gestasi_minggu')
     .eq('id', d.balitaId)
     .maybeSingle()
 
@@ -112,6 +113,10 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
     posisiUkur: d.posisiUkur,
     lilaCm: d.lilaCm,
     edema: d.edema,
+    // Usia gestasi WAJIB ikut. Tanpa ini server menghitung ulang dengan umur
+    // kronologis sementara perangkat memakai umur koreksi, dan `bandingkanHasil`
+    // akan melaporkan selisih pada setiap bayi prematur (temuan audit T-2).
+    usiaGestasiMinggu: balita.usia_gestasi_minggu ?? undefined,
   })
 
   const baris = keBarisSkrining(
@@ -125,6 +130,7 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
       lilaCm: d.lilaCm,
       lingkarKepalaCm: d.lingkarKepalaCm,
       edema: d.edema,
+      usiaGestasiMinggu: balita.usia_gestasi_minggu ?? undefined,
       catatan: d.catatan,
       createdBy: profil.id,
       posyanduId: balita.posyandu_id,

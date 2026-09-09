@@ -5,7 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, ChevronRight, Sparkles, AlertCircle, WifiOff, TrendingUp, AlertTriangle } from 'lucide-react'
 import type { BalitaDetail } from '@/lib/db/balita'
-import { hitungSkrining, hitungUmurKalender, hitungVelocity } from '@/lib/zscore'
+import {
+  hitungSkrining,
+  hitungUmurKalender,
+  hitungVelocity,
+  tanggalLahirEfektif,
+} from '@/lib/zscore'
 import type { HasilSkrining, PosisiUkur } from '@/lib/zscore/tipe'
 import { InputAngka } from '@/components/ui/InputAngka'
 import { Button } from '@/components/ui/Button'
@@ -85,6 +90,20 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
     }
 
     try {
+      // ==================================================================
+      // TEMUAN AUDIT T-2: JALUR NAKES TIDAK PERNAH MEMAKAI USIA GESTASI
+      //
+      // `usia_gestasi_minggu` dicatat saat pendaftaran balita dan tersimpan di
+      // database, tetapi tidak satu pun jalur skrining pernah membacanya.
+      // Akibatnya bayi prematur dinilai dengan umur kronologis penuh.
+      //
+      // Bayi umur 6 bulan yang lahir 32 minggu, 6,5 kg, 63 cm:
+      //   dengan koreksi   -> Z TB/U -0,623  status NORMAL
+      //   tanpa koreksi    -> Z TB/U -2,191  status PENDEK
+      //
+      // Selisih 1,57 SD, dan arahnya menghasilkan diagnosis stunting PALSU
+      // pada bayi prematur — pada aplikasi yang tugasnya mendeteksi stunting.
+      // ==================================================================
       const res = hitungSkrining({
         tanggalLahir: balita.tanggalLahir,
         tanggalPeriksa,
@@ -94,6 +113,7 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
         posisiUkur,
         lilaCm: l,
         edema,
+        usiaGestasiMinggu: balita.usiaGestasiMinggu,
       })
       setHasilInstan(res)
       setPesanGalat(null)
@@ -506,7 +526,12 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
             if (!prev || isNaN(b) || b <= 0) return null
 
             const vel = hitungVelocity({
-              tanggalLahir: balita.tanggalLahir,
+              // Koreksi prematuritas lewat tanggal lahir efektif (T-2).
+              tanggalLahir: tanggalLahirEfektif(
+                balita.tanggalLahir,
+                prev.tanggal,
+                balita.usiaGestasiMinggu,
+              ),
               jenisKelamin: balita.jenisKelamin === 'L' ? 'lk' : 'pr',
               tanggalAwal: prev.tanggal,
               beratAwalKg: prev.beratKg,

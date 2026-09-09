@@ -257,3 +257,42 @@ export function hitungUsiaKoreksi(
     teksKoreksi: `${umurKoreksi.teks} (dikurangi ${defisitMinggu} minggu / ${defisitHari} hari)`,
   }
 }
+
+/**
+ * Tanggal lahir yang harus dipakai fungsi yang HANYA menerima tanggal lahir.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT T-1: KOREKSI PREMATURITAS DIKERJAKAN DI DUA TEMPAT DENGAN DUA
+ * ATURAN YANG BERBEDA
+ *
+ * `hitungSkrining` sudah menerima `usiaGestasiMinggu` dan menegakkan seluruh
+ * aturannya sendiri sejak perbaikan Z-4. Halaman skrining tamu tidak pernah
+ * ikut berpindah: ia masih menyuntikkan TANGGAL LAHIR PALSU yang digeser
+ * sebesar defisit prematuritas — persis pola yang temuan Z-4 hapus.
+ *
+ * Dua akibatnya nyata:
+ *   1. Batas 24 bulan TIDAK ditegakkan. Anak umur 30 bulan yang lahir 32
+ *      minggu tetap dikurangi 56 hari, menghasilkan Z TB/U -1,077 padahal
+ *      seharusnya -1,454 — selisih 0,38 SD ke arah yang lebih baik daripada
+ *      keadaan sebenarnya.
+ *   2. Jejaknya hilang. Hasilnya melaporkan `umurDikoreksiPrematur: false` dan
+ *      `defisitPrematurHari: 0`, sehingga baris yang umurnya dikoreksi tidak
+ *      dapat dibedakan dari baris yang tidak.
+ *
+ * Fungsi ini ada untuk pemanggil yang memang hanya punya tanggal lahir, yaitu
+ * `hitungVelocity`. Ia memakai ATURAN YANG SAMA dengan mesin: koreksi hanya
+ * diterapkan bila `hitungUsiaKoreksi` menyatakan berlaku, termasuk batas
+ * umurnya. Dengan begitu tidak ada lagi aturan kedua yang ditulis di halaman.
+ * ==========================================================================
+ */
+export function tanggalLahirEfektif(
+  tanggalLahir: string,
+  tanggalRujukan: string,
+  usiaGestasiMinggu?: number,
+): string {
+  const koreksi = hitungUsiaKoreksi(tanggalLahir, tanggalRujukan, usiaGestasiMinggu)
+  if (!koreksi.isPrematur || koreksi.defisitHari <= 0) return tanggalLahir
+
+  const ms = new Date(tanggalLahir + 'T00:00:00Z').getTime()
+  return new Date(ms + koreksi.defisitHari * 86_400_000).toISOString().slice(0, 10)
+}
