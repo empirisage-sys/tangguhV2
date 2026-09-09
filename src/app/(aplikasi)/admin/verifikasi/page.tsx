@@ -20,6 +20,22 @@ function jamMenunggu(diajukanPada: string): number {
   return (Date.now() - Date.parse(diajukanPada)) / 3_600_000
 }
 
+/**
+ * Penanda kecil di samping nama wilayah yang masih berstatus usulan.
+ *
+ * Sebelum migrasi 20260911000000, kolom status tidak ada di
+ * `v_antrean_verifikasi`, sehingga admin tidak punya cara membedakan nama yang
+ * diketik pendaftar dari data master resmi. Lihat temuan audit R-8.
+ */
+function PenandaUsulan({ status }: { status?: string }) {
+  if (status !== 'usulan') return null
+  return (
+    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 ring-1 ring-amber-300">
+      Usulan
+    </span>
+  )
+}
+
 export default async function HalamanVerifikasi() {
   await wajibPeran(['admin'])
   const supabase = await createClient()
@@ -119,14 +135,27 @@ export default async function HalamanVerifikasi() {
                   </div>
                   <div>
                     <dt className="text-tinta-400">Puskesmas</dt>
-                    <dd className="font-semibold">{(p.nama_puskesmas as string) ?? '-'}</dd>
+                    <dd className="font-semibold">
+                      {(p.nama_puskesmas as string) ?? '-'}
+                      <PenandaUsulan status={p.status_puskesmas as string} />
+                    </dd>
                   </div>
+                  {p.jenis_faskes === 'rumah_sakit' && p.nama_faskes ? (
+                    <div className="sm:col-span-2">
+                      <dt className="text-tinta-400">Rumah sakit</dt>
+                      <dd className="font-semibold">
+                        {p.nama_faskes as string}
+                        <PenandaUsulan status={p.status_faskes as string} />
+                      </dd>
+                    </div>
+                  ) : null}
                   {p.nama_posyandu ? (
                     <div className="sm:col-span-2">
                       <dt className="text-tinta-400">Posyandu</dt>
                       <dd className="font-semibold">
                         {p.nama_posyandu as string}
                         {p.desa ? `, Desa ${p.desa as string}` : ''}
+                        <PenandaUsulan status={p.status_posyandu as string} />
                       </dd>
                     </div>
                   ) : null}
@@ -150,9 +179,13 @@ export default async function HalamanVerifikasi() {
                     faskesId={p.faskes_id as string}
                     namaFaskes={(p.nama_faskes || p.nama_puskesmas) as string}
                     statusFaskes={p.status_faskes as 'master' | 'usulan'}
-                    kabupatenId={p.kabupaten_id as string}
                     jenisFaskes={p.jenis_faskes as 'puskesmas' | 'rumah_sakit'}
+                    puskesmasId={p.puskesmas_id as string}
+                    namaPuskesmas={p.nama_puskesmas as string}
+                    statusPuskesmas={p.status_puskesmas as 'master' | 'usulan'}
+                    posyanduId={p.posyandu_id as string}
                     namaPosyandu={p.nama_posyandu as string}
+                    desa={p.desa as string}
                     statusPosyandu={p.status_posyandu as 'master' | 'usulan'}
                   />
                 </div>
