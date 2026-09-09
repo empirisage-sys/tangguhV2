@@ -6,6 +6,7 @@ import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { skemaAsuhanGizi, bacaFormAsuhanGizi } from '@/lib/validasi/asuhan-gizi'
 import { keBarisAsuhanGizi, barisAsuhanKonsisten } from '@/lib/db/asuhan-gizi'
 import { hitungTakaran } from '@/lib/pkmk/hitung'
+import { produkSesuaiUmur } from '@/lib/pkmk/produk'
 import { bacaProdukPKMKAktifById } from '@/lib/db/pkmk-server'
 import { ringkasanTakaran } from '@/lib/pkmk/teks'
 import type { HasilTindakan } from '@/app/(publik)/daftar/actions'
@@ -76,18 +77,73 @@ export async function simpanAsuhanGizi(formData: FormData): Promise<HasilSimpanA
   let skriningId: string | null = d.skriningId ?? null
   let puskesmasId: string | null = null
 
-  const { data: skrining } = await supabase
+  // ======================================================================
+  // TEMUAN AUDIT P-3: `skriningId` YANG DIKIRIM DIABAIKAN
+  //
+  // Bentuk lama SELALU mengambil skrining terbaru balita itu, lalu menyimpan
+  // `skrining_id` yang dikirim formulir apa adanya. Akibatnya sebuah baris bisa
+  // tersimpan dengan `skrining_id = X` sementara `kalori_target` diturunkan
+  // dari skrining Y yang lebih baru — misalnya ketika kader mencatat
+  // penimbangan baru sementara dietisien masih membuka kunjungan sebelumnya.
+  // Takarannya lalu tidak dapat ditelusuri kembali ke skrining yang tercatat
+  // pada barisnya sendiri, yang justru tujuan kolom itu ada.
+  //
+  // Sekarang bila formulir menyebut satu skrining, ITU yang dibaca. Kalau
+  // rujukannya tidak sah, permintaannya ditolak alih-alih diam-diam
+  // dialihkan ke baris lain.
+  // ======================================================================
+  const kueriSkrining = supabase
     .from('skrining')
-    .select('id, kalori_catchup_kkal, kalori_target_kkal, puskesmas_id, balita_id')
+    .select('id, kalori_catchup_kkal, kalori_target_kkal, puskesmas_id, balita_id, umur_bulan')
     .eq('balita_id', d.balitaId)
-    .order('tanggal_periksa', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+
+  const { data: skrining } = skriningId
+    ? await kueriSkrining.eq('id', skriningId).maybeSingle()
+    : await kueriSkrining
+        .order('tanggal_periksa', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+  if (!skrining && skriningId) {
+    return {
+      ok: false,
+      pesan:
+        'Hasil skrining yang dirujuk tidak ditemukan pada balita ini. Muat ulang halaman, ' +
+        'lalu pilih kembali hasil skrining yang menjadi dasar peresepan.',
+    }
+  }
 
   if (skrining) {
     totalKebutuhanKkal = skrining.kalori_catchup_kkal ?? skrining.kalori_target_kkal ?? null
     skriningId ??= skrining.id
     puskesmasId = skrining.puskesmas_id
+  }
+
+  // ======================================================================
+  // TEMUAN AUDIT P-2: BATAS UMUR PRODUK TIDAK DITEGAKKAN DI SERVER
+  //
+  // Penyaring umur dahulu hanya ada di layar, dan bahkan di sana batas atas
+  // `maks_usia_bulan` tidak pernah dibaca. Server tidak memeriksa umur sama
+  // sekali, sehingga permintaan yang disusun tangan dapat meresepkan produk
+  // untuk balita di luar rentang indikasinya.
+  //
+  // Umur diambil dari `umur_bulan` pada skrining yang menjadi dasar peresepan
+  // — bukan umur hari ini — supaya angka yang diperiksa sama dengan angka yang
+  // dipakai menghitung kebutuhan energinya.
+  // ======================================================================
+  const umurBulanSkrining = typeof skrining?.umur_bulan === 'number' ? skrining.umur_bulan : null
+
+  if (umurBulanSkrining !== null && !produkSesuaiUmur(produk, umurBulanSkrining)) {
+    const batasAtas =
+      produk.maksUsiaBulan != null ? ` sampai ${produk.maksUsiaBulan} bulan` : ' ke atas'
+    return {
+      ok: false,
+      pesan:
+        `${produk.nama} berindikasi untuk umur ${produk.minUsiaBulan} bulan${batasAtas}, ` +
+        `sedangkan balita ini berumur ${Math.round(umurBulanSkrining)} bulan. ` +
+        'Pilih produk yang sesuai umur, atau perbarui indikasi umur produk ini pada master data.',
+      galatMedan: { produkId: 'Produk ini di luar rentang umur balita.' },
+    }
   }
 
   if (totalKebutuhanKkal === null) {

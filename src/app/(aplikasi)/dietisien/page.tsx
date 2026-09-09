@@ -204,7 +204,15 @@ export default function HalamanDietisien() {
                 namaBalita={balitaTerpilih.nama}
                 umurBulan={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 24}
                 beratKg={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 8.0}
-                targetEnergiDefaultKkal={770}
+                // Kebutuhan energi WAJIB berasal dari hasil skrining balita
+                // ini, bukan angka literal. Selama halaman ini masih membaca
+                // data contoh yang belum bersambung ke Supabase, nilainya
+                // belum ada — dan panel akan menyatakannya, bukan menebak.
+                // Lihat temuan audit P-1.
+                targetEnergiDefaultKkal={
+                  balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]
+                    ?.kaloriCatchUpKkal ?? null
+                }
                 balitaId={balitaTerpilih.id}
                 aksiSimpan={simpanAsuhanGizi}
               />

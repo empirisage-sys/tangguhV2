@@ -58,6 +58,14 @@ export function bacaPeringatan(p: Peringatan): PeringatanTerbaca {
         pesan: `Volume per saji ${angka(a.mlPerSaji!)} ml melebihi batas wajar ${angka(a.batasMl!)} ml untuk balita.`,
         saran: `Bagi menjadi ${angka(a.frekuensiSaran!)}x sehari agar tiap saji lebih kecil. Volume terlalu besar membuat anak kenyang sebelum kalorinya masuk.`,
       }
+    case 'target_belum_ditetapkan':
+      return {
+        kode: p.kode,
+        nada: p.nada,
+        pesan: `Target energi PKMK belum ditetapkan, sehingga takaran ${angka(a.kkalDiberikan!)} kkal per hari (${angka(a.sendokPerHari!)} sendok) tidak dapat dinilai terhadap apa pun.`,
+        saran:
+          'Tetapkan persen target terhadap kebutuhan energi balita terlebih dahulu. Tanpa itu, tidak ada dasar untuk mengatakan takaran ini cukup atau berlebih.',
+      }
     case 'target_tidak_tercapai':
       return {
         kode: p.kode,

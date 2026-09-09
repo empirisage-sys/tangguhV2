@@ -135,10 +135,33 @@ export const PERINGATAN_DATA_PRODUK =
   'Data produk (kalori dan volume per sendok takar) belum diverifikasi terhadap ' +
   'label kemasan yang beredar. Cocokkan dengan kemasan sebelum dipakai.'
 
+/**
+ * `true` bila umur balita berada di dalam rentang indikasi produk.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT P-2: BATAS UMUR ATAS TIDAK PERNAH DITEGAKKAN
+ *
+ * Kolom `maks_usia_bulan` disimpan database, berkendala `check` terhadap
+ * `min_usia_bulan`, divalidasi silang pada skema admin, dan dipetakan ke model.
+ * Tidak ada satu pun penyaring di seluruh aplikasi yang pernah membacanya.
+ * Produk yang berindikasi sampai 24 bulan tetap muncul pada dropdown untuk
+ * balita 59 bulan, tanpa keterangan apa pun.
+ *
+ * Batas bawah pun hanya ditegakkan di layar. Server tidak memeriksa umur sama
+ * sekali, sehingga permintaan yang disusun tangan melewatinya — lihat
+ * `dietisien/actions.ts`.
+ * ==========================================================================
+ */
+export function produkSesuaiUmur(produk: ProdukPKMK, umurBulan: number): boolean {
+  if (!Number.isFinite(umurBulan)) return false
+  if (umurBulan < produk.minUsiaBulan) return false
+  if (produk.maksUsiaBulan != null && umurBulan > produk.maksUsiaBulan) return false
+  return true
+}
+
 /** Menyaring produk yang sesuai umur balita dalam bulan. */
 export function produkUntukUmur(umurBulan: number): ProdukPKMK[] {
-  if (!Number.isFinite(umurBulan)) return []
-  return PRODUK_PKMK.filter((p) => umurBulan >= p.minUsiaBulan)
+  return PRODUK_PKMK.filter((p) => produkSesuaiUmur(p, umurBulan))
 }
 
 /** Mencari produk berdasarkan id. Mengembalikan null bila tidak ada. */

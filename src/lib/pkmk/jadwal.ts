@@ -79,12 +79,60 @@ export function sebarMerata(banyak: number, panjang: number): number[] {
 }
 
 /**
+ * Menyebar pemberian PKMK sambil mempertahankan waktu makan utama.
+ *
+ * ==========================================================================
+ * TEMUAN AUDIT P-5: PADA 6x SEHARI, KETIGA WAKTU MAKAN UTAMA HILANG
+ *
+ * `sebarMerata(6, 8)` menghasilkan indeks [0, 1, 3, 4, 6, 7], yang menutup
+ * SELURUH `INDEKS_MAKAN_UTAMA` [1, 3, 6]. Jadwal yang tercetak menjadi enam
+ * baris PKMK dan dua selingan, tanpa satu pun makan utama — sementara lembar
+ * yang sama menuliskan ratusan kkal yang harus datang dari makanan keluarga.
+ * Dua selingan tidak dapat memikul angka itu, dan komentar berkas ini sendiri
+ * menyatakan ASI tidak menggantikan MPASI.
+ *
+ * Sekarang PKMK didahulukan pada kisi jam yang BUKAN makan utama. Bila
+ * frekuensinya melebihi jumlah kisi yang tersedia, waktu makan utama baru
+ * dipakai seperlunya — dan sisanya tetap dipertahankan, tidak pernah habis
+ * sekaligus. `banyakSlotPkmk` tetap sama dengan `frekuensiPerHari`, sehingga
+ * aturan yang mengikat di atas tidak dilanggar.
+ * ==========================================================================
+ */
+export function sebarPkmkTanpaMenghapusMakan(banyak: number, panjang: number): number[] {
+  const n = Math.max(0, Math.min(banyak, panjang))
+  if (n === 0) return []
+
+  const bukanMakanUtama = Array.from({ length: panjang }, (_, i) => i).filter(
+    (i) => !INDEKS_MAKAN_UTAMA.includes(i),
+  )
+
+  // Sebar merata pada kisi yang bukan makan utama.
+  const terpilih = sebarMerata(Math.min(n, bukanMakanUtama.length), bukanMakanUtama.length).map(
+    (k) => bukanMakanUtama[k] as number,
+  )
+
+  // Bila masih kurang, ambil waktu makan utama dari yang paling belakang,
+  // supaya makan pagi dan makan siang bertahan lebih lama daripada makan malam.
+  if (terpilih.length < n) {
+    const cadangan = [...INDEKS_MAKAN_UTAMA].sort((a, b) => b - a)
+    for (const i of cadangan) {
+      if (terpilih.length >= n) break
+      terpilih.push(i)
+    }
+  }
+
+  return [...new Set(terpilih)].sort((a, b) => a - b)
+}
+
+/**
  * Menyusun jadwal harian dari satu hasil takaran.
  *
  * Seluruh angka PKMK pada jadwal berasal dari `hasil`, tidak dihitung ulang.
  */
 export function susunJadwal({ hasil, masihASI }: MasukanJadwal): Jadwal {
-  const indeksPkmk = new Set(sebarMerata(hasil.frekuensiPerHari, JAM_JADWAL.length))
+  const indeksPkmk = new Set(
+    sebarPkmkTanpaMenghapusMakan(hasil.frekuensiPerHari, JAM_JADWAL.length),
+  )
 
   const kkalPerSaji = hasil.sendokPerSaji * hasil.kkalPerSendok
 
@@ -118,4 +166,9 @@ export function susunJadwal({ hasil, masihASI }: MasukanJadwal): Jadwal {
 /** Banyaknya baris PKMK pada jadwal. Dipakai untuk memastikan jadwal dan takaran sejalan. */
 export function banyakSlotPkmk(jadwal: Jadwal): number {
   return jadwal.slot.filter((s) => s.jenis === 'pkmk').length
+}
+
+/** Banyaknya waktu makan utama yang bertahan. Nol berarti jadwalnya tidak masuk akal. */
+export function banyakMakanUtama(jadwal: Jadwal): number {
+  return jadwal.slot.filter((s) => s.jenis === 'makan_utama').length
 }

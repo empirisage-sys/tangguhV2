@@ -840,7 +840,7 @@ export default function HalamanSkriningTamu() {
                 namaBalita={nama || 'Balita'}
                 umurBulan={hasil.umurBulan}
                 beratKg={parseFloat(beratKg) || 8}
-                targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal || 770}
+                targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal ?? null}
               />
             ) : (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 shadow-sm">
