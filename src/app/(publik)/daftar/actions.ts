@@ -34,17 +34,22 @@ const MAP_KABUPATEN_UUID: Record<string, string> = {
   '7571': '15d83e69-dee0-4430-a8b3-302bcd7a361a', // Kota Gorontalo
 }
 
-const MAP_KABUPATEN_DEFAULT_PUSKESMAS: Record<string, string> = {
-  '7501': '2c08601b-cc6b-4b9c-89e4-af9890432516', // Boalemo - Puskesmas Mananggu
-  '7502': '587772e0-54f2-4905-80af-094208959563', // Kab. Gorontalo - Puskesmas Batudaa Pantai
-  '7503': '510f3489-9d24-4f46-be8e-75419f827d52', // Pohuwato - Puskesmas Popayato
-  '7504': 'f4b73597-f1ca-4e63-a5e3-4aad7d512382', // Bone Bolango - Puskesmas Tapa
-  '7505': '671c6d55-62e9-4364-8daf-4d7b8dbf7b49', // Gorontalo Utara - Puskesmas Atinggola
-  '7571': '920c0fa8-7bac-4b78-8b0a-6aaa43806f12', // Kota Gorontalo - Puskesmas Pilolodaa
-}
-
-const DEFAULT_PUSKESMAS_UUID = '920c0fa8-7bac-4b78-8b0a-6aaa43806f12'
-const DEFAULT_POSYANDU_UUID = '5dd232fc-d677-4728-8b0a-4e6c0f963978'
+// ---------------------------------------------------------------------
+// MAP_KABUPATEN_DEFAULT_PUSKESMAS, DEFAULT_PUSKESMAS_UUID, dan
+// DEFAULT_POSYANDU_UUID DIHAPUS DARI BERKAS INI.
+//
+// Ketiganya adalah wilayah cadangan yang dipasangkan pada pendaftar ketika
+// pilihannya tidak dapat diselesaikan. Justru di situlah kerusakannya: seorang
+// kader yang mengetik nama posyandunya tersimpan sebagai kader posyandu lain,
+// dan seorang pendaftar yang memilih puskesmas di luar daftar tersimpan di
+// Puskesmas Pilolodaa. Keduanya berhasil tanpa satu pun peringatan, dan
+// datanya salah sejak baris pertama.
+//
+// Sejak migrasi 20260910000000, nama yang diketik pendaftar didaftarkan
+// sebagai USULAN oleh `handle_new_user` lalu dipakai. Bila wilayah tetap tidak
+// dapat ditentukan, pendaftaran ditolak dengan pesan yang menyebut apa yang
+// harus diisi. Menyimpan nilai tebakan tidak lagi menjadi pilihan.
+// ---------------------------------------------------------------------
 
 export async function daftar(formData: FormData): Promise<HasilTindakan> {
   const hasil = skemaPendaftaran.safeParse({
@@ -106,15 +111,33 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
     provinsiDbId = provData?.id ?? null
   }
 
-  const kabKode = d.kabupatenId?.replace(/^kab-/, '') || '7571'
-  let kabupatenDbId = await idBerlaku('kabupaten', MAP_KABUPATEN_UUID[kabKode])
-  if (!kabupatenDbId) {
-    const { data: kabData } = await supabase
-      .from('kabupaten')
-      .select('id')
-      .eq('kode', kabKode)
-      .maybeSingle()
-    kabupatenDbId = kabData?.id ?? null
+  // ---------------------------------------------------------------------
+  // KABUPATEN TIDAK LAGI BERCADANGAN KOTA GORONTALO
+  //
+  // Bentuk lamanya `d.kabupatenId?.replace(...) || '7571'` menjadikan Kota
+  // Gorontalo sebagai cadangan bagi SIAPA PUN yang tidak memilih kabupaten.
+  // Yang selalu terjadi pada pendaftar di luar Provinsi Gorontalo: mereka
+  // mengisi `kabupatenManual`, medan `kabupatenId` kosong, dan profilnya
+  // tersimpan sebagai warga Kota Gorontalo. Provinsinya benar, kabupatennya
+  // milik provinsi lain — satu profil menunjuk dua wilayah yang bertentangan,
+  // dan tidak ada yang memberi tahu pendaftarnya. Lihat temuan audit R-7.
+  //
+  // Sekarang kabupaten dikosongkan bila tidak dipilih. Nama yang diketik tetap
+  // dikirim sebagai `kabupaten_manual` agar admin dapat menormalkannya saat
+  // verifikasi.
+  // ---------------------------------------------------------------------
+  const kabKode = d.kabupatenId?.replace(/^kab-/, '') || ''
+  let kabupatenDbId: string | null = null
+  if (kabKode) {
+    kabupatenDbId = await idBerlaku('kabupaten', MAP_KABUPATEN_UUID[kabKode])
+    if (!kabupatenDbId) {
+      const { data: kabData } = await supabase
+        .from('kabupaten')
+        .select('id')
+        .eq('kode', kabKode)
+        .maybeSingle()
+      kabupatenDbId = kabData?.id ?? null
+    }
   }
 
   // Cari Puskesmas / Faskes yang sesuai di DB
@@ -133,33 +156,30 @@ export async function daftar(formData: FormData): Promise<HasilTindakan> {
     }
   }
 
-  // Rumah sakit, faskes usulan manual, atau pencarian di atas tidak menemukan apa pun.
-  if (!puskesmasDbId) {
-    puskesmasDbId = await idBerlaku('puskesmas', MAP_KABUPATEN_DEFAULT_PUSKESMAS[kabKode])
-  }
-  if (!puskesmasDbId) {
-    puskesmasDbId = await idBerlaku('puskesmas', DEFAULT_PUSKESMAS_UUID)
-  }
-  if (!puskesmasDbId) {
-    // Ambil puskesmas mana pun yang ada agar profil tetap punya rujukan yang sah.
-    const { data: pkmAda } = await supabase.from('puskesmas').select('id').limit(1).maybeSingle()
-    puskesmasDbId = pkmAda?.id ?? null
-  }
+  // ---------------------------------------------------------------------
+  // TIDAK ADA LAGI PUSKESMAS DAN POSYANDU CADANGAN SEMBARANG
+  //
+  // Bentuk lama meneruskan tiga lapis cadangan: puskesmas induk kabupaten,
+  // sebuah UUID tetap, lalu `select id from puskesmas limit 1` — puskesmas
+  // mana pun yang kebetulan ada. Untuk kader ditambah `select id from posyandu
+  // limit 1`. Akibatnya seorang kader yang mengetik "Posyandu Melati Baru"
+  // tersimpan sebagai kader "Posyandu Uji" di puskesmas yang tidak ia sebut,
+  // dan tidak ada satu pun pesan yang memberitahunya. Terbukti dengan
+  // menjalankan pendaftaran sungguhan pada PostgreSQL; lihat temuan R-1 dan R-2.
+  //
+  // Sejak migrasi 20260910000000, penyelesaian wilayah dikerjakan
+  // `handle_new_user` di database, yang MEMAKAI nama yang diketik pendaftar
+  // dan mendaftarkannya sebagai usulan. Bila wilayah tetap tidak dapat
+  // ditentukan, pendaftaran ditolak dengan pesan yang menyebut apa yang harus
+  // diisi — jauh lebih baik daripada berhasil dengan data yang salah.
+  //
+  // Yang dikirim dari sini karena itu hanya nilai yang BENAR-BENAR dipilih
+  // pendaftar, ditambah nama-nama yang ia ketik sendiri.
+  // ---------------------------------------------------------------------
 
-  // Cari Posyandu yang sesuai di DB untuk kader
-  let posyanduDbId: string | null = null
-  if (d.peran === 'kader') {
-    posyanduDbId = await idBerlaku('posyandu', DEFAULT_POSYANDU_UUID)
-    if (!posyanduDbId) {
-      const { data: posAda } = await supabase
-        .from('posyandu')
-        .select('id')
-        .eq('puskesmas_id', puskesmasDbId ?? '')
-        .limit(1)
-        .maybeSingle()
-      posyanduDbId = posAda?.id ?? null
-    }
-  }
+  // Kader mengetik nama posyandunya; `handle_new_user` yang mendaftarkannya
+  // sebagai usulan di bawah puskesmas yang benar.
+  const posyanduDbId: string | null = null
 
   const siteUrl = urlSitus()
 
