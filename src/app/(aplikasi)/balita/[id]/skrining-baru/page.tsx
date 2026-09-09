@@ -124,33 +124,38 @@ export default function HalamanSkriningBaru({
       return
     }
 
+    // Satu tempat penyusunan baris antrean, dipakai jalur offline maupun jalur
+    // penyelamatan setelah server gagal (temuan audit S-1).
+    const keOutbox = () =>
+      simpanKeOutbox({
+        clientUuid,
+        balitaId: balita.id,
+        namaBalita: balita.nama,
+        posyanduId: balita.posyanduId,
+        puskesmasId: balita.puskesmasId,
+        kabupatenId: balita.kabupatenId,
+        masukan: {
+          balitaId: balita.id,
+          tanggalPeriksa,
+          beratKg: b,
+          panjangCm: p,
+          posisiUkur,
+          lilaCm: l,
+          lingkarKepalaCm: lk,
+          edema,
+          catatan,
+          clientUuid,
+        },
+        hasilLokal: hasil,
+      })
+
     // Jika offline, simpan langsung ke outbox IndexedDB
     if (!navigator.onLine) {
       try {
-        await simpanKeOutbox({
-          clientUuid,
-          balitaId: balita.id,
-          namaBalita: balita.nama,
-          posyanduId: balita.posyanduId,
-          puskesmasId: balita.puskesmasId,
-          kabupatenId: balita.kabupatenId,
-          masukan: {
-            balitaId: balita.id,
-            tanggalPeriksa,
-            beratKg: b,
-            panjangCm: p,
-            posisiUkur,
-            lilaCm: l,
-            lingkarKepalaCm: lk,
-            edema,
-            catatan,
-            clientUuid,
-          },
-          hasilLokal: hasil,
-        })
+        await keOutbox()
         router.push(`/balita/${balita.id}`)
         return
-      } catch (err: unknown) {
+      } catch {
         setPesanGalat('Gagal menyimpan ke penyimpanan lokal offline.')
         setSedangSimpan(false)
         return
@@ -173,6 +178,30 @@ export default function HalamanSkriningBaru({
     try {
       const res = await simpanSkrining(formData)
       if (res && !res.ok) {
+        // Kegagalan yang masih dapat diselamatkan: simpan ke antrean perangkat
+        // agar hasil penimbangan tidak hilang. Tanpa ini, `navigator.onLine`
+        // yang bernilai true pada jaringan tanpa rute keluar membuat data
+        // dibuang begitu saja (temuan audit S-1).
+        if (res.simpanKeOutbox) {
+          try {
+            await keOutbox()
+            setPesanGalat(
+              `${res.pesan ?? 'Server tidak dapat dihubungi.'} Data sudah disimpan di perangkat ` +
+                'dan akan dikirim sendiri saat jaringan kembali.',
+            )
+            setSedangSimpan(false)
+            return
+          } catch {
+            setPesanGalat(
+              `${res.pesan ?? 'Server tidak dapat dihubungi.'} Penyimpanan di perangkat juga ` +
+                'gagal, jadi data ini BELUM tersimpan. Catat angkanya di kertas sebelum ' +
+                'meninggalkan halaman ini.',
+            )
+            setSedangSimpan(false)
+            return
+          }
+        }
+
         setPesanGalat(res.pesan || 'Gagal menyimpan ke server.')
         setSedangSimpan(false)
       }

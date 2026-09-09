@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { wajibPeran } from '@/lib/supabase/penjaga'
+import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { hitungSkrining } from '@/lib/zscore'
 import { keBarisSkrining, bandingkanHasil } from '@/lib/db/pemetaan'
 import { skemaSkrining, periksaTerhadapBalita } from '@/lib/validasi/skrining'
@@ -83,16 +83,57 @@ export async function POST(request: Request) {
     const { error: insertErr } = await supabase.from('skrining').insert(baris)
 
     if (insertErr) {
-      // Jika kode error duplikasi unik client_uuid (23505), anggap sukses
-      if (insertErr.code === '23505' || insertErr.message?.includes('duplicate key')) {
+      // ====================================================================
+      // TEMUAN AUDIT S-2: DUA KENDALA UNIK, SATU KODE GALAT
+      //
+      // Tabel `skrining` punya DUA kendala unik yang keduanya memicu 23505:
+      //   - `client_uuid` unik          -> idempotensi sinkronisasi, memang
+      //                                    kita inginkan, aman dianggap sukses
+      //   - `uq_skrining_harian`        -> (balita_id, tanggal_periksa)
+      //                                    penimbangan lain sudah ada hari itu
+      //
+      // Bentuk lama memperlakukan SETIAP 23505 sebagai "sudah tersinkron".
+      // Akibatnya, ketika kader mencatat penimbangan koreksi pada hari yang
+      // sama karena timbangan salah baca, baris koreksi itu ditolak database
+      // lalu dilaporkan ke perangkat sebagai berhasil, dihapus dari antrean,
+      // dan hilang selamanya — sambil layar berkata "berhasil dikirim".
+      //
+      // Kedua kendala dibedakan dari nama kendala dan rinciannya.
+      // ====================================================================
+      const jejak = `${insertErr.message ?? ''} ${(insertErr as { details?: string }).details ?? ''}`
+      const duplikatClientUuid = insertErr.code === '23505' && jejak.includes('client_uuid')
+
+      if (duplikatClientUuid) {
         return NextResponse.json({ success: true, duplikat: true })
       }
+
+      if (insertErr.code === '23505') {
+        return NextResponse.json(
+          {
+            error:
+              'Sudah ada penimbangan lain untuk balita ini pada tanggal tersebut. ' +
+              'Data ini tidak dapat disimpan sebagai baris baru. Periksa penimbangan ' +
+              'yang sudah tercatat, lalu perbaiki yang benar.',
+            kendala: 'skrining_harian_ganda',
+          },
+          { status: 409 },
+        )
+      }
+
       return NextResponse.json({ error: insertErr.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, id: masukan.clientUuid })
   } catch (err: unknown) {
+    // Bentuk lama mengembalikan 401 untuk SETIAP pengecualian, termasuk body
+    // JSON yang rusak dan galat pemrograman. Perangkat lalu mencatatnya sebagai
+    // gagal tanpa tahu apa yang salah, dan pengguna yang sah tampak seperti
+    // tidak berwenang. Hanya galat kewenangan yang 401 (temuan audit S-7).
     const message = err instanceof Error ? err.message : 'Terjadi kesalahan'
-    return NextResponse.json({ error: message }, { status: 401 })
+    if (err instanceof TidakBerwenangError) {
+      return NextResponse.json({ error: message }, { status: 401 })
+    }
+    console.error('[TANGGUH Sync] Galat tak terduga:', err)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
