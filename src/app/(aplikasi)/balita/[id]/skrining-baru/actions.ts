@@ -128,13 +128,62 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
     hasilServer,
   )
 
+  // ======================================================================
+  // TEMUAN AUDIT S-1: KEGAGALAN SIMPAN DAHULU DIBUANG TANPA SUARA
+  //
+  // Bentuk lama hanya menulis `console.warn` lalu tetap `redirect`. Kader
+  // mendarat di halaman rincian balita seolah tersimpan, padahal barisnya tidak
+  // ada di Postgres dan juga tidak pernah masuk antrean offline, sehingga tidak
+  // ada sinkronisasi mana pun yang bisa memulihkannya. Penimbangan itu hilang.
+  //
+  // Yang membuatnya sering terjadi: halaman memilih jalur online berdasarkan
+  // `navigator.onLine`, yang bernilai true pada jaringan yang tersambung tetapi
+  // tanpa rute keluar — justru bentuk kegagalan khas di posyandu.
+  //
+  // Sekarang setiap kegagalan dikembalikan sebagai `{ ok: false }` disertai
+  // penanda `simpanKeOutbox`, agar halaman dapat menyimpannya ke antrean lokal
+  // alih-alih membuangnya.
+  // ======================================================================
   try {
     const { error: insertErr } = await supabase.from('skrining').insert(baris)
-    if (insertErr && insertErr.code !== '23505') {
-      console.warn('Supabase notice:', insertErr.message)
+
+    if (insertErr) {
+      const jejak = `${insertErr.message ?? ''} ${(insertErr as { details?: string }).details ?? ''}`
+
+      // Duplikat `client_uuid` berarti baris ini memang sudah tersimpan,
+      // biasanya karena tombol ditekan dua kali. Itu keberhasilan.
+      if (insertErr.code === '23505' && jejak.includes('client_uuid')) {
+        revalidatePath(`/balita/${balita.id}`)
+        redirect(`/balita/${balita.id}`)
+      }
+
+      // Duplikat (balita_id, tanggal_periksa): penimbangan lain sudah ada hari
+      // itu. Bukan keberhasilan, dan menyimpannya ke antrean pun tidak menolong
+      // karena server akan menolaknya lagi dengan alasan yang sama.
+      if (insertErr.code === '23505') {
+        return {
+          ok: false,
+          pesan:
+            'Sudah ada penimbangan untuk balita ini pada tanggal tersebut. Buka penimbangan ' +
+            'yang sudah tercatat lalu perbaiki angkanya, jangan menambah baris baru.',
+        }
+      }
+
+      return {
+        ok: false,
+        pesan: `Gagal menyimpan ke server: ${insertErr.message}`,
+        simpanKeOutbox: true,
+      }
     }
   } catch (err) {
-    console.warn('Supabase offline/mock active.')
+    // Jaringan mati di tengah jalan. Datanya masih dapat diselamatkan.
+    return {
+      ok: false,
+      pesan:
+        'Server tidak dapat dihubungi. Data akan disimpan di perangkat dan dikirim ' +
+        'sendiri saat jaringan kembali.',
+      simpanKeOutbox: true,
+    }
   }
 
   revalidatePath(`/balita/${balita.id}`)

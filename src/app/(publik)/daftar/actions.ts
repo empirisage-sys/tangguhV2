@@ -18,6 +18,13 @@ export type HasilTindakan = {
   ok: boolean
   pesan?: string
   galatMedan?: Record<string, string>
+  /**
+   * `true` bila kegagalan ini masih dapat diselamatkan dengan menyimpan data ke
+   * antrean offline di perangkat. Dipakai jalur skrining: kegagalan jaringan
+   * atau penolakan server yang bersifat sementara tidak boleh membuang hasil
+   * penimbangan. Lihat temuan audit S-1.
+   */
+  simpanKeOutbox?: boolean
 }
 
 // Pemetaan statis UUID master dari database

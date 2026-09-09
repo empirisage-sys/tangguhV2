@@ -7,6 +7,7 @@ import {
   PERINGATAN_DATA_PRODUK,
   PRODUK_PKMK,
   type ProdukPKMK,
+  produkSesuaiUmur,
 } from '@/lib/pkmk/produk'
 import {
   BATAS,
@@ -53,7 +54,12 @@ export type FormulasiPKMKProps = {
   namaBalita?: string
   umurBulan?: number
   beratKg?: number
-  targetEnergiDefaultKkal?: number
+  /**
+   * Kebutuhan energi tumbuh kejar balita ini, kkal per hari, DIBACA DARI HASIL
+   * SKRININGNYA. `null` berarti belum ada — dan itu bukan alasan memakai angka
+   * bawaan. Lihat temuan audit P-1.
+   */
+  targetEnergiDefaultKkal?: number | null
   /** Wajib diisi bila `aksiSimpan` diberikan. */
   balitaId?: string
   skriningId?: string
@@ -91,7 +97,7 @@ function angka(nilai: number): string {
 export function FormulasiPKMKSection({
   namaBalita = 'Balita',
   umurBulan = 24,
-  targetEnergiDefaultKkal = 770,
+  targetEnergiDefaultKkal = null,
   balitaId,
   skriningId,
   aksiSimpan,
@@ -147,11 +153,24 @@ export function FormulasiPKMKSection({
     }
   }, [daftarProduk])
 
-  const produkTersedia = useMemo<ProdukPKMK[]>(() => {
-    const sumber = produkMaster ?? []
-    const sesuaiUmur = sumber.filter((p) => umurBulan >= p.minUsiaBulan)
-    return sesuaiUmur.length > 0 ? sesuaiUmur : sumber
-  }, [produkMaster, umurBulan])
+  // ==========================================================================
+  // TEMUAN AUDIT P-2: PENYARING UMUR YANG TIDAK MENYARING
+  //
+  // Bentuk lama hanya membandingkan batas BAWAH, dan bila tidak ada satu pun
+  // produk yang cocok ia mengembalikan SELURUH daftar. Untuk balita 6 bulan —
+  // yang tidak cocok dengan satu pun produk seed, semuanya berindikasi 12 bulan
+  // ke atas — dropdown karena itu menawarkan kelima produk tanpa penanda apa
+  // pun. Batas atas `maks_usia_bulan` tidak pernah dibaca sama sekali.
+  //
+  // Sekarang daftar kosong dibiarkan kosong, dan layar menyatakan alasannya.
+  // ==========================================================================
+  const produkTersedia = useMemo<ProdukPKMK[]>(
+    () => (produkMaster ?? []).filter((p) => produkSesuaiUmur(p, umurBulan)),
+    [produkMaster, umurBulan],
+  )
+
+  const adaProdukTapiTidakSesuaiUmur =
+    (produkMaster?.length ?? 0) > 0 && produkTersedia.length === 0
 
   const [tataLaksana, setTataLaksana] = useState('PKMK + observasi 2 minggu')
   const [targetPersen, setTargetPersen] = useState(80)
@@ -196,7 +215,8 @@ export function FormulasiPKMKSection({
     densitasKkalPerMl: 1,
   }
 
-  const targetKkal = Math.round((targetEnergiDefaultKkal * targetPersen) / 100)
+  const kebutuhanKkal = targetEnergiDefaultKkal ?? 0
+  const targetKkal = Math.round((kebutuhanKkal * targetPersen) / 100)
 
   // SATU sumber kebenaran. Setiap angka di layar ini berasal dari objek ini.
   const hasil = useMemo(
@@ -212,7 +232,7 @@ export function FormulasiPKMKSection({
   )
 
   const peringatan = bacaSeluruhPeringatan(hasil)
-  const sisaMakanan = sisaDariMakanan(targetEnergiDefaultKkal, hasil)
+  const sisaMakanan = sisaDariMakanan(kebutuhanKkal, hasil)
   const daftarPilihan = useMemo(
     () => (mode === 'dari_target' && produk ? pilihanTakaran(produk, targetKkal) : []),
     [mode, produk, targetKkal],
@@ -299,7 +319,7 @@ export function FormulasiPKMKSection({
           namaBalita,
           umurBulan,
           tataLaksana: tataLaksana || '-',
-          totalKebutuhanKkal: targetEnergiDefaultKkal,
+          totalKebutuhanKkal: kebutuhanKkal,
           masihASI,
         },
         hasil,
@@ -351,6 +371,66 @@ export function FormulasiPKMKSection({
     return (
       <div className="rounded-2xl border border-kabut-200 bg-white p-6 text-sm text-tinta-600 shadow-[var(--shadow-kartu)]">
         Memuat master data produk PKMK…
+      </div>
+    )
+  }
+
+  // ==========================================================================
+  // TEMUAN AUDIT P-1: KEBUTUHAN ENERGI YANG DIPAKAI LAYAR ADALAH ANGKA MATI
+  //
+  // Panel ini dahulu menerima `targetEnergiDefaultKkal = 770` — satu angka
+  // literal, sama untuk setiap balita. Dari angka itu layar menurunkan target
+  // kkal, persen terhadap target, selisih, sisa dari makanan, SELURUH
+  // peringatan, dan baris "Kebutuhan energi tumbuh kejar" pada lembar PDF yang
+  // dibawa ibu pulang. Server sama sekali tidak memakainya: ia membaca
+  // `kalori_catchup_kkal` dari hasil skrining balita itu.
+  //
+  // Kebutuhan sungguhan berkisar 976 sampai 1.430 kkal pada kasus nyata, yaitu
+  // 1,3 sampai 1,9 kali angka literal itu. Pada mode `dari_target` selisihnya
+  // bukan cuma label: layar dan PDF mencetak 4 sendok = 640 kkal sementara
+  // baris yang tersimpan berisi 6 sendok = 960 kkal. Ibu diberi tahu 4, rekam
+  // medis mencatat 6.
+  //
+  // Karena itu tidak ada lagi angka bawaan. Bila kebutuhan energi belum ada,
+  // panel menolak menghitung — pesan yang sama dengan yang dikembalikan server.
+  // ==========================================================================
+  if (targetEnergiDefaultKkal === null || !Number.isFinite(targetEnergiDefaultKkal)) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-[var(--shadow-kartu)]">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="text-sm text-amber-900">
+            <p className="font-bold">Kebutuhan energi balita ini belum tersedia.</p>
+            <p className="mt-1 text-xs leading-relaxed sm:text-sm">
+              Target PKMK dihitung dari kebutuhan energi tumbuh kejar pada hasil skrining
+              antropometri balita ini. Lakukan skrining terlebih dahulu. Panel ini sengaja
+              tidak memakai angka perkiraan, karena seluruh takaran, persen target, dan
+              peringatan di layar berasal dari angka tersebut — dan angka perkiraan akan
+              membuat layar dan rekam medis mencatat takaran yang berbeda.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (adaProdukTapiTidakSesuaiUmur) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-6 shadow-[var(--shadow-kartu)]">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="text-sm text-amber-900">
+            <p className="font-bold">
+              Tidak ada produk PKMK yang berindikasi untuk umur {angka(umurBulan)} bulan.
+            </p>
+            <p className="mt-1 text-xs leading-relaxed sm:text-sm">
+              Seluruh produk pada master data berada di luar rentang umur balita ini. Bentuk
+              sebelumnya menampilkan semua produk begitu tidak ada yang cocok, tanpa penanda
+              apa pun. Hubungi administrator untuk melengkapi master produk, atau tentukan
+              tata laksana gizi tanpa PKMK bersama dokter.
+            </p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -573,7 +653,7 @@ export function FormulasiPKMKSection({
       {/* 4. Kartu hasil — seluruhnya dari satu objek HasilTakaran */}
       <div className="rounded-xl border border-laut-200 bg-laut-50/60 p-4">
         <p className="text-[11px] font-bold uppercase tracking-wider text-tinta-500">
-          Target Kebutuhan Energi Anak (Catch-up Growth: {angka(targetEnergiDefaultKkal)} kkal)
+          Target Kebutuhan Energi Anak (Catch-up Growth: {angka(kebutuhanKkal)} kkal)
         </p>
         <p className="mt-2 font-display text-base font-black leading-snug text-laut-900 sm:text-lg">
           {ringkasanTakaran(hasil)}

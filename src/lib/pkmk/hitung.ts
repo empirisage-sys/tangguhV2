@@ -64,6 +64,11 @@ export type KodePeringatan =
   | 'lebih_dari_target'
   | 'volume_per_saji_berlebih'
   | 'target_tidak_tercapai'
+  /**
+   * Target energi bernilai nol atau kurang, sehingga tidak ada acuan apa pun
+   * untuk menilai takaran ini. Lihat temuan audit P-4.
+   */
+  | 'target_belum_ditetapkan'
 
 export type Peringatan = {
   kode: KodePeringatan
@@ -155,6 +160,26 @@ export function hitungTakaran(masukan: MasukanTakaran): HasilTakaran {
   const mlLarutanPerHari = mlLarutanPerSaji * frekuensiPerHari
 
   const peringatan: Peringatan[] = []
+
+  // ======================================================================
+  // TEMUAN AUDIT P-4: TARGET NOL MEMBUNGKAM SELURUH PERINGATAN ENERGI
+  //
+  // Kedua peringatan energi di bawah berada di dalam `if (targetKkal > 0)`,
+  // sedangkan 0% adalah pilihan pertama pada dropdown target dan skema server
+  // menerimanya. Akibatnya takaran 1.080 kkal sehari untuk balita dapat
+  // tersimpan dengan `peringatan: []` — tanpa satu pun tanda bahwa tidak ada
+  // acuan yang dipakai menilainya.
+  //
+  // Sekarang keadaan itu punya peringatannya sendiri, sehingga daftar
+  // peringatan tidak pernah kosong hanya karena acuannya hilang.
+  // ======================================================================
+  if (targetKkal <= 0) {
+    peringatan.push({
+      kode: 'target_belum_ditetapkan',
+      nada: 'bahaya',
+      angka: { kkalDiberikan, sendokPerHari },
+    })
+  }
 
   if (targetKkal > 0) {
     const selisihPersen = Math.abs((selisihKkal / targetKkal) * 100)

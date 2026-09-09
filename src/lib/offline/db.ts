@@ -2,6 +2,17 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { MasukanSkrining } from '@/lib/validasi/skrining'
 import type { HasilSkrining } from '@/lib/zscore/tipe'
 
+/**
+ * Keadaan satu baris antrean.
+ *
+ * `ditolak` DITAMBAHKAN pada temuan audit S-4. Tanpa keadaan ini, baris yang
+ * ditolak server secara permanen — misalnya catatan melebihi 500 karakter, yang
+ * jalur offline tidak pernah memvalidasi sebelum menyimpan — berputar sebagai
+ * `gagal` dan dikirim ulang pada setiap penyambungan, selamanya, dengan pesan
+ * "Gagal mengirim" yang tidak menjelaskan apa pun.
+ */
+export type StatusSinkron = 'tertunda' | 'sedang_kirim' | 'terkirim' | 'gagal' | 'ditolak'
+
 export type SkriningOutboxItem = {
   clientUuid: string
   balitaId: string
@@ -12,9 +23,11 @@ export type SkriningOutboxItem = {
   puskesmasId: string
   kabupatenId: string
   dibuatPada: string
-  statusSinkron: 'tertunda' | 'sedang_kirim' | 'terkirim' | 'gagal'
+  statusSinkron: StatusSinkron
   pesanGalat?: string
   waktuKirim?: string
+  /** Banyaknya percobaan pengiriman yang gagal. Dipakai untuk menyetop putaran tanpa ujung. */
+  percobaan?: number
 }
 
 export type BalitaLokalItem = {

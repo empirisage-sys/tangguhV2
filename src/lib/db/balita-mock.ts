@@ -12,6 +12,14 @@ export type SkriningRiwayatItem = KunjunganRiwayat & {
   statusBBTB: StatusBBTB | null
   edema?: boolean
   diLuarRentang: boolean
+  /**
+   * Kebutuhan energi tumbuh kejar, kkal per hari, dari kolom
+   * `skrining.kalori_catchup_kkal`. WAJIB ada di bentuk riwayat karena panel
+   * PKMK menurunkan seluruh takarannya dari angka ini; tanpa itu, layar dahulu
+   * memakai angka literal 770 sementara server memakai angka sebenarnya.
+   * Lihat temuan audit P-1.
+   */
+  kaloriCatchUpKkal?: number | null
 }
 
 export type BalitaDetail = {
