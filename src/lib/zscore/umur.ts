@@ -25,11 +25,33 @@ export const HARI_PER_BULAN = 30.4375
 const POLA_TANGGAL = /^(\d{4})-(\d{2})-(\d{2})$/
 
 export class TanggalTidakValidError extends Error {
-  constructor(nilai: string, nama: string) {
-    super(`${nama} harus berformat YYYY-MM-DD, diterima: "${nilai}"`)
+  constructor(nilai: string, nama: string, alasan = 'harus berformat YYYY-MM-DD') {
+    super(`${nama} ${alasan}, diterima: "${nilai}"`)
     this.name = 'TanggalTidakValidError'
   }
 }
+
+/**
+ * Tahun paling awal yang diterima sebagai tanggal lahir.
+ *
+ * ==========================================================================
+ * TEMUAN LAPANGAN: KOTAK TANGGAL MENGIRIM TAHUN SATU DIGIT SAAT DIKETIK
+ *
+ * Medan `<input type="date">` mengirim nilai pada SETIAP ketukan. Saat pengguna
+ * mengetik tahun "2026" satu angka demi satu angka, nilainya melewati
+ * "0002-01-01", "0020-01-01", "0202-01-01" sebelum sampai "2026-01-01".
+ *
+ * Ketiganya lolos pemeriksaan pola YYYY-MM-DD. Yang kemudian menolaknya adalah
+ * `Date.UTC`, yang memetakan tahun 0-99 ke 1900+tahun, sehingga pemeriksaan
+ * pulang-pergi gagal — dan pesan galatnya berbunyi "harus berformat
+ * YYYY-MM-DD" untuk nilai yang formatnya justru sudah benar.
+ *
+ * Batas ini membuat penolakannya jujur dan mudah dibaca. Yang lebih penting:
+ * lapisan tampilan WAJIB memakai `tanggalValid()` sebelum menghitung, sebab
+ * nilai setengah ketik itu keadaan yang sepenuhnya normal.
+ * ==========================================================================
+ */
+export const TAHUN_MIN = 1900
 
 /**
  * Mengubah string YYYY-MM-DD menjadi jumlah hari sejak epoch.
@@ -44,7 +66,22 @@ export function keHariEpoch(tanggal: string, namaField = 'Tanggal'): number {
   const hari = Number(cocok[3])
 
   if (bulan < 1 || bulan > 12 || hari < 1 || hari > 31) {
-    throw new TanggalTidakValidError(tanggal, namaField)
+    throw new TanggalTidakValidError(
+      tanggal,
+      namaField,
+      'memuat bulan atau tanggal yang tidak ada',
+    )
+  }
+
+  // Ditolak lebih dahulu supaya pesannya benar. Tanpa cabang ini, tahun 0-99
+  // gagal pada pemeriksaan pulang-pergi di bawah dan dilaporkan sebagai
+  // kesalahan FORMAT, padahal formatnya sudah benar.
+  if (tahun < TAHUN_MIN) {
+    throw new TanggalTidakValidError(
+      tanggal,
+      namaField,
+      `memuat tahun yang tidak masuk akal (minimal ${TAHUN_MIN})`,
+    )
   }
 
   const ms = Date.UTC(tahun, bulan - 1, hari)
@@ -56,10 +93,33 @@ export function keHariEpoch(tanggal: string, namaField = 'Tanggal'): number {
     d.getUTCMonth() !== bulan - 1 ||
     d.getUTCDate() !== hari
   ) {
-    throw new TanggalTidakValidError(tanggal, namaField)
+    throw new TanggalTidakValidError(
+      tanggal,
+      namaField,
+      'menunjuk tanggal yang tidak ada pada kalender',
+    )
   }
 
   return Math.round(ms / 86_400_000)
+}
+
+/**
+ * `true` bila tanggal ini aman dihitung. TIDAK PERNAH melempar.
+ *
+ * Dipakai lapisan tampilan sebelum memanggil perhitungan apa pun atas nilai
+ * yang berasal dari medan tanggal. Komponen React menghitung ulang pada setiap
+ * ketukan; satu lemparan di sana bukan pesan galat, melainkan layar putih
+ * bertuliskan "Application error: a client-side exception has occurred" yang
+ * memaksa pengguna memuat ulang halaman dan kehilangan isian.
+ */
+export function tanggalValid(nilai: unknown): nilai is string {
+  if (typeof nilai !== 'string' || nilai.length === 0) return false
+  try {
+    keHariEpoch(nilai)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Selisih dua tanggal dalam hari penuh. Bernilai negatif bila akhir mendahului awal. */

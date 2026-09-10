@@ -10,6 +10,7 @@ import {
   hitungUmurKalender,
   hitungVelocity,
   tanggalLahirEfektif,
+  tanggalValid,
 } from '@/lib/zscore'
 import type { HasilSkrining, PosisiUkur } from '@/lib/zscore/tipe'
 import { InputAngka } from '@/components/ui/InputAngka'
@@ -78,6 +79,11 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
     )
   }
 
+  // Dihitung sekali, dengan penjaga, lalu dipakai di JSX.
+  const umurSaatDitimbang = tanggalValid(tanggalPeriksa)
+    ? hitungUmurKalender(balita.tanggalLahir, tanggalPeriksa)
+    : null
+
   const hitungHasilLokal = () => {
     const b = Number(beratKg.replace(',', '.'))
     const p = Number(panjangCm.replace(',', '.'))
@@ -128,6 +134,10 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
   const lanjutKeLangkah2 = () => {
     if (!tanggalPeriksa) {
       setPesanGalat('Pilih tanggal pemeriksaan.')
+      return
+    }
+    if (!tanggalValid(tanggalPeriksa)) {
+      setPesanGalat('Tanggal pemeriksaan belum lengkap atau tidak masuk akal. Periksa kembali tahunnya.')
       return
     }
     setPesanGalat(null)
@@ -370,8 +380,18 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
               <div>Posyandu: <span className="font-semibold text-tinta-900">{balita.namaPosyandu}</span></div>
               <div className="col-span-2 pt-1 border-t border-kabut-200">
                 Umur saat Ditimbang:{' '}
+                {/*
+                  Dihitung SETELAH tanggalnya dipastikan sah. `tanggalPeriksa`
+                  adalah medan tanggal yang dapat dikosongkan atau diketik
+                  ulang oleh kader; `hitungUmurKalender` melempar galat untuk
+                  nilai setengah ketik, dan lemparan di dalam JSX mematikan
+                  seluruh halaman. Cacat yang sama sudah terjadi di halaman
+                  skrining tamu di produksi.
+                */}
                 <span className="font-bold text-laut-800">
-                  {hitungUmurKalender(balita.tanggalLahir, tanggalPeriksa).teks} ({hitungUmurKalender(balita.tanggalLahir, tanggalPeriksa).totalHari} Hari)
+                  {umurSaatDitimbang
+                    ? `${umurSaatDitimbang.teks} (${umurSaatDitimbang.totalHari} Hari)`
+                    : 'Lengkapi tanggal pemeriksaan'}
                 </span>
               </div>
             </div>
