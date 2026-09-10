@@ -15,7 +15,7 @@ import {
   ArrowRight,
   Calculator,
 } from 'lucide-react'
-import { hitungVelocity, selisihHari, hitungUmurKalender } from '@/lib/zscore'
+import { hitungVelocity, selisihHari, hitungUmurKalender, tanggalValid } from '@/lib/zscore'
 import type { InputVelocity, HasilVelocity } from '@/lib/zscore/tipe'
 import { tampilanVelocity, sumberAmbangVelocity } from '@/lib/tampilan/status'
 import {
@@ -86,9 +86,13 @@ export function PanelVelocity({
       isNaN(bAkhir) ||
       bAwal <= 0 ||
       bAkhir <= 0 ||
-      !tanggalLahir ||
-      !tanggalAwal ||
-      !tanggalAkhir
+      // Penjagaan lama hanya memeriksa string kosong. Medan tanggal mengirim
+      // nilai pada setiap ketukan, dan "0002-01-01" bukan string kosong —
+      // ia lolos, lalu `hitungVelocity` melempar galat DI DALAM useMemo, yang
+      // mematikan seluruh halaman alih-alih menampilkan pesan.
+      !tanggalValid(tanggalLahir) ||
+      !tanggalValid(tanggalAwal) ||
+      !tanggalValid(tanggalAkhir)
     ) {
       return null
     }

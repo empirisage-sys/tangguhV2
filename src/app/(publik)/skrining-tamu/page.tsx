@@ -19,6 +19,7 @@ import {
   hitungUsiaKoreksi,
   hitungVelocity,
   tanggalLahirEfektif,
+  tanggalValid,
   apakahPerluPKMK,
   type HasilSkrining,
   type HasilVelocity,
@@ -106,8 +107,27 @@ export default function HalamanSkriningTamu() {
   const defisitMinggu = isPrematur ? Math.max(0, 40 - usiaGestasiMinggu) : 0
   const defisitHari = defisitMinggu * 7
 
+  // ==========================================================================
+  // PENJAGA TANGGAL SETENGAH KETIK
+  //
+  // Medan `<input type="date">` mengirim nilai pada SETIAP ketukan. Mengetik
+  // tahun "2026" melewati "0002-01-01", "0020-01-01", dan "0202-01-01" lebih
+  // dahulu. Ketiganya berformat YYYY-MM-DD yang sah, tetapi bukan tanggal yang
+  // masuk akal, dan `hitungUsiaKoreksi` melemparkan galat untuk nilai seperti
+  // itu.
+  //
+  // Lemparan di badan komponen BUKAN pesan galat: ia mematikan seluruh pohon
+  // React dan menampilkan "Application error: a client-side exception has
+  // occurred". Pengguna kehilangan seluruh isian hanya karena mengetik tanggal
+  // lahir. Ditemukan Pak Nelitie di produksi.
+  //
+  // Penjagaan `tanggalLahir && tanggalPeriksa` yang lama hanya memeriksa
+  // string kosong, sehingga tidak menangkap keadaan ini.
+  // ==========================================================================
+  const tanggalSiap = tanggalValid(tanggalLahir) && tanggalValid(tanggalPeriksa)
+
   // Umur kronologis (untuk tampilan di step 1)
-  const teksUmurKronologis = tanggalLahir && tanggalPeriksa
+  const teksUmurKronologis = tanggalSiap
     ? formatUmurKalender(tanggalLahir, tanggalPeriksa)
     : '—'
 
@@ -117,26 +137,24 @@ export default function HalamanSkriningTamu() {
   // dengan rumus lokal tanpa batas umur, sehingga layar menjanjikan umur
   // koreksi pada anak 30 bulan padahal perhitungannya nanti memakai umur
   // kronologis — layar dan hasil berselisih tanpa ada yang menyebutkannya.
-  const koreksiTampilan =
-    tanggalLahir && tanggalPeriksa
-      ? hitungUsiaKoreksi(
-          tanggalLahir,
-          tanggalPeriksa,
-          isPrematur ? usiaGestasiMinggu : undefined,
-        )
-      : null
+  const koreksiTampilan = tanggalSiap
+    ? hitungUsiaKoreksi(
+        tanggalLahir,
+        tanggalPeriksa,
+        isPrematur ? usiaGestasiMinggu : undefined,
+      )
+    : null
 
-  const tglEfektif =
-    tanggalLahir && tanggalPeriksa
-      ? tanggalLahirEfektif(
-          tanggalLahir,
-          tanggalPeriksa,
-          isPrematur ? usiaGestasiMinggu : undefined,
-        )
-      : tanggalLahir
+  const tglEfektif = tanggalSiap
+    ? tanggalLahirEfektif(
+        tanggalLahir,
+        tanggalPeriksa,
+        isPrematur ? usiaGestasiMinggu : undefined,
+      )
+    : tanggalLahir
 
   const teksUmurKoreksi =
-    koreksiTampilan?.isPrematur && tanggalLahir && tanggalPeriksa
+    koreksiTampilan?.isPrematur && tanggalSiap
       ? formatUmurKalender(tglEfektif, tanggalPeriksa)
       : null
 
@@ -155,6 +173,14 @@ export default function HalamanSkriningTamu() {
     // Validasi input
     if (!tanggalLahir) { setError('Tanggal lahir belum diisi.'); return }
     if (!tanggalPeriksa) { setError('Tanggal periksa belum diisi.'); return }
+    if (!tanggalValid(tanggalLahir)) {
+      setError('Tanggal lahir belum lengkap atau tidak masuk akal. Periksa kembali tahunnya.')
+      return
+    }
+    if (!tanggalValid(tanggalPeriksa)) {
+      setError('Tanggal periksa belum lengkap atau tidak masuk akal. Periksa kembali tahunnya.')
+      return
+    }
 
     const bb = parseFloat(beratKg.replace(',', '.'))
     const tb = parseFloat(panjangCm.replace(',', '.'))
@@ -440,7 +466,7 @@ export default function HalamanSkriningTamu() {
             </div>
 
             {/* Info Umur */}
-            {tanggalLahir && tanggalPeriksa && (
+            {tanggalSiap && (
               <div className="rounded-xl bg-laut-50 p-4 ring-1 ring-laut-200 space-y-2">
                 <div className="flex flex-col justify-between gap-1 text-xs sm:flex-row sm:items-center">
                   <span className="font-semibold text-laut-800">Umur Kronologis:</span>
@@ -676,7 +702,7 @@ export default function HalamanSkriningTamu() {
                     {isPrematur ? '⭐ Berbasis Usia Koreksi Prematuritas — ' : ''}
                     Standar Baku WHO Child Growth Standards 2006
                   </p>
-                  {tanggalLahir && tanggalPeriksa && (
+                  {tanggalSiap && (
                     <p className="text-xs text-tinta-500">
                       Umur Kronologis: <strong>{teksUmurKronologis}</strong>
                       {isPrematur && teksUmurKoreksi && (
