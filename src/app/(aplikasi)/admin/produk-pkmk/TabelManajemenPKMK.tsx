@@ -53,7 +53,6 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
   const [formMerek, setFormMerek] = useState('')
   const [formKkalPerSaji, setFormKkalPerSaji] = useState<number>(180)
   const [formSendokPerSaji, setFormSendokPerSaji] = useState<number>(5)
-  const [formDensitas, setFormDensitas] = useState<number>(1.0)
   const [formMlAirPerSendok, setFormMlAirPerSendok] = useState<number>(30)
   const [formMlPerSaji, setFormMlPerSaji] = useState<number>(180)
   const [formMinUsia, setFormMinUsia] = useState<number>(12)
@@ -80,6 +79,23 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
   const formKkalPerSendok = useMemo(() => {
     return hitungKkalPerSendok(formKkalPerSaji, formSendokPerSaji) ?? 0
   }, [formKkalPerSaji, formSendokPerSaji])
+
+  /**
+   * Densitas DITURUNKAN, tidak lagi diketik.
+   *
+   * TEMUAN T-11. Selama densitas boleh diketik sendiri, ia dapat berselisih
+   * dengan kkal dan volume pada label yang sama — dan validator akan menolak
+   * simpan dengan menuduh angka yang mungkin justru benar. Menurunkannya di
+   * sini membuat perselisihan itu mustahil ada, sejalan dengan aturan modul
+   * produk.ts: hanya angka label yang boleh diketik tangan, sisanya dihitung.
+   *
+   * Pemeriksaan densitas di skema tetap dipertahankan sebagai jaring server,
+   * karena FormData dapat disusun tangan tanpa melewati layar ini.
+   */
+  const formDensitas = useMemo(() => {
+    if (!formKkalPerSaji || !formMlPerSaji || formMlPerSaji <= 0) return 0
+    return formKkalPerSaji / formMlPerSaji
+  }, [formKkalPerSaji, formMlPerSaji])
 
   // ==========================================================================
   // SIMULASI TAKARAN
@@ -179,7 +195,6 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     setFormMerek('')
     setFormKkalPerSaji(180)
     setFormSendokPerSaji(5)
-    setFormDensitas(1.0)
     setFormMlAirPerSendok(30)
     setFormMlPerSaji(180)
     setFormMinUsia(12)
@@ -201,7 +216,9 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     setFormMerek(p.merek)
     setFormKkalPerSaji(p.kkalPerSaji)
     setFormSendokPerSaji(p.sendokPerSaji)
-    setFormDensitas(p.densitasKkalPerMl)
+    // Densitas tidak dipulihkan dari data lama: ia diturunkan ulang dari kkal
+    // dan volume yang baru saja dimuat. Produk lama yang densitasnya tersimpan
+    // keliru akan terkoreksi sendiri begitu disimpan ulang.
     setFormMlAirPerSendok(p.mlAirPerSendok ?? p.mlLarutanPerSendok ?? 30)
     setFormMlPerSaji(p.mlPerSaji ?? p.mlLarutanPerSaji ?? 180)
     setFormMinUsia(p.minUsiaBulan)
@@ -700,20 +717,17 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label className="block text-xs font-semibold text-tinta-700">
-                      Densitas (kkal/ml) <span className="text-rose-500">*</span>
+                      Densitas (kkal/ml) <span className="text-tinta-400">— terhitung</span>
                     </label>
-                    <input
-                      type="number"
-                      required
-                      min={0.5}
-                      max={3.0}
-                      step={0.01}
-                      value={formDensitas}
-                      onChange={(e) => setFormDensitas(Number(e.target.value))}
-                      className="font-mono mt-1 h-10 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
-                    />
+                    <output
+                      aria-live="polite"
+                      className="font-mono mt-1 flex h-10 w-full items-center rounded-xl border border-dashed border-kabut-300 bg-kabut-50 px-3 text-xs font-bold text-tinta-700"
+                    >
+                      {formDensitas > 0 ? formDensitas.toFixed(2) : '—'}
+                    </output>
                     <p className="mt-1 text-[10px] text-tinta-500">
-                      1.0 = standar, 1.5 = padat kalori
+                      {formKkalPerSaji || 0} kkal ÷ {formMlPerSaji || 0} ml larutan jadi.
+                      {formDensitas > 1.0 ? ' Padat kalori.' : ''}
                     </p>
                   </div>
 
@@ -732,7 +746,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                       className="font-mono mt-1 h-10 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
                     />
                     <p className="mt-1 text-[10px] text-tinta-500">
-                      Air hangat per 1 sendok takar
+                      Air hangat yang DITUANG per 1 sendok takar — sebelum bubuk larut.
                     </p>
                   </div>
 
@@ -750,7 +764,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                       className="font-mono mt-1 h-10 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
                     />
                     <p className="mt-1 text-[10px] text-tinta-500">
-                      Total cairan jadi 1 porsi saji
+                      Larutan JADI setelah bubuk larut — biasanya lebih besar daripada airnya.
                     </p>
                   </div>
                 </div>

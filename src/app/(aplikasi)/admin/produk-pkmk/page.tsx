@@ -65,6 +65,29 @@ export default async function HalamanAdminProdukPKMK() {
         ).toFixed(1)
       : '0.0'
 
+  // ==========================================================================
+  // TEMUAN T-12: SPANDUK MENGARANG RENTANG "20 HINGGA 40 KKAL PER SENDOK"
+  //
+  // Kalimat itu tertulis tetap di layar, tidak pernah diturunkan dari data, dan
+  // tidak ditegakkan di mana pun — tidak ada satu pun aturan validasi atas
+  // kkal per sendok. Ia kebetulan memerikan lima produk benih (20 sampai 40),
+  // lalu menyesatkan begitu produk nyata dimasukkan: SGM Gain Optigrow dengan
+  // 213 kkal per 4 sendok bernilai 53,3 kkal per sendok, jauh di luar kalimat
+  // itu, padahal angkanya sah. Rentang di bawah dibaca dari data yang benar-
+  // benar ada, sehingga tidak dapat berbohong lagi.
+  // ==========================================================================
+  const nilaiKkalPerSendok = daftarAktif
+    .map((p) => p.kkalPerSendok)
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0)
+
+  const rentangKkalPerSendok =
+    nilaiKkalPerSendok.length > 0
+      ? {
+          min: Math.min(...nilaiKkalPerSendok).toFixed(1),
+          maks: Math.max(...nilaiKkalPerSendok).toFixed(1),
+        }
+      : null
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       {/* Header */}
@@ -92,7 +115,11 @@ export default async function HalamanAdminProdukPKMK() {
               Prinsip Klinis Satu Sumber Kebenaran (Keputusan D-5 &amp; Temuan S-2)
             </p>
             <p className="mt-1 text-laut-800">
-              Setiap produk PKMK memiliki spesifikasi kalori yang unik (berkisar antara 20 hingga 40 kkal per sendok takar). Nilai <span className="font-semibold text-laut-950">kkal_per_sendok</span> dihitung otomatis dari <span className="font-semibold text-laut-950">kkal_per_saji ÷ sendok_per_saji</span>, dan bukan angka perkiraan tetap 25 kkal. Produk yang aktif di sini langsung tersedia bagi dokter dan dietisien saat meresepkan asuhan gizi balita.
+              Setiap produk PKMK memiliki spesifikasi kalori yang unik
+              {rentangKkalPerSendok
+                ? ` — produk aktif saat ini berkisar ${rentangKkalPerSendok.min} sampai ${rentangKkalPerSendok.maks} kkal per sendok takar`
+                : ''}
+              . Nilai <span className="font-semibold text-laut-950">kkal_per_sendok</span> dihitung otomatis dari <span className="font-semibold text-laut-950">kkal_per_saji ÷ sendok_per_saji</span>, dan bukan angka perkiraan tetap 25 kkal. Begitu pula <span className="font-semibold text-laut-950">densitas</span>, yang dihitung dari <span className="font-semibold text-laut-950">kkal_per_saji ÷ volume larutan jadi</span> — bukan volume air yang dituang, karena bubuk ikut menempati ruang. Produk yang aktif di sini langsung tersedia bagi dokter dan dietisien saat meresepkan asuhan gizi balita.
             </p>
           </div>
         </div>
