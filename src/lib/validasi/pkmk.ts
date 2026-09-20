@@ -15,7 +15,27 @@ import { z } from 'zod'
  * 24 bulan sehingga produk tidak akan cocok untuk umur mana pun. Sekarang
  * ketiga hubungan berikut ditegakkan pada saat simpan.
  */
-const TOLERANSI = { densitasPersen: 5, volumeSajiPersen: 10 } as const
+const TOLERANSI = {
+  densitasPersen: 5,
+  /**
+   * Kelonggaran saat membandingkan air tuang dengan larutan jadi. Label kemasan
+   * membulatkan keduanya (180 ml air, 210 ml larutan), jadi selisih beberapa
+   * persen ke arah "air sedikit melebihi larutan" adalah pembulatan, bukan
+   * kesalahan isi.
+   */
+  airMelebihiLarutanPersen: 2,
+} as const
+
+/**
+ * Batas atas ruang yang boleh ditempati bubuk, per sendok takar.
+ *
+ * ANGKA INI PILIHAN KAMI, BUKAN ANGKA LABEL. Satu sendok takar susu bubuk
+ * berbobot sekitar 4-5 g dengan densitas curah sekitar 0,5 g/ml, jadi ruang
+ * yang ditempatinya sekitar 8-10 ml. Batas 25 ml diambil longgar: cukup lapang
+ * untuk sendok besar produk padat kalori, tetapi masih menangkap salah ketik
+ * seperti volume larutan 800 ml untuk 4 sendok.
+ */
+const MAKS_RUANG_BUBUK_PER_SENDOK_ML = 25
 
 const medanProdukPKMK = z.object({
   id: z.string().optional(),
@@ -115,17 +135,61 @@ export const skemaProdukPKMKAdmin = medanProdukPKMK
       }
     }
 
-    // 3. Volume per saji wajib sejalan dengan sendok x air per sendok.
-    const rekonstruksi = d.sendokPerSaji * d.mlAirPerSendok
-    const selisihVolume = Math.abs((rekonstruksi - d.mlPerSaji) / d.mlPerSaji) * 100
-    if (selisihVolume > TOLERANSI.volumeSajiPersen) {
+    // 3. Air tuang dan larutan jadi adalah DUA BESARAN BERBEDA.
+    //
+    // ======================================================================
+    // TEMUAN T-11: PEMERIKSAAN LAMA MENYAMAKAN AIR DENGAN LARUTAN JADI
+    //
+    // Bentuk lama menuntut `sendok × air per sendok ≈ volume per saji` dalam
+    // 10%. Tuntutan itu keliru secara fisik: bubuk menempati ruang, sehingga
+    // 180 ml air yang dituang menghasilkan larutan sekitar 210 ml. Label SGM
+    // Gain Optigrow yang benar (213 kkal, 180 ml air, 210 ml larutan jadi)
+    // ditolak dengan selisih 14%.
+    //
+    // Yang terjadi berikutnya lebih merugikan: demi lolos, Administrator
+    // terpaksa mengisi "volume per saji" dengan volume AIR (180). Pemeriksaan
+    // nomor 2 lalu menghitung 213 ÷ 180 = 1,18 kkal/ml dan menolak densitas
+    // 1,0 kkal/ml yang JUSTRU BENAR (213 ÷ 210 = 1,01). Jadi satu aturan yang
+    // salah membuat aturan lain yang benar menuduh angka yang benar.
+    //
+    // Data benih tidak pernah menyingkapkannya karena `turunkan()` di
+    // produk.ts menetapkan air per sendok = larutan per sendok, sehingga
+    // kesamaan itu benar menurut definisi dan pemeriksaannya selalu lolos.
+    // `previewSimulasi` di layar admin bahkan sudah menuliskan alasan yang
+    // betul — "bubuk menempati ruang" — sementara validatornya menyangkalnya.
+    //
+    // Yang ditegakkan sekarang hanya yang memang benar: air tidak boleh
+    // MELEBIHI larutan jadi, dan ruang yang tersisa untuk bubuk harus masuk
+    // akal. Selisih di antara keduanya bukan lagi kesalahan — itu bubuknya.
+    // ======================================================================
+    const airTotal = d.sendokPerSaji * d.mlAirPerSendok
+    const ruangBubuk = d.mlPerSaji - airTotal
+
+    const ambangKelebihan = d.mlPerSaji * (TOLERANSI.airMelebihiLarutanPersen / 100)
+    if (ruangBubuk < -ambangKelebihan) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['mlAirPerSendok'],
+        path: ['mlPerSaji'],
         message:
-          `${d.sendokPerSaji} sendok × ${d.mlAirPerSendok} ml air = ${rekonstruksi} ml, ` +
-          `sedangkan volume per saji diisi ${d.mlPerSaji} ml (selisih ${selisihVolume.toFixed(0)}%). ` +
-          'Periksa kembali label kemasan; kedua angka harus menggambarkan saji yang sama.',
+          `${d.sendokPerSaji} sendok × ${d.mlAirPerSendok} ml air = ${airTotal} ml air, ` +
+          `sedangkan larutan jadi diisi hanya ${d.mlPerSaji} ml. Larutan jadi tidak mungkin ` +
+          'lebih sedikit daripada air yang dituang — bubuk menambah volume, tidak menguranginya. ' +
+          'Periksa kembali kedua angka pada label kemasan.',
+      })
+      return
+    }
+
+    const bubukPerSendok = ruangBubuk / d.sendokPerSaji
+    if (bubukPerSendok > MAKS_RUANG_BUBUK_PER_SENDOK_ML) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['mlPerSaji'],
+        message:
+          `Selisih larutan jadi (${d.mlPerSaji} ml) dan air (${airTotal} ml) adalah ` +
+          `${ruangBubuk.toFixed(0)} ml, atau ${bubukPerSendok.toFixed(1)} ml per sendok takar. ` +
+          `Satu sendok bubuk hanya menempati sekitar 8-10 ml, jadi angka di atas ` +
+          `${MAKS_RUANG_BUBUK_PER_SENDOK_ML} ml per sendok hampir pasti salah ketik. ` +
+          'Periksa kembali volume larutan jadi atau takaran airnya.',
       })
     }
   })

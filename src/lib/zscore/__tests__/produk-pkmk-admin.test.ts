@@ -156,8 +156,10 @@ describe('Manajemen Master PKMK & Kalori Per Sendok (D-5 & S-2)', () => {
       }
     })
 
-    it('menolak volume per saji yang bertentangan dengan sendok kali air per sendok', () => {
-      // 10 sendok x 30 ml = 300 ml, tetapi volume per saji diisi 150 ml.
+    it('menolak air yang melebihi larutan jadi, karena bubuk menambah volume', () => {
+      // 10 sendok x 30 ml = 300 ml air, tetapi larutan jadi diisi 150 ml.
+      // Mustahil: bubuk menempati ruang, jadi larutan TIDAK PERNAH lebih
+      // sedikit daripada airnya.
       const hasil = skemaProdukPKMKAdmin.safeParse({
         nama: 'Nutrinidrink',
         merek: 'Nutricia',
@@ -169,7 +171,9 @@ describe('Manajemen Master PKMK & Kalori Per Sendok (D-5 & S-2)', () => {
       })
       expect(hasil.success).toBe(false)
       if (!hasil.success) {
-        expect(hasil.error.issues.some((i) => i.path.includes('mlAirPerSendok'))).toBe(true)
+        const isu = hasil.error.issues.find((i) => i.path.includes('mlPerSaji'))
+        expect(isu).toBeDefined()
+        expect(isu!.message).toContain('bubuk menambah volume')
       }
     })
 
