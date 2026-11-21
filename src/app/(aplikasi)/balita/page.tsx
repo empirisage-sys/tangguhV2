@@ -5,7 +5,7 @@ import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
-import { formatTanggal, formatUmurBulan } from '@/lib/tampilan/format'
+import { formatTanggal, formatUmurBulan, formatBerat, formatPanjang } from '@/lib/tampilan/format'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { Hospital, Info } from 'lucide-react'
 
@@ -218,7 +218,7 @@ export default async function HalamanDaftarBalita({
 
                   {skriningTerakhir && (
                     <p className="angka text-xs font-medium text-tinta-600">
-                      Terakhir diukur: {skriningTerakhir.beratKg} kg • {skriningTerakhir.panjangCm} cm ({formatTanggal(skriningTerakhir.tanggal)})
+                      Terakhir diukur: {formatBerat(skriningTerakhir.beratKg)} • {formatPanjang(skriningTerakhir.panjangCm)} ({formatTanggal(skriningTerakhir.tanggal)})
                     </p>
                   )}
                 </div>

@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/Button'
 import { KartuHasil } from '@/components/skrining/KartuHasil'
 import { simpanKeOutbox } from '@/lib/offline/outbox'
 import { simpanSkrining } from './actions'
-import { formatTanggal, formatGramBertanda } from '@/lib/tampilan/format'
+import { formatTanggal, formatGramBertanda, formatBerat } from '@/lib/tampilan/format'
 import { sumberAmbangVelocity } from '@/lib/tampilan/status'
 
 /**
@@ -45,8 +45,11 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
     new Date().toISOString().slice(0, 10),
   )
 
-  const [beratKg, setBeratKg] = useState<string>('8.0')
-  const [panjangCm, setPanjangCm] = useState<string>('78.0')
+  // Kosong, bukan angka contoh. Dahulu terisi 8,0 kg dan 78,0 cm sehingga
+  // penimbangan dapat tersimpan dengan angka bawaan tanpa pernah diukur
+  // (temuan uji tulis 21 November 2026).
+  const [beratKg, setBeratKg] = useState<string>('')
+  const [panjangCm, setPanjangCm] = useState<string>('')
   const [posisiUkur, setPosisiUkur] = useState<PosisiUkur>('otomatis')
   const [lilaCm, setLilaCm] = useState<string>('')
   const [lingkarKepalaCm, setLingkarKepalaCm] = useState<string>('')
@@ -607,7 +610,7 @@ export function FormulirSkriningBaru({ balita }: { balita: BalitaDetail }) {
                         </span>
                       </div>
                       <p className="text-[11px] text-tinta-600">
-                        {formatTanggal(prev.tanggal)} ({prev.beratKg} kg) ➔ {formatTanggal(tanggalPeriksa)} ({b} kg)
+                        {formatTanggal(prev.tanggal)} ({formatBerat(prev.beratKg)}) ➔ {formatTanggal(tanggalPeriksa)} ({formatBerat(b)})
                       </p>
                     </div>
                   </div>

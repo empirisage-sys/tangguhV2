@@ -84,7 +84,7 @@ export async function buatPdfSkriningBalita(
     },
     body: [
       ['Nama Balita', `: ${balita.nama}`, 'Tanggal Periksa', `: ${skrining ? formatTanggal(skrining.tanggal) : '-'}`],
-      ['NIK Balita', `: ${balita.nik ?? '-'}`, 'Umur Saat Periksa', `: ${skrining ? `${skrining.umurBulan} Bulan` : '-'}`],
+      ['NIK Balita', `: ${balita.nik ?? '-'}`, 'Umur Saat Periksa', `: ${skrining ? `${angkaId(skrining.umurBulan)} Bulan` : '-'}`],
       ['Tanggal Lahir', `: ${formatTanggal(balita.tanggalLahir)}`, 'Posyandu / Faskes', `: ${balita.namaPosyandu}`],
       ['Jenis Kelamin', `: ${balita.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}`, 'Puskesmas', `: ${balita.namaPuskesmas}`],
       ['Nama Ibu', `: ${balita.namaIbu ?? '-'}`, 'Kabupaten / Kota', `: ${balita.namaKabupaten}`],
@@ -113,19 +113,19 @@ export async function buatPdfSkriningBalita(
     body: [
       [
         'Berat Badan menurut Umur (BB/U)',
-        `${skrining?.beratKg ?? '-'} kg`,
+        skrining ? `${angkaId(skrining.beratKg)} kg` : '-',
         formatZ(skrining?.z_bbu ?? null),
         skrining?.statusBBU?.replace(/_/g, ' ').toUpperCase() ?? '-',
       ],
       [
         'Tinggi/Panjang menurut Umur (TB/U)',
-        `${skrining?.panjangCm ?? '-'} cm`,
+        skrining ? `${angkaId(skrining.panjangCm)} cm` : '-',
         formatZ(skrining?.z_tbu ?? null),
         skrining?.statusTBU?.replace(/_/g, ' ').toUpperCase() ?? '-',
       ],
       [
         'Berat menurut Panjang/Tinggi (BB/TB)',
-        `${skrining?.beratKg ?? '-'} kg / ${skrining?.panjangCm ?? '-'} cm`,
+        skrining ? `${angkaId(skrining.beratKg)} kg / ${angkaId(skrining.panjangCm)} cm` : '-',
         formatZ(skrining?.z_bbtb ?? null),
         skrining?.statusBBTB?.replace(/_/g, ' ').toUpperCase() ?? '-',
       ],
