@@ -118,6 +118,7 @@ export function PanelDietisien({
           </span>
         </div>
         <FormulasiPKMKSection
+          tampilkanKebutuhanKemasan
           namaBalita={balitaTerpilih ? balitaTerpilih.nama : 'Pasien Anak (Simulasi)'}
           umurBulan={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 12 : 12}
           beratKg={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 7.5 : 7.5}
@@ -229,6 +230,7 @@ export function PanelDietisien({
             {/* Isi Formulasi Persis Seperti Gambar 2 */}
             <div className="mt-5">
               <FormulasiPKMKSection
+          tampilkanKebutuhanKemasan
                 namaBalita={balitaTerpilih.nama}
                 umurBulan={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 24}
                 beratKg={balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 8.0}

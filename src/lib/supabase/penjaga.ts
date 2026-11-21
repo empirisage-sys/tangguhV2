@@ -28,6 +28,12 @@ export type ProfilAktif = {
   kabupatenId: string | null
   provinsiId: string | null
   jenisFaskes: 'puskesmas' | 'rumah_sakit' | null
+  /**
+   * `true` bila akun masih memakai kata sandi sementara dari administrator.
+   * Dibaca dari `app_metadata`, yang hanya dapat diubah server dengan kunci
+   * rahasia, bukan dari `user_metadata` yang dapat diubah pengguna sendiri.
+   */
+  wajibGantiSandi: boolean
 }
 
 export class TidakBerwenangError extends Error {
@@ -52,6 +58,7 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
   const { data: klaim } = await supabase.auth.getClaims()
   const penggunaId = klaim?.claims?.sub
   if (!penggunaId) return null
+  const wajibGantiSandi = bacaWajibGantiSandi(klaim?.claims)
 
   const { data } = await supabase
     .from('profiles')
@@ -101,7 +108,16 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
     kabupatenId: data.kabupaten_id,
     provinsiId: data.provinsi_id,
     jenisFaskes: data.jenis_faskes as ProfilAktif['jenisFaskes'],
+    wajibGantiSandi,
   }
+}
+
+/** Membaca penanda kata sandi sementara dari klaim JWT. Tidak pernah melempar. */
+export function bacaWajibGantiSandi(klaim: unknown): boolean {
+  if (!klaim || typeof klaim !== 'object') return false
+  const app = (klaim as { app_metadata?: unknown }).app_metadata
+  if (!app || typeof app !== 'object') return false
+  return (app as Record<string, unknown>).wajib_ganti_sandi === true
 }
 
 /**
@@ -129,6 +145,12 @@ export async function wajibPeran(peran: Peran[]): Promise<ProfilAktif> {
   if (!profil) {
     throw new TidakBerwenangError(
       'Akun Anda belum diverifikasi admin, sehingga tindakan ini belum dapat dilakukan.',
+    )
+  }
+
+  if (profil.wajibGantiSandi) {
+    throw new TidakBerwenangError(
+      'Akun Anda masih memakai kata sandi sementara. Ganti kata sandi terlebih dahulu.',
     )
   }
 
