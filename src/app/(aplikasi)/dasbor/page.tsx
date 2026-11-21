@@ -2,7 +2,7 @@ import { ENGINE_VERSION } from '@/lib/zscore'
 import Link from 'next/link'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { bacaDaftarBalita } from '@/lib/db/balita-server'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import {
   Activity,
@@ -25,7 +25,7 @@ import { formatTanggal } from '@/lib/tampilan/format'
 
 export default async function DasborPage() {
   const profil = await ambilProfil()
-  const daftarRujukan = ambilSemuaRujukan()
+  const daftarRujukan = await bacaRujukanUntukAkses()
   const peran = profil?.peran ?? 'kader'
   const nama = profil?.namaLengkap ?? 'Pengguna TANGGUH'
   const jenisFaskes = profil?.jenisFaskes ?? 'puskesmas'

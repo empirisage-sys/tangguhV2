@@ -1,24 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
-  CheckCircle2,
   Clock,
-  FileText,
   Hospital,
   Lock,
-  Plus,
   Send,
-  Sparkles,
   Stethoscope,
-  Utensils,
+  XCircle,
 } from 'lucide-react'
 import type { BalitaDetail } from '@/lib/db/balita'
-import {
-  cariRujukanByBalitaId,
-  type RujukanDetail,
-} from '@/lib/db/rujukan'
+import type { RujukanDetail, RumahSakitPilihan } from '@/lib/db/rujukan'
+import { batalkanRujukan } from '@/app/(aplikasi)/rujukan/actions'
 import { formatTanggal } from '@/lib/tampilan/format'
 import { ModalTerbitkanRujukan } from './ModalTerbitkanRujukan'
 import { ModalBalasanRujukan } from './ModalBalasanRujukan'
@@ -27,14 +22,36 @@ import type { Peran } from '@/lib/tampilan/akses'
 type Props = {
   balita: BalitaDetail
   peran: Peran
+  /** Rujukan terbaru yang belum dibatalkan, dibaca di server. */
+  rujukan: RujukanDetail | null
+  rumahSakit: RumahSakitPilihan[]
+  namaPengguna?: string
 }
 
-export function BannerRujukanBalita({ balita, peran }: Props) {
-  const [rujukan, setRujukan] = useState<RujukanDetail | undefined>(
-    cariRujukanByBalitaId(balita.id),
-  )
+/** Puskesmas menerbitkan dan membatalkan; rumah sakit membalas. Sama dengan policy RLS. */
+const PERAN_PENERBIT: Peran[] = ['dokter', 'dietisien', 'admin']
+const PERAN_PEMBALAS: Peran[] = ['dokter_spesialis_anak', 'admin']
+
+export function BannerRujukanBalita({ balita, peran, rujukan, rumahSakit, namaPengguna }: Props) {
+  const router = useRouter()
   const [modalTerbitBuka, setModalTerbitBuka] = useState<boolean>(false)
   const [modalBalasBuka, setModalBalasBuka] = useState<boolean>(false)
+  const [galatBatal, setGalatBatal] = useState<string | null>(null)
+  const [sedangBatal, mulaiBatal] = useTransition()
+
+  const bolehTerbit = PERAN_PENERBIT.includes(peran)
+  const bolehBalas = PERAN_PEMBALAS.includes(peran)
+  const perbarui = () => router.refresh()
+
+  const batalkan = () => {
+    if (!rujukan) return
+    setGalatBatal(null)
+    mulaiBatal(async () => {
+      const hasil = await batalkanRujukan(rujukan.id)
+      if (!hasil.ok) setGalatBatal(hasil.pesan ?? 'Rujukan gagal dibatalkan.')
+      else perbarui()
+    })
+  }
 
   const skriningTerakhir = balita.riwayat[balita.riwayat.length - 1]
   const isGiziBuruk =
@@ -83,11 +100,36 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-kabut-100 px-3 py-1.5 text-xs font-semibold text-tinta-700">
                 <Lock className="size-3.5 text-amber-600" />
-                Akses Medis RS: Aktif (90 Hari)
+                {rujukan.aksesAktif
+                  ? `Akses RS aktif s.d. ${formatTanggal(rujukan.aksesBerakhir)}`
+                  : 'Akses RS 90 hari telah berakhir'}
               </span>
 
-              {/* Tombol Tindakan untuk Dokter / Spesialis RS */}
-              {(peran === 'dokter' || peran === 'dokter_spesialis_anak' || peran === 'admin') && (
+              {bolehTerbit && rujukan.status === 'diajukan' && (
+                <button
+                  type="button"
+                  onClick={batalkan}
+                  disabled={sedangBatal}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-kabut-200 bg-white px-3.5 py-1.5 text-xs font-bold text-tinta-700 hover:bg-kabut-100 disabled:opacity-50"
+                >
+                  <XCircle className="size-3.5" />
+                  {sedangBatal ? 'Membatalkan...' : 'Batalkan Rujukan'}
+                </button>
+              )}
+
+              {bolehTerbit && rujukan.status === 'selesai' && (
+                <button
+                  type="button"
+                  onClick={() => setModalTerbitBuka(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-laut-200 bg-white px-3.5 py-1.5 text-xs font-bold text-laut-800 hover:bg-laut-50"
+                >
+                  <Send className="size-3.5" />
+                  Rujuk Kembali
+                </button>
+              )}
+
+              {/* Balasan hanya oleh dokter spesialis anak rumah sakit tujuan */}
+              {bolehBalas && (
                 <button
                   type="button"
                   onClick={() => setModalBalasBuka(true)}
@@ -99,6 +141,13 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
               )}
             </div>
           </div>
+
+          {galatBatal && (
+            <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-900 ring-1 ring-red-200">
+              <AlertTriangle className="size-4 text-red-600" />
+              {galatBatal}
+            </p>
+          )}
 
           <div className="grid gap-3 text-xs sm:grid-cols-2">
             <div className="rounded-xl bg-kabut-50 p-3 ring-1 ring-kabut-200 space-y-1">
@@ -183,10 +232,7 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
               </div>
             </div>
 
-            {(peran === 'dokter' ||
-              peran === 'dokter_spesialis_anak' ||
-              peran === 'admin' ||
-              peran === 'dietisien') && (
+            {bolehTerbit && (
               <button
                 type="button"
                 onClick={() => setModalTerbitBuka(true)}
@@ -210,15 +256,18 @@ export function BannerRujukanBalita({ balita, peran }: Props) {
         balita={balita}
         terbuka={modalTerbitBuka}
         onTutup={() => setModalTerbitBuka(false)}
-        onSukses={(baru) => setRujukan(baru)}
+        onSukses={perbarui}
+        rumahSakit={rumahSakit}
       />
 
       {rujukan && (
         <ModalBalasanRujukan
+          key={rujukan.id + rujukan.status}
           rujukan={rujukan}
           terbuka={modalBalasBuka}
           onTutup={() => setModalBalasBuka(false)}
-          onSukses={(updated) => setRujukan(updated)}
+          onSukses={perbarui}
+          namaSpesialis={namaPengguna}
         />
       )}
     </div>

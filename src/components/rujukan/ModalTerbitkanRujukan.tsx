@@ -1,72 +1,59 @@
 'use client'
 
-import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, Hospital, Lock, Send, ShieldAlert, X } from 'lucide-react'
-import { RUMAH_SAKIT_GORONTALO } from '@/lib/db/wilayah'
-import { tambahRujukan, type RujukanDetail } from '@/lib/db/rujukan'
+import { useState, useTransition } from 'react'
+import { AlertTriangle, Hospital, Lock, Send, X } from 'lucide-react'
+import type { RumahSakitPilihan } from '@/lib/db/rujukan'
 import type { BalitaDetail } from '@/lib/db/balita'
+import { terbitkanRujukan } from '@/app/(aplikasi)/rujukan/actions'
 import { Button } from '@/components/ui/Button'
 
 type Props = {
   balita: BalitaDetail
   terbuka: boolean
   onTutup: () => void
-  onSukses: (rujukan: RujukanDetail) => void
-  namaPengaju?: string
+  onSukses: () => void
+  /** Rumah sakit dari tabel `faskes`, dibaca di server. */
+  rumahSakit: RumahSakitPilihan[]
 }
 
-export function ModalTerbitkanRujukan({
-  balita,
-  terbuka,
-  onTutup,
-  onSukses,
-  namaPengaju = 'dr. Hendra Pratama (Puskesmas)',
-}: Props) {
-  const [rsTujuanId, setRsTujuanId] = useState<string>(RUMAH_SAKIT_GORONTALO[0]?.id || '')
-  const [alasan, setAlasan] = useState<string>(
-    'Gizi buruk (BB/TB < -3 SD), stunting berat, dan indikasi tatalaksana medis spesialistik komprehensif.',
-  )
-  const [diagnosisAwal, setDiagnosisAwal] = useState<string>(
-    'Severe Acute Malnutrition (SAM) / Gizi Buruk',
-  )
-  const [sedangKirim, setSedangKirim] = useState<boolean>(false)
-  const [setujuPeringatan, setSetujuPeringatan] = useState<boolean>(true)
+/**
+ * Formulir penerbitan rujukan.
+ *
+ * Isian diagnosis dan alasan sengaja KOSONG. Bentuk lama sudah terisi teks
+ * klinis contoh ("Severe Acute Malnutrition ...") dan persetujuan akses sudah
+ * tercentang, sehingga rujukan dapat terkirim dengan diagnosis yang tidak
+ * pernah ditulis dokternya.
+ */
+export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, rumahSakit }: Props) {
+  const [rsTujuanId, setRsTujuanId] = useState<string>('')
+  const [alasan, setAlasan] = useState<string>('')
+  const [diagnosisAwal, setDiagnosisAwal] = useState<string>('')
+  const [setujuPeringatan, setSetujuPeringatan] = useState<boolean>(false)
+  const [galat, setGalat] = useState<string | null>(null)
+  const [sedangKirim, mulaiKirim] = useTransition()
 
   if (!terbuka) return null
 
-  const rsTerpilih = RUMAH_SAKIT_GORONTALO.find((r) => r.id === rsTujuanId) || RUMAH_SAKIT_GORONTALO[0]
+  const rsTerpilih = rumahSakit.find((r) => r.id === rsTujuanId)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!rsTujuanId || !alasan.trim()) return
-
-    setSedangKirim(true)
-    setTimeout(() => {
-      const hasil = tambahRujukan({
+    setGalat(null)
+    mulaiKirim(async () => {
+      const hasil = await terbitkanRujukan({
         balitaId: balita.id,
-        namaBalita: balita.nama,
-        nik: balita.nik,
-        tanggalLahir: balita.tanggalLahir,
-        jenisKelamin: balita.jenisKelamin,
-        umurBulan: balita.riwayat[balita.riwayat.length - 1]?.umurBulan || 24,
-        namaIbu: balita.namaIbu,
-        noHpOrtu: balita.noHpOrtu,
-        alamat: balita.alamat,
-        puskesmasId: balita.puskesmasId,
-        namaPuskesmas: balita.namaPuskesmas,
-        namaKabupaten: balita.namaKabupaten,
-        rsTujuanId: rsTerpilih.id,
-        namaRsTujuan: rsTerpilih.nama,
-        alasanRujukan: alasan,
-        diagnosisAwal: diagnosisAwal,
-        diajukanOlehNama: namaPengaju,
-        diajukanOlehPeran: 'Dokter Puskesmas',
+        rsTujuanId,
+        diagnosisAwal,
+        alasan,
+        setujuAkses: setujuPeringatan,
       })
-
-      setSedangKirim(false)
-      onSukses(hasil)
+      if (!hasil.ok) {
+        setGalat(hasil.pesan ?? 'Rujukan gagal diterbitkan.')
+        return
+      }
+      onSukses()
       onTutup()
-    }, 600)
+    })
   }
 
   return (
@@ -102,17 +89,27 @@ export function ModalTerbitkanRujukan({
             <label className="block font-bold uppercase tracking-wider text-tinta-700">
               Rumah Sakit Rujukan Tujuan (RSUD se-Gorontalo) <span className="text-red-500">*</span>
             </label>
-            <select
-              value={rsTujuanId}
-              onChange={(e) => setRsTujuanId(e.target.value)}
-              className="mt-1.5 h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-            >
-              {RUMAH_SAKIT_GORONTALO.map((rs) => (
-                <option key={rs.id} value={rs.id}>
-                  {rs.nama}
-                </option>
-              ))}
-            </select>
+            {rumahSakit.length === 0 ? (
+              <p className="mt-1.5 rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
+                Belum ada rumah sakit terdaftar. Rumah sakit muncul di sini setelah dokter spesialis
+                anak di rumah sakit tersebut mendaftar, atau setelah admin menambahkannya.
+              </p>
+            ) : (
+              <select
+                value={rsTujuanId}
+                onChange={(e) => setRsTujuanId(e.target.value)}
+                className="mt-1.5 h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
+                required
+              >
+                <option value="">-- Pilih rumah sakit --</option>
+                {rumahSakit.map((rs) => (
+                  <option key={rs.id} value={rs.id}>
+                    {rs.nama}
+                    {rs.status === 'usulan' ? ' (belum diverifikasi admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Diagnosis Kerja Awal */}
@@ -152,7 +149,7 @@ export function ModalTerbitkanRujukan({
               <span>Pemberitahuan Hak Akses Medis Rujukan (90 Hari)</span>
             </div>
             <p className="text-[11px] leading-relaxed text-amber-800">
-              Dengan menerbitkan rujukan ini, Dokter Spesialis Anak dan tim medis di <strong>{rsTerpilih.nama}</strong> akan secara otomatis diberikan hak akses membaca <strong>seluruh riwayat penimbangan antropometri dan kurva pertumbuhan WHO balita ini sejak lahir</strong> selama masa aktif rujukan (90 hari).
+              Dengan menerbitkan rujukan ini, Dokter Spesialis Anak di <strong>{rsTerpilih?.nama ?? 'rumah sakit tujuan'}</strong> akan secara otomatis diberikan hak akses membaca <strong>seluruh riwayat penimbangan antropometri dan kurva pertumbuhan WHO balita ini sejak lahir</strong> selama masa aktif rujukan (90 hari).
             </p>
             <label className="flex items-center gap-2 pt-1 cursor-pointer font-bold text-xs text-amber-950">
               <input
@@ -165,6 +162,13 @@ export function ModalTerbitkanRujukan({
             </label>
           </div>
 
+          {galat && (
+            <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-red-900 ring-1 ring-red-200">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600" />
+              <span>{galat}</span>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button type="button" onClick={onTutup} varian="sekunder">
@@ -173,7 +177,9 @@ export function ModalTerbitkanRujukan({
             <Button
               type="submit"
               varian="utama"
-              disabled={!setujuPeringatan || !alasan.trim() || sedangKirim}
+              disabled={
+                !setujuPeringatan || !rsTujuanId || !diagnosisAwal.trim() || !alasan.trim() || sedangKirim
+              }
               sedangProses={sedangKirim}
             >
               <Send className="size-4" />

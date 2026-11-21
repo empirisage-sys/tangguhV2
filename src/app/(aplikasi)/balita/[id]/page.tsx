@@ -2,7 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { bacaBalitaById } from '@/lib/db/balita-server'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import {
+  bacaRujukanTerbaruBalita,
+  bacaRujukanUntukAkses,
+  bacaRumahSakitTujuan,
+} from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { semuaKurva } from '@/lib/grafik/seri'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
@@ -64,13 +68,22 @@ export default async function HalamanDetailBalita({
   }
 
   const profil = await ambilProfil()
-  const daftarRujukan = ambilSemuaRujukan()
+  const daftarRujukan = await bacaRujukanUntukAkses()
 
   if (profil && !bolehLihatBalita(balita, profil, daftarRujukan)) {
     notFound()
   }
 
   const peran = profil?.peran ?? 'dokter'
+
+  // Rujukan dan daftar rumah sakit dibaca dari Supabase. Galat tidak
+  // menghentikan halaman profil; banner cukup tampil tanpa rujukan.
+  const [hasilRujukan, hasilRs] = await Promise.all([
+    bacaRujukanTerbaruBalita(balita.id),
+    bacaRumahSakitTujuan(),
+  ])
+  const rujukanTerbaru = hasilRujukan.ok ? hasilRujukan.data : null
+  const rumahSakit = hasilRs.ok ? hasilRs.data : []
 
   const jenisKelaminEngine = balita.jenisKelamin === 'L' ? 'lk' : 'pr'
   const kurvaData = semuaKurva(balita.riwayat, jenisKelaminEngine)
@@ -177,7 +190,13 @@ export default async function HalamanDetailBalita({
       </div>
 
       {/* Banner & Alur Rujukan Terintegrasi Puskesmas ⇄ RSUD */}
-      <BannerRujukanBalita balita={balita} peran={peran} />
+      <BannerRujukanBalita
+        balita={balita}
+        peran={peran}
+        rujukan={rujukanTerbaru}
+        rumahSakit={rumahSakit}
+        namaPengguna={profil?.namaLengkap}
+      />
 
       {/* Identitas Ringkas & Status Terkini */}
       <div className="grid gap-4 sm:grid-cols-3">

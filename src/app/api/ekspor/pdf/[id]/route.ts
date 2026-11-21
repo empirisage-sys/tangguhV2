@@ -3,7 +3,7 @@ import { buatPdfSkriningBalita } from '@/lib/ekspor/pdf'
 import { bacaBalitaById } from '@/lib/db/balita-server'
 import { wajibPeran, TidakBerwenangError } from '@/lib/supabase/penjaga'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 
 /**
  * Lembar laporan skrining satu balita dalam PDF.
@@ -42,7 +42,7 @@ export async function GET(
       return NextResponse.json({ error: 'Balita tidak ditemukan' }, { status: 404 })
     }
 
-    if (!bolehLihatBalita(balita, profil, ambilSemuaRujukan())) {
+    if (!bolehLihatBalita(balita, profil, await bacaRujukanUntukAkses())) {
       return NextResponse.json({ error: 'Balita tidak ditemukan' }, { status: 404 })
     }
 

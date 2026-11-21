@@ -20,7 +20,7 @@ npx supabase@2.122.1 start
 
 Pemakaian pertama mengunduh beberapa GB image Docker, jadi bisa memakan 10 sampai 20 menit. Pemakaian berikutnya hanya beberapa detik.
 
-Perintah ini menjalankan 14 migrasi di `supabase/migrations` secara berurutan, lalu mengisi data dari `supabase/seed.sql`.
+Perintah ini menjalankan semua migrasi di `supabase/migrations` secara berurutan, lalu mengisi data dari `supabase/seed.sql`.
 
 ## 3. Menyambungkan aplikasi ke Supabase lokal
 
@@ -80,7 +80,7 @@ Anak 62 bulan hanya terdaftar sebagai balita tanpa skrining, karena database men
 | Wasting (BB/TB < -2) | 4 |
 | Penanda rujukan (`is_red_flag`) dari mesin | 7 |
 
-Halaman **Pasien Rujukan** tetap kosong walaupun tabel `rujukan` berisi 4 baris, karena aplikasi belum membaca tabel ini. Rujukan masih disimpan di memori (`src/lib/db/rujukan.ts`). Ini temuan yang harus diperbaiki, bukan kesalahan seed.
+Halaman **Pasien Rujukan** menampilkan keempat rujukan ini sejak rujukan tersimpan di database (migrasi `20261121000000_rujukan_tersambung.sql`). Masuk sebagai `dsa@tangguh.lokal` untuk mencoba alur balasan rumah sakit, dan sebagai `dokter1@tangguh.lokal` untuk menerbitkan rujukan baru.
 
 ## 6. Perintah harian
 

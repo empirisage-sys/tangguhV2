@@ -1,64 +1,63 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircle2, FileText, Hospital, Send, Stethoscope, Utensils, X } from 'lucide-react'
-import { tanggapiRujukan, type RujukanDetail, type StatusRujukan } from '@/lib/db/rujukan'
+import { useState, useTransition } from 'react'
+import { AlertTriangle, Send, Stethoscope, X } from 'lucide-react'
+import type { RujukanDetail } from '@/lib/db/rujukan'
+import { tanggapiRujukan } from '@/app/(aplikasi)/rujukan/actions'
 import { Button } from '@/components/ui/Button'
 
 type Props = {
   rujukan: RujukanDetail
   terbuka: boolean
   onTutup: () => void
-  onSukses: (rujukan: RujukanDetail) => void
+  onSukses: () => void
+  /** Nama pengguna yang sedang masuk, sebagai isian awal dokter pemeriksa. */
   namaSpesialis?: string
 }
 
-export function ModalBalasanRujukan({
-  rujukan,
-  terbuka,
-  onTutup,
-  onSukses,
-  namaSpesialis = 'dr. Andi Kurniawan, Sp.A',
-}: Props) {
-  const [status, setStatus] = useState<StatusRujukan>('selesai')
+/**
+ * Formulir balasan rujukan oleh dokter spesialis anak.
+ *
+ * Isian klinis sengaja KOSONG kecuali yang sudah pernah disimpan. Bentuk lama
+ * terisi diagnosis, tatalaksana, dan takaran PKMK contoh atas nama dokter
+ * fiktif, sehingga satu klik "Simpan" mengirim resep yang tidak pernah ditulis.
+ */
+export function ModalBalasanRujukan({ rujukan, terbuka, onTutup, onSukses, namaSpesialis = '' }: Props) {
+  const [status, setStatus] = useState<'diterima' | 'selesai'>(
+    rujukan.status === 'diajukan' ? 'diterima' : 'selesai',
+  )
   const [dokter, setDokter] = useState<string>(rujukan.namaDokterSpesialis || namaSpesialis)
-  const [diagnosisDefinitif, setDiagnosisDefinitif] = useState<string>(
-    rujukan.diagnosisDefinitifRS || 'Severe Wasting ec Intake Nutrisi Suboptimal + Post-Diare Akut',
-  )
-  const [tatalaksana, setTatalaksana] = useState<string>(
-    rujukan.tatalaksanaLanjutan ||
-      'Tatalaksana nutrisi fase stabilisasi & transisi, suplementasi mikronutrien (Zinc 20mg/hari, Vit A), peresepan PKMK Oral Tinggi Kalori 100 kkal/100ml.',
-  )
-  const [rekomendasiPKMK, setRekomendasiPKMK] = useState<string>(
-    rujukan.rekomendasiPKMK ||
-      'PKMK Tinggi Kalori (Target Energi Catch-Up: 1020 kkal/hari). Takaran: 4 sendok takar dilarutkan dalam 180 ml air hangat, diberikan 3-4 kali sehari.',
-  )
-  const [catatan, setCatatan] = useState<string>(
-    rujukan.catatanBalasan ||
-      'Pasien dalam kondisi perbaikan klinis tanpa tanda dehidrasi/komplikasi berat. Dirujuk balik ke Puskesmas untuk pemantauan kepatuhan konsumsi PKMK dan penimbangan BB mingguan.',
-  )
-  const [sedangSimpan, setSedangSimpan] = useState<boolean>(false)
+  const [diagnosisDefinitif, setDiagnosisDefinitif] = useState<string>(rujukan.diagnosisDefinitifRS || '')
+  const [tatalaksana, setTatalaksana] = useState<string>(rujukan.tatalaksanaLanjutan || '')
+  const [rekomendasiPKMK, setRekomendasiPKMK] = useState<string>(rujukan.rekomendasiPKMK || '')
+  const [catatan, setCatatan] = useState<string>(rujukan.catatanBalasan || '')
+  const [galat, setGalat] = useState<string | null>(null)
+  const [sedangSimpan, mulaiSimpan] = useTransition()
 
   if (!terbuka) return null
 
+  const wajibRujukBalik = status === 'selesai'
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setSedangSimpan(true)
-
-    setTimeout(() => {
-      const hasil = tanggapiRujukan(rujukan.id, {
+    setGalat(null)
+    mulaiSimpan(async () => {
+      const hasil = await tanggapiRujukan({
+        rujukanId: rujukan.id,
         status,
         namaDokterSpesialis: dokter,
-        diagnosisDefinitifRS: diagnosisDefinitif,
-        tatalaksanaLanjutan: tatalaksana,
-        rekomendasiPKMK,
-        catatanBalasan: catatan,
+        diagnosisDefinitif,
+        tatalaksana,
+        rekomendasiPkmk: rekomendasiPKMK,
+        catatan,
       })
-
-      setSedangSimpan(false)
-      if (hasil) onSukses(hasil)
+      if (!hasil.ok) {
+        setGalat(hasil.pesan ?? 'Balasan gagal disimpan.')
+        return
+      }
+      onSukses()
       onTutup()
-    }, 600)
+    })
   }
 
   return (
@@ -98,7 +97,10 @@ export function ModalBalasanRujukan({
               <button
                 type="button"
                 onClick={() => setStatus('diterima')}
+                disabled={rujukan.status === 'selesai'}
+                title={rujukan.status === 'selesai' ? 'Rujukan yang sudah selesai tidak dapat dikembalikan.' : undefined}
                 className={[
+                  'disabled:cursor-not-allowed disabled:opacity-40',
                   'flex h-11 items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all',
                   status === 'diterima'
                     ? 'bg-amber-600 text-white shadow-md'
@@ -139,7 +141,7 @@ export function ModalBalasanRujukan({
           {/* Diagnosis Definitif */}
           <div>
             <label className="block font-bold uppercase tracking-wider text-tinta-700">
-              Diagnosis Definitif Spesialis Anak <span className="text-red-500">*</span>
+              Diagnosis Definitif Spesialis Anak {wajibRujukBalik && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
@@ -147,7 +149,7 @@ export function ModalBalasanRujukan({
               onChange={(e) => setDiagnosisDefinitif(e.target.value)}
               placeholder="Contoh: Severe Wasting ec Penyakit Jantung Bawaan / Asupan Kurang"
               className="mt-1.5 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
-              required
+              required={wajibRujukBalik}
             />
           </div>
 
@@ -182,7 +184,8 @@ export function ModalBalasanRujukan({
           {/* Catatan Balasan ke Puskesmas */}
           <div>
             <label className="block font-bold uppercase tracking-wider text-tinta-700">
-              Catatan Balasan Rujukan (Instruksi Pemantauan di Puskesmas/Posyandu) <span className="text-red-500">*</span>
+              Catatan Balasan Rujukan (Instruksi Pemantauan di Puskesmas/Posyandu){' '}
+              {wajibRujukBalik && <span className="text-red-500">*</span>}
             </label>
             <textarea
               rows={3}
@@ -190,9 +193,16 @@ export function ModalBalasanRujukan({
               onChange={(e) => setCatatan(e.target.value)}
               placeholder="Pesan untuk dokter & tim puskesmas mengenai rencana monitoring berat badan..."
               className="mt-1.5 w-full rounded-xl border border-kabut-200 bg-white p-3 text-xs font-medium text-tinta-900 focus:border-laut-500 focus:outline-none leading-relaxed"
-              required
+              required={wajibRujukBalik}
             />
           </div>
+
+          {galat && (
+            <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-red-900 ring-1 ring-red-200">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600" />
+              <span>{galat}</span>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
@@ -202,11 +212,15 @@ export function ModalBalasanRujukan({
             <Button
               type="submit"
               varian="utama"
-              disabled={!diagnosisDefinitif.trim() || !catatan.trim() || sedangSimpan}
+              disabled={
+                !dokter.trim() ||
+                (wajibRujukBalik && (!diagnosisDefinitif.trim() || !catatan.trim())) ||
+                sedangSimpan
+              }
               sedangProses={sedangSimpan}
             >
               <Send className="size-4" />
-              Simpan &amp; Kirim Balasan Rujuk Balik
+              {wajibRujukBalik ? 'Simpan & Kirim Balasan Rujuk Balik' : 'Simpan: Sedang Ditangani'}
             </Button>
           </div>
         </form>

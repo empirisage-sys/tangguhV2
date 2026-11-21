@@ -158,15 +158,21 @@ for (const u of data.pengukuran) {
   ringkas.push([b.id, u.tanggal_ukur, baris.z_bbu, baris.z_tbu, baris.z_bbtb, baris.status_bbtb, baris.is_red_flag].join(' | '))
 }
 L.push('')
-L.push('-- Rujukan (tabel sudah ada, tetapi aplikasi belum membacanya) -------')
+L.push('-- Rujukan -----------------------------------------------------------')
 const STATUS: Record<string, string> = { MENUNGGU_RS: 'diajukan', DITANGANI_RS: 'diterima', SELESAI_RUJUK_BALIK: 'selesai' }
 for (const r of data.rujukan) {
   const b = data.balita.find((x) => x.id === r.balita_id)!
   const p = posy.get(b.posyandu)!
   const pIdx = pkm.findIndex((x) => x.id === p.pkm.id)
   const skr = uid('skr:' + b.id + data.meta.tanggal_acuan)
-  L.push(`insert into public.rujukan (id, balita_id, skrining_id, tujuan, alasan, status, diajukan_oleh, puskesmas_id, rs_tujuan_id)`)
-  L.push(`  values (${q(uid('ruj:' + b.id))}, ${q(uid(b.id))}, (select id from public.skrining where client_uuid = ${q(skr)}), 'SIM RSUD Uji', ${q('SIM ' + b.skenario)}, ${q(STATUS[r.status])}, ${q(DOKTER[pIdx])}, ${q(p.pkm.id)}, ${q(RS_ID)}) on conflict (id) do nothing;`)
+  const st = STATUS[r.status]
+  const balas = st === 'selesai'
+    ? { nama: 'SIM dr. Spesialis Anak', dx: 'SIM diagnosis definitif', tl: 'SIM tatalaksana lanjutan', pkmk: 'SIM rekomendasi PKMK', cat: 'SIM catatan rujuk balik' }
+    : null
+  L.push(`insert into public.rujukan (id, balita_id, skrining_id, tujuan, alasan, diagnosis_awal, status, diajukan_oleh, diajukan_oleh_nama, puskesmas_id, rs_tujuan_id,`)
+  L.push(`  nama_dokter_spesialis, diagnosis_definitif_rs, tatalaksana_lanjutan, rekomendasi_pkmk, catatan_balasan, ditanggapi_oleh, diterima_pada, selesai_pada)`)
+  L.push(`  values (${q(uid('ruj:' + b.id))}, ${q(uid(b.id))}, (select id from public.skrining where client_uuid = ${q(skr)}), 'SIM RSUD Uji', ${q('SIM ' + b.skenario)}, ${q('SIM ' + b.skenario)}, ${q(st)}, ${q(DOKTER[pIdx])}, ${q(akun[2 + pIdx].nama)}, ${q(p.pkm.id)}, ${q(RS_ID)},`)
+  L.push(`  ${q(balas?.nama)}, ${q(balas?.dx)}, ${q(balas?.tl)}, ${q(balas?.pkmk)}, ${q(balas?.cat)}, ${st === 'diajukan' ? 'null' : q(uid('akun:dsa'))}, ${st === 'diajukan' ? 'null' : 'now()'}, ${st === 'selesai' ? 'now()' : 'null'}) on conflict (id) do nothing;`)
 }
 L.push('')
 writeFileSync('supabase/seed.sql', L.join('\n') + '\n')

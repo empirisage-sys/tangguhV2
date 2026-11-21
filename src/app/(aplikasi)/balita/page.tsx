@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Search, UserPlus, ChevronRight, Filter, Stethoscope } from 'lucide-react'
 import { bacaDaftarBalita } from '@/lib/db/balita-server'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
@@ -15,7 +15,7 @@ export default async function HalamanDaftarBalita({
   searchParams: Promise<{ q?: string; status?: string }>
 }) {
   const profil = await ambilProfil()
-  const daftarRujukan = ambilSemuaRujukan()
+  const daftarRujukan = await bacaRujukanUntukAkses()
   const isDokter = profil?.peran === 'dokter'
   const isRumahSakit = profil?.jenisFaskes === 'rumah_sakit'
 
