@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import type { BalitaDetail } from '@/lib/db/balita'
+import { tampilanBBTB, tampilanBBU, tampilanTBU } from '@/lib/tampilan/status'
 
 /**
  * Menghasilkan berkas Excel Rekapitulasi Stunting TANGGUH sesuai spesifikasi Sprint 9:
@@ -67,10 +68,12 @@ export async function buatExcelRekap(balitaList: BalitaDetail[]): Promise<Uint8A
         z_bbu: r.z_bbu ?? '-',
         z_tbu: r.z_tbu ?? '-',
         z_bbtb: r.z_bbtb ?? '-',
-        statusBBU: r.statusBBU ?? '-',
-        statusTBU: r.statusTBU ?? '-',
-        statusBBTB: r.statusBBTB ?? '-',
-        isRedFlag: r.statusBBTB === 'gizi_buruk' || r.statusTBU === 'sangat_pendek' ? 'YA' : 'TIDAK',
+        // Label yang dibaca petugas, bukan kode basis data (mis. "berat_badan_normal").
+        statusBBU: tampilanBBU(r.statusBBU ?? null).label,
+        statusTBU: tampilanTBU(r.statusTBU ?? null).label,
+        statusBBTB: tampilanBBTB(r.statusBBTB ?? null).label,
+        // Penanda rujukan dari mesin (edema, LILA, Z < -3, dll.), sama dengan layar.
+        isRedFlag: r.isRedFlag ? 'YA' : 'TIDAK',
       })
     }
   }
@@ -142,8 +145,10 @@ export async function buatExcelRekap(balitaList: BalitaDetail[]): Promise<Uint8A
   }
 
   for (const g of grupPosyandu.values()) {
-    const pStunting = g.balitaCount > 0 ? ((g.stuntingCount / g.balitaCount) * 100).toFixed(1) : '0.0'
-    const pWasting = g.balitaCount > 0 ? ((g.wastingCount / g.balitaCount) * 100).toFixed(1) : '0.0'
+    const persenId = (n: number) =>
+      n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    const pStunting = g.balitaCount > 0 ? persenId((g.stuntingCount / g.balitaCount) * 100) : '0,0'
+    const pWasting = g.balitaCount > 0 ? persenId((g.wastingCount / g.balitaCount) * 100) : '0,0'
 
     sheetRingkasan.addRow({
       posyandu: g.posyandu,

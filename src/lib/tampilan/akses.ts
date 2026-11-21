@@ -148,7 +148,9 @@ export type CakupanData = 'posyandu' | 'faskes' | 'input_sendiri_dan_rujukan' | 
  * Menentukan cakupan data balita yang boleh dilihat oleh pengguna:
  * - Kader: balita di posyandu tempat bertugas
  * - Dietisien di Puskesmas: balita di puskesmas tempat bertugas
- * - Dokter: HANYA pasien yang diinput sendiri + pasien rujukan Puskesmas/RS wilayahnya
+ * - Dokter puskesmas: seluruh balita di puskesmasnya (diinput dokter, kader,
+ *   maupun petugas gizi puskesmas itu), ditambah pasien rujukan
+ *   (keputusan pemilik aplikasi, 21 November 2026)
  * - Admin: seluruh provinsi
  */
 export function cakupanData(
@@ -158,7 +160,7 @@ export function cakupanData(
   if (peran === 'admin') return 'provinsi'
   if (peran === 'kader') return 'posyandu'
   if (peran === 'dietisien') return 'faskes'
-  if (peran === 'dokter') return 'input_sendiri_dan_rujukan'
+  if (peran === 'dokter') return jenisFaskes === 'rumah_sakit' ? 'input_sendiri_dan_rujukan' : 'faskes'
   if (peran === 'dokter_spesialis_anak') return 'input_sendiri_dan_rujukan'
   return 'input_sendiri_dan_rujukan'
 }
@@ -199,6 +201,14 @@ export function dokterBolehLihatBalita(
   daftarRujukan: RujukanAksesInput[] = [],
 ): boolean {
   if (dokter.peran !== 'dokter') return false
+
+  // 0. Seluruh balita di puskesmas tempat dokter bertugas, siapa pun yang
+  //    menginputnya (dokter, kader, atau petugas gizi puskesmas yang sama).
+  //    Keputusan pemilik aplikasi 21 November 2026; sama dengan policy RLS
+  //    `boleh_akses_balita` dan AGENTS.md 3.6.
+  if (dokter.jenisFaskes !== 'rumah_sakit' && dokter.puskesmasId && balita.puskesmasId === dokter.puskesmasId) {
+    return true
+  }
 
   // 1. Data pasien yang di-input sendiri
   if (balita.createdBy && balita.createdBy === dokter.id) {

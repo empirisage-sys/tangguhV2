@@ -5,7 +5,7 @@ import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
-import { formatTanggal, formatUmurBulan } from '@/lib/tampilan/format'
+import { formatTanggal, formatUmurBulan, formatBerat, formatPanjang } from '@/lib/tampilan/format'
 import { ambilProfil } from '@/lib/supabase/penjaga'
 import { Hospital, Info } from 'lucide-react'
 
@@ -92,7 +92,7 @@ export default async function HalamanDaftarBalita({
               Cakupan Data Rekam Medis (Akun Dokter):
             </p>
             <p className="mt-0.5 text-sky-800 leading-relaxed">
-              Sesuai standar kerahasiaan medis, Anda hanya dapat melihat data pasien balita yang <strong>Anda input sendiri</strong>, pasien yang <strong>dirujuk ke Puskesmas wilayah Anda</strong>, atau pasien yang <strong>dirujuk ke Rumah Sakit tempat bertugas</strong>.
+              Anda dapat melihat seluruh balita di <strong>puskesmas tempat Anda bertugas</strong>, baik yang diinput dokter, kader, maupun petugas gizi puskesmas tersebut, serta pasien yang <strong>dirujuk</strong> kepada Anda.
             </p>
           </div>
         </div>
@@ -218,7 +218,7 @@ export default async function HalamanDaftarBalita({
 
                   {skriningTerakhir && (
                     <p className="angka text-xs font-medium text-tinta-600">
-                      Terakhir diukur: {skriningTerakhir.beratKg} kg • {skriningTerakhir.panjangCm} cm ({formatTanggal(skriningTerakhir.tanggal)})
+                      Terakhir diukur: {formatBerat(skriningTerakhir.beratKg)} • {formatPanjang(skriningTerakhir.panjangCm)} ({formatTanggal(skriningTerakhir.tanggal)})
                     </p>
                   )}
                 </div>

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
-import { formatTanggal } from '@/lib/tampilan/format'
+import { formatTanggal, formatBerat, formatPanjang } from '@/lib/tampilan/format'
 
 export default async function DasborPage() {
   const profil = await ambilProfil()
@@ -277,11 +277,11 @@ export default async function DasborPage() {
                             {balita.nama}
                           </Link>
                           <span className="angka rounded-md bg-kabut-100 px-2 py-0.5 text-xs font-semibold text-tinta-600">
-                            {skriningAkhir.umurBulan} bln • {balita.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
+                            {(Math.round(skriningAkhir.umurBulan * 10) / 10).toLocaleString('id-ID')} bln • {balita.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
                           </span>
                         </div>
                         <p className="angka text-xs text-tinta-600">
-                          {skriningAkhir.beratKg} kg • {skriningAkhir.panjangCm} cm • Diperiksa {formatTanggal(skriningAkhir.tanggal)}
+                          {formatBerat(skriningAkhir.beratKg)} • {formatPanjang(skriningAkhir.panjangCm)} • Diperiksa {formatTanggal(skriningAkhir.tanggal)}
                         </p>
                       </div>
 

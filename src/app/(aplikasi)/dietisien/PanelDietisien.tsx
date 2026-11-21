@@ -20,6 +20,7 @@ import { tampilanBBTB, tampilanTBU } from '@/lib/tampilan/status'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
 import { apakahPerluPKMK } from '@/lib/zscore'
 import { simpanAsuhanGizi } from './actions'
+import { formatBerat, formatPanjang } from '@/lib/tampilan/format'
 
 /**
  * Daftar prioritas peresepan PKMK.
@@ -117,11 +118,19 @@ export function PanelDietisien({
             Pilih balita dari daftar prioritas atau gunakan kalkulator langsung
           </span>
         </div>
+        {/*
+          Kalkulator simulasi, TIDAK terikat pada balita mana pun. Dahulu
+          judulnya ikut berganti ke nama balita terpilih sementara target
+          energinya tetap angka simulasi 750 kkal, sehingga balita dengan
+          kebutuhan 990 kkal tampak dihitung dari 750 kkal (temuan uji tulis
+          21 November 2026). Peresepan untuk balita dilakukan di panel
+          "Formulasi PKMK" pada daftar prioritas.
+        */}
         <FormulasiPKMKSection
           tampilkanKebutuhanKemasan
-          namaBalita={balitaTerpilih ? balitaTerpilih.nama : 'Pasien Anak (Simulasi)'}
-          umurBulan={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.umurBulan ?? 12 : 12}
-          beratKg={balitaTerpilih ? balitaTerpilih.riwayat[balitaTerpilih.riwayat.length - 1]?.beratKg ?? 7.5 : 7.5}
+          namaBalita="Pasien Anak (Simulasi)"
+          umurBulan={12}
+          beratKg={7.5}
           targetEnergiDefaultKkal={750}
         />
       </div>
@@ -163,11 +172,11 @@ export function PanelDietisien({
                       {balita.nama}
                     </Link>
                     <span className="angka text-xs text-tinta-600">
-                      ({skrining.umurBulan} bulan, {balita.jenisKelamin === 'L' ? 'L' : 'P'})
+                      ({(Math.round(skrining.umurBulan * 10) / 10).toLocaleString('id-ID')} bulan, {balita.jenisKelamin === 'L' ? 'L' : 'P'})
                     </span>
                   </div>
                   <p className="angka text-xs text-tinta-600">
-                    BB: {skrining.beratKg} kg • TB: {skrining.panjangCm} cm • {balita.namaPosyandu}
+                    BB: {formatBerat(skrining.beratKg)} • TB: {formatPanjang(skrining.panjangCm)} • {balita.namaPosyandu}
                   </p>
                 </div>
 

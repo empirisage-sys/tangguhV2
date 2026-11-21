@@ -217,7 +217,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="mt-auto border-t border-kabut-200 bg-white py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-xs text-tinta-400 sm:flex-row sm:px-6">
-          <p>© 2026 Aplikasi TANGGUH — Fakultas Kedokteran Univ. Muhammadiyah Gorontalo - FB -</p>
+          <p>© 2026 Aplikasi TANGGUH — Fakultas Kedokteran Univ. Muhammadiyah Gorontalo</p>
           <div className="flex items-center gap-4">
             <Link href="/masuk" className="hover:text-laut-700">Masuk</Link>
             <Link href="/daftar" className="hover:text-laut-700">Daftar Akun</Link>

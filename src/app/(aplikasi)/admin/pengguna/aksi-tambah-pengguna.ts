@@ -104,12 +104,12 @@ export async function adminTambahPengguna(formData: FormData): Promise<HasilTind
     puskesmasId = pkm.id
     faskesId = pkm.id
     kabupatenId = pkm.kabupaten_id ?? ''
-    namaTempat = `Puskesmas ${pkm.nama}`
+    namaTempat = denganAwalan('Puskesmas', pkm.nama)
 
     if (d.peran === 'kader') {
       if (d.posyanduId === POSYANDU_BARU) {
         namaManualPosyandu = (d.namaPosyanduBaru ?? '').trim()
-        namaTempat = `Posyandu ${namaManualPosyandu}`
+        namaTempat = denganAwalan('Posyandu', namaManualPosyandu)
       } else {
         const { data: pos } = await supabase
           .from('posyandu')
@@ -120,7 +120,7 @@ export async function adminTambahPengguna(formData: FormData): Promise<HasilTind
           return { ok: false, pesan: 'Posyandu tidak berada di bawah puskesmas yang dipilih.', galatMedan: { posyanduId: 'Tidak sesuai puskesmas' } }
         }
         posyanduId = pos.id
-        namaTempat = `Posyandu ${pos.nama}`
+        namaTempat = denganAwalan('Posyandu', pos.nama)
       }
     }
   }
@@ -188,4 +188,9 @@ export async function adminTambahPengguna(formData: FormData): Promise<HasilTind
       `Akun ${LABEL_PERAN[d.peran]} untuk ${d.namaLengkap} sudah aktif (${namaTempat}). ` +
       'Sampaikan email dan kata sandi sementara; pengguna wajib menggantinya saat masuk pertama kali.',
   }
+}
+
+/** "Biawu" -> "Puskesmas Biawu"; "Puskesmas Biawu" tetap, tidak menjadi "Puskesmas Puskesmas Biawu". */
+function denganAwalan(awalan: string, nama: string): string {
+  return nama.toLowerCase().startsWith(awalan.toLowerCase()) ? nama : `${awalan} ${nama}`
 }

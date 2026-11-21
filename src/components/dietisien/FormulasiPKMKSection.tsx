@@ -854,15 +854,23 @@ export function FormulasiPKMKSection({
       </div>
 
       <div className="space-y-2 pt-1">
-        <Button
-          type="button"
-          onClick={handleSimpan}
-          varian="utama"
-          lebarPenuh
-          disabled={sedangSimpan}
-        >
-          {sedangSimpan ? 'Menyimpan...' : 'Simpan Asuhan Gizi Balita'}
-        </Button>
+        {/*
+          Tombol simpan hanya bila memang ada tempat menyimpan. Dahulu Skrining
+          Tamu dan kalkulator simulasi menampilkan tombol ini lalu memunculkan
+          "Asuhan gizi ... disimpan." padahal tidak ada yang tersimpan
+          (temuan uji tulis 21 November 2026).
+        */}
+        {((aksiSimpan && balitaId) || onSimpan) && (
+          <Button
+            type="button"
+            onClick={handleSimpan}
+            varian="utama"
+            lebarPenuh
+            disabled={sedangSimpan}
+          >
+            {sedangSimpan ? 'Menyimpan...' : 'Simpan Asuhan Gizi Balita'}
+          </Button>
+        )}
 
         <button
           type="button"

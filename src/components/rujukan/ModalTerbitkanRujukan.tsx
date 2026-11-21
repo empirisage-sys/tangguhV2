@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { AlertTriangle, Hospital, Lock, Send, X } from 'lucide-react'
 import type { RumahSakitPilihan } from '@/lib/db/rujukan'
 import type { BalitaDetail } from '@/lib/db/balita'
@@ -11,7 +11,8 @@ type Props = {
   balita: BalitaDetail
   terbuka: boolean
   onTutup: () => void
-  onSukses: () => void
+  /** Dipanggil dengan pesan keberhasilan dari server, sesudah rujukan tersimpan. */
+  onSukses: (pesan: string) => void
   /** Rumah sakit dari tabel `faskes`, dibaca di server. */
   rumahSakit: RumahSakitPilihan[]
 }
@@ -32,12 +33,45 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
   const [galat, setGalat] = useState<string | null>(null)
   const [sedangKirim, mulaiKirim] = useTransition()
 
+  // ==========================================================================
+  // FORMULIR SELALU BERSIH SAAT DIBUKA (temuan uji tulis 21 November 2026)
+  //
+  // Isian dahulu bertahan di antara pembukaan, dan sesudah rujukan terkirim
+  // layar sempat tampak masih terbuka dalam keadaan kosong tanpa keterangan
+  // apa pun, sehingga petugas tidak tahu rujukannya sudah terkirim atau belum.
+  // Sekarang setiap pembukaan dimulai dari formulir kosong, keberhasilan
+  // diumumkan oleh banner di halaman balita, dan jendela tidak dapat ditutup
+  // selama pengiriman berlangsung.
+  // ==========================================================================
+  useEffect(() => {
+    if (!terbuka) return
+    setRsTujuanId('')
+    setAlasan('')
+    setDiagnosisAwal('')
+    setSetujuPeringatan(false)
+    setGalat(null)
+  }, [terbuka])
+
+  useEffect(() => {
+    if (!terbuka) return
+    const tekan = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !sedangKirim) onTutup()
+    }
+    window.addEventListener('keydown', tekan)
+    return () => window.removeEventListener('keydown', tekan)
+  }, [terbuka, sedangKirim, onTutup])
+
   if (!terbuka) return null
+
+  const tutup = () => {
+    if (!sedangKirim) onTutup()
+  }
 
   const rsTerpilih = rumahSakit.find((r) => r.id === rsTujuanId)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (sedangKirim) return
     setGalat(null)
     mulaiKirim(async () => {
       const hasil = await terbitkanRujukan({
@@ -51,18 +85,21 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
         setGalat(hasil.pesan ?? 'Rujukan gagal diterbitkan.')
         return
       }
-      onSukses()
       onTutup()
+      onSukses(hasil.pesan ?? 'Rujukan berhasil diterbitkan.')
     })
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-kabut-200 sm:p-7 max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="judul-terbit-rujukan"
+        className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-kabut-200 sm:p-7 max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           type="button"
-          onClick={onTutup}
+          onClick={tutup}
+          aria-label="Tutup"
+          disabled={sedangKirim}
           className="absolute right-5 top-5 flex size-8 items-center justify-center rounded-full bg-kabut-100 text-tinta-600 hover:bg-kabut-200 transition-colors"
         >
           <X className="size-4" />
@@ -74,7 +111,7 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
             <Hospital className="size-6" />
           </div>
           <div>
-            <h2 className="font-display text-lg font-bold text-tinta-900">
+            <h2 id="judul-terbit-rujukan" className="font-display text-lg font-bold text-tinta-900">
               Terbitkan Rujukan ke Rumah Sakit
             </h2>
             <p className="text-xs text-tinta-600">
@@ -86,7 +123,7 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
         <form onSubmit={handleSubmit} className="mt-5 space-y-4 text-xs">
           {/* Rumah Sakit Tujuan */}
           <div>
-            <label className="block font-bold uppercase tracking-wider text-tinta-700">
+            <label htmlFor="rujukan-rs" className="block font-bold uppercase tracking-wider text-tinta-700">
               Rumah Sakit Rujukan Tujuan (RSUD se-Gorontalo) <span className="text-red-500">*</span>
             </label>
             {rumahSakit.length === 0 ? (
@@ -96,6 +133,7 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
               </p>
             ) : (
               <select
+                id="rujukan-rs"
                 value={rsTujuanId}
                 onChange={(e) => setRsTujuanId(e.target.value)}
                 className="mt-1.5 h-12 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
@@ -105,20 +143,26 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
                 {rumahSakit.map((rs) => (
                   <option key={rs.id} value={rs.id}>
                     {rs.nama}
-                    {rs.status === 'usulan' ? ' (belum diverifikasi admin)' : ''}
                   </option>
                 ))}
               </select>
+            )}
+            {rsTerpilih?.status === 'usulan' && (
+              <p className="mt-1 text-[11px] text-amber-800">
+                Data rumah sakit ini belum disahkan admin. Rujukan tetap dapat dikirim.
+              </p>
             )}
           </div>
 
           {/* Diagnosis Kerja Awal */}
           <div>
-            <label className="block font-bold uppercase tracking-wider text-tinta-700">
+            <label htmlFor="rujukan-diagnosis" className="block font-bold uppercase tracking-wider text-tinta-700">
               Diagnosis Kerja / Indikasi Rujukan <span className="text-red-500">*</span>
             </label>
             <input
+              id="rujukan-diagnosis"
               type="text"
+              maxLength={200}
               value={diagnosisAwal}
               onChange={(e) => setDiagnosisAwal(e.target.value)}
               placeholder="Misal: Gizi Buruk (Severe Wasting) & Failure to Thrive"
@@ -129,11 +173,13 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
 
           {/* Alasan & Anamnesis Ringkas */}
           <div>
-            <label className="block font-bold uppercase tracking-wider text-tinta-700">
+            <label htmlFor="rujukan-alasan" className="block font-bold uppercase tracking-wider text-tinta-700">
               Alasan Rujukan &amp; Riwayat Klinis <span className="text-red-500">*</span>
             </label>
             <textarea
+              id="rujukan-alasan"
               rows={3}
+              maxLength={2000}
               value={alasan}
               onChange={(e) => setAlasan(e.target.value)}
               placeholder="Tuliskan temuan klinis, hasil antropometri, penyakit penyerta, dan alasan perujukan..."
@@ -171,7 +217,7 @@ export function ModalTerbitkanRujukan({ balita, terbuka, onTutup, onSukses, ruma
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Button type="button" onClick={onTutup} varian="sekunder">
+            <Button type="button" onClick={tutup} varian="sekunder" disabled={sedangKirim}>
               Batal
             </Button>
             <Button

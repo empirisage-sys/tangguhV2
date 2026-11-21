@@ -18,14 +18,7 @@ import {
   tampilanVelocity,
   sumberAmbangVelocity,
 } from '@/lib/tampilan/status'
-import {
-  formatTanggal,
-  formatZ,
-  formatGramBertanda,
-  formatBerat,
-  formatPanjang,
-  formatUmurBulan,
-} from '@/lib/tampilan/format'
+import { formatTanggal, formatZ, formatGramBertanda, formatBerat, formatPanjang, formatUmurBulan } from '@/lib/tampilan/format'
 import {
   hitungVelocity,
   apakahPerluPKMK,
@@ -34,6 +27,7 @@ import {
 } from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
+import { TombolHapusBalita } from '@/components/balita/TombolHapusBalita'
 
 export default async function HalamanDetailBalita({
   params,
@@ -177,6 +171,7 @@ export default async function HalamanDetailBalita({
             <Plus className="size-4" />
             Catat Pengukuran Baru
           </Link>
+          <TombolHapusBalita balitaId={balita.id} namaBalita={balita.nama} />
           {perluPKMKBalita && (
             <Link
               href="/dietisien"
@@ -236,13 +231,13 @@ export default async function HalamanDetailBalita({
                 <div>
                   <p className="text-tinta-600">Berat Badan</p>
                   <p className="angka mt-0.5 text-base font-bold text-tinta-900">
-                    {skriningTerakhir.beratKg} kg
+                    {formatBerat(skriningTerakhir.beratKg)}
                   </p>
                 </div>
                 <div>
                   <p className="text-tinta-600">Panjang / Tinggi</p>
                   <p className="angka mt-0.5 text-base font-bold text-tinta-900">
-                    {skriningTerakhir.panjangCm} cm
+                    {formatPanjang(skriningTerakhir.panjangCm)}
                   </p>
                 </div>
                 <div>
@@ -333,7 +328,7 @@ export default async function HalamanDetailBalita({
                   </span>
                 </div>
                 <p className="text-xs text-tinta-600 mt-0.5">
-                  Membandingkan penimbangan {formatTanggal(skriningSebelumnya.tanggal)} ({skriningSebelumnya.beratKg} kg) ➔ {formatTanggal(skriningTerakhir.tanggal)} ({skriningTerakhir.beratKg} kg)
+                  Membandingkan penimbangan {formatTanggal(skriningSebelumnya.tanggal)} ({formatBerat(skriningSebelumnya.beratKg)}) ➔ {formatTanggal(skriningTerakhir.tanggal)} ({formatBerat(skriningTerakhir.beratKg)})
                 </p>
               </div>
             </div>
