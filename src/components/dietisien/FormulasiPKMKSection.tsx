@@ -8,6 +8,8 @@ import {
   PRODUK_PKMK,
   type ProdukPKMK,
   produkSesuaiUmur,
+  namaSatuan,
+  namaSatuanPendek,
 } from '@/lib/pkmk/produk'
 import {
   BATAS,
@@ -559,7 +561,7 @@ export function FormulasiPKMKSection({
             <span>
               <span className="block text-sm font-bold text-tinta-900">Saya tentukan takarannya</span>
               <span className="block text-[11px] text-tinta-600">
-                Pilih frekuensi dan sendok per saji. Energinya dihitung aplikasi.
+                Pilih frekuensi dan {namaSatuanPendek(produk.satuanTakar)} per saji. Energinya dihitung aplikasi.
               </span>
             </span>
           </button>
@@ -577,7 +579,7 @@ export function FormulasiPKMKSection({
             <span>
               <span className="block text-sm font-bold text-tinta-900">Hitungkan dari target</span>
               <span className="block text-[11px] text-tinta-600">
-                Pilih target dan frekuensi. Sendok per saji dihitung aplikasi.
+                Pilih target dan frekuensi. Jumlah {namaSatuanPendek(produk.satuanTakar)} per saji dihitung aplikasi.
               </span>
             </span>
           </button>
@@ -624,7 +626,7 @@ export function FormulasiPKMKSection({
 
         <div>
           <label htmlFor="sendokSelect" className="block text-xs font-semibold text-tinta-700">
-            Sendok Takar/Saji
+            <span className="capitalize">{namaSatuan(produk.satuanTakar)}</span>/Saji
           </label>
           {mode === 'dari_takaran' ? (
             <select
@@ -635,7 +637,7 @@ export function FormulasiPKMKSection({
             >
               {Array.from({ length: BATAS.sendokPerSajiMaks }, (_, i) => i + 1).map((s) => (
                 <option key={s} value={s}>
-                  {s} sendok
+                  {s} {namaSatuanPendek(produk.satuanTakar)}
                 </option>
               ))}
             </select>
@@ -644,7 +646,7 @@ export function FormulasiPKMKSection({
               id="sendokSelect"
               className="angka mt-1 flex h-11 w-full items-center rounded-xl border border-dashed border-laut-300 bg-laut-50 px-3 text-sm font-bold text-laut-800"
             >
-              {angka(hasil.sendokPerSaji)} sendok (dihitung)
+              {angka(hasil.sendokPerSaji)} {namaSatuanPendek(produk.satuanTakar)} (dihitung)
             </p>
           )}
         </div>
@@ -736,7 +738,7 @@ export function FormulasiPKMKSection({
             <thead className="text-[11px] uppercase tracking-wide text-tinta-500">
               <tr>
                 <th scope="col" className="px-3 py-2">Frekuensi</th>
-                <th scope="col" className="px-3 py-2">Sendok/saji</th>
+                <th scope="col" className="px-3 py-2 capitalize">{namaSatuanPendek(produk.satuanTakar)}/saji</th>
                 <th scope="col" className="px-3 py-2">Energi</th>
                 <th scope="col" className="px-3 py-2">% target</th>
                 <th scope="col" className="px-3 py-2">Volume/saji</th>

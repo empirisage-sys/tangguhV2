@@ -18,13 +18,48 @@
  * Wajib diverifikasi dietisien sebelum dipakai untuk asuhan gizi nyata.
  */
 
+/**
+ * Satuan takar yang dipakai label kemasan.
+ *
+ * Sebagian besar produk ditakar dengan sendok takar dari dalam kaleng. Ada
+ * produk yang dikemas per sachet (Transvita 40 g: satu sachet untuk satu
+ * saji, tidak dibagi di luar rumah sakit) dan ada label yang masih memakai
+ * sendok makan. Seluruh angka "per sendok" di modul ini sebenarnya berarti
+ * "per satuan takar"; nama kolomnya dipertahankan demi kompatibilitas.
+ */
+export const SATUAN_TAKAR = ['sendok_takar', 'sachet', 'sendok_makan'] as const
+export type SatuanTakar = (typeof SATUAN_TAKAR)[number]
+
+const NAMA_SATUAN: Record<SatuanTakar, { panjang: string; pendek: string }> = {
+  sendok_takar: { panjang: 'sendok takar', pendek: 'sendok' },
+  sachet: { panjang: 'sachet', pendek: 'sachet' },
+  sendok_makan: { panjang: 'sendok makan', pendek: 'sdm' },
+}
+
+/** Membaca nilai mentah menjadi satuan sah. Nilai tak dikenal dianggap sendok takar. */
+export function satuanSah(nilai: unknown): SatuanTakar {
+  return (SATUAN_TAKAR as readonly unknown[]).includes(nilai) ? (nilai as SatuanTakar) : 'sendok_takar'
+}
+
+/** Nama satuan untuk kalimat, misalnya "sendok takar" atau "sachet". */
+export function namaSatuan(satuan: SatuanTakar | undefined | null): string {
+  return NAMA_SATUAN[satuanSah(satuan)].panjang
+}
+
+/** Nama satuan ringkas untuk sel tabel, misalnya "sendok" atau "sachet". */
+export function namaSatuanPendek(satuan: SatuanTakar | undefined | null): string {
+  return NAMA_SATUAN[satuanSah(satuan)].pendek
+}
+
 /** Angka mentah sebagaimana tercetak pada label kemasan. */
 export type LabelProdukPKMK = {
   id: string
   nama: string
   merek: string
-  /** Jumlah sendok takar untuk satu saji, menurut label. */
+  /** Jumlah satuan takar (sendok takar, sachet, ...) untuk satu saji, menurut label. */
   sendokPerSaji: number
+  /** Satuan takar. Kosong berarti sendok takar. */
+  satuanTakar?: SatuanTakar
   /** Energi satu saji dalam kkal, menurut label. */
   kkalPerSaji: number
   /** Volume LARUTAN JADI satu saji dalam ml, menurut label. */

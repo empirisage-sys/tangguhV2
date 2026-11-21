@@ -17,6 +17,7 @@
  * (AGENTS.md 2.4). Teksnya disusun di `teks.ts`.
  */
 
+import type { SatuanTakar } from './produk'
 import type { HasilTakaran } from './hitung'
 
 /** Kisi jam anjuran, dua jam sekali. */
@@ -41,8 +42,10 @@ export type SlotJadwal = {
   jenis: JenisSlot
   /** Hanya untuk jenis `pkmk`: energi satu saji, kkal. */
   kkalPerSaji?: number
-  /** Hanya untuk jenis `pkmk`: jumlah sendok takar satu saji. */
+  /** Hanya untuk jenis `pkmk`: jumlah satuan takar satu saji. */
   sendokPerSaji?: number
+  /** Hanya untuk jenis `pkmk`: satuan takar produk (sendok takar, sachet, ...). */
+  satuanTakar?: SatuanTakar
   /** Hanya untuk jenis `pkmk`: volume larutan satu saji, ml. */
   mlPerSaji?: number
 }
@@ -143,6 +146,7 @@ export function susunJadwal({ hasil, masihASI }: MasukanJadwal): Jadwal {
         jenis: 'pkmk',
         kkalPerSaji,
         sendokPerSaji: hasil.sendokPerSaji,
+        satuanTakar: hasil.produk.satuanTakar,
         mlPerSaji: hasil.mlLarutanPerSaji,
       }
     }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SATUAN_TAKAR, namaSatuan, type SatuanTakar } from '@/lib/pkmk/produk'
 
 /**
  * Skema validasi produk PKMK (Pangan Olahan untuk Keperluan Medis Khusus)
@@ -37,6 +38,19 @@ const TOLERANSI = {
  */
 const MAKS_RUANG_BUBUK_PER_SENDOK_ML = 25
 
+/**
+ * Batas ruang bubuk per SATUAN TAKAR. Sendok takar dan sendok makan memakai
+ * batas di atas. Satu sachet berisi bubuk satu saji penuh (Transvita 40 g),
+ * sehingga ruangnya beberapa kali lipat satu sendok: 40 g bubuk menempati
+ * sekitar 25-35 ml setelah larut. Batas 80 ml tetap menangkap salah ketik.
+ * Angka ini pilihan kami, bukan angka label.
+ */
+const MAKS_RUANG_BUBUK_ML: Record<SatuanTakar, number> = {
+  sendok_takar: MAKS_RUANG_BUBUK_PER_SENDOK_ML,
+  sendok_makan: MAKS_RUANG_BUBUK_PER_SENDOK_ML,
+  sachet: 80,
+}
+
 const medanProdukPKMK = z.object({
   id: z.string().optional(),
   nama: z
@@ -58,6 +72,7 @@ const medanProdukPKMK = z.object({
     .int('Jumlah sendok harus bilangan bulat.')
     .min(1, 'Jumlah sendok per saji minimal 1 sendok.')
     .max(30, 'Jumlah sendok per saji maksimal 30 sendok.'),
+  satuanTakar: z.enum(SATUAN_TAKAR).default('sendok_takar'),
   densitasKkalPerMl: z.coerce
     .number({ invalid_type_error: 'Densitas kkal/ml harus berupa angka.' })
     .positive('Densitas harus lebih besar dari 0.')
@@ -180,15 +195,16 @@ export const skemaProdukPKMKAdmin = medanProdukPKMK
     }
 
     const bubukPerSendok = ruangBubuk / d.sendokPerSaji
-    if (bubukPerSendok > MAKS_RUANG_BUBUK_PER_SENDOK_ML) {
+    const batasRuang = MAKS_RUANG_BUBUK_ML[d.satuanTakar]
+    const satuan = namaSatuan(d.satuanTakar)
+    if (bubukPerSendok > batasRuang) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['mlPerSaji'],
         message:
           `Selisih larutan jadi (${d.mlPerSaji} ml) dan air (${airTotal} ml) adalah ` +
-          `${ruangBubuk.toFixed(0)} ml, atau ${bubukPerSendok.toFixed(1)} ml per sendok takar. ` +
-          `Satu sendok bubuk hanya menempati sekitar 8-10 ml, jadi angka di atas ` +
-          `${MAKS_RUANG_BUBUK_PER_SENDOK_ML} ml per sendok hampir pasti salah ketik. ` +
+          `${ruangBubuk.toFixed(0)} ml, atau ${bubukPerSendok.toFixed(1)} ml per ${satuan}. ` +
+          `Angka di atas ${batasRuang} ml per ${satuan} hampir pasti salah ketik. ` +
           'Periksa kembali volume larutan jadi atau takaran airnya.',
       })
     }

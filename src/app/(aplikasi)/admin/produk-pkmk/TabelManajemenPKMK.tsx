@@ -8,6 +8,12 @@ import {
   adminHapusProdukPKMK,
 } from './actions'
 import { type ProdukPKMK, hitungKkalPerSendok } from '@/lib/db/pkmk'
+import {
+  SATUAN_TAKAR,
+  namaSatuan,
+  namaSatuanPendek,
+  type SatuanTakar,
+} from '@/lib/pkmk/produk'
 import { BATAS as BATAS_TAKARAN, hitungTakaran, type HasilTakaran } from '@/lib/pkmk/hitung'
 import { bacaSeluruhPeringatan, ringkasanTakaran } from '@/lib/pkmk/teks'
 import {
@@ -53,6 +59,9 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
   const [formMerek, setFormMerek] = useState('')
   const [formKkalPerSaji, setFormKkalPerSaji] = useState<number>(180)
   const [formSendokPerSaji, setFormSendokPerSaji] = useState<number>(5)
+  const [formSatuan, setFormSatuan] = useState<SatuanTakar>('sendok_takar')
+  const satuanForm = namaSatuan(formSatuan)
+  const satuanFormPendek = namaSatuanPendek(formSatuan)
   const [formMlAirPerSendok, setFormMlAirPerSendok] = useState<number>(30)
   const [formMlPerSaji, setFormMlPerSaji] = useState<number>(180)
   const [formMinUsia, setFormMinUsia] = useState<number>(12)
@@ -131,6 +140,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
       nama: formNama || 'Produk Uji',
       merek: formMerek || 'Merek',
       sendokPerSaji: formSendokPerSaji || 5,
+      satuanTakar: formSatuan,
       kkalPerSaji: formKkalPerSaji || 180,
       mlLarutanPerSaji,
       mlPerSaji: mlLarutanPerSaji,
@@ -156,6 +166,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     formNama,
     formMerek,
     formSendokPerSaji,
+    formSatuan,
     formKkalPerSaji,
     formMlPerSaji,
     formMlAirPerSendok,
@@ -195,6 +206,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     setFormMerek('')
     setFormKkalPerSaji(180)
     setFormSendokPerSaji(5)
+    setFormSatuan('sendok_takar')
     setFormMlAirPerSendok(30)
     setFormMlPerSaji(180)
     setFormMinUsia(12)
@@ -216,6 +228,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     setFormMerek(p.merek)
     setFormKkalPerSaji(p.kkalPerSaji)
     setFormSendokPerSaji(p.sendokPerSaji)
+    setFormSatuan(p.satuanTakar ?? 'sendok_takar')
     // Densitas tidak dipulihkan dari data lama: ia diturunkan ulang dari kkal
     // dan volume yang baru saja dimuat. Produk lama yang densitasnya tersimpan
     // keliru akan terkoreksi sendiri begitu disimpan ulang.
@@ -245,6 +258,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
     formData.append('merek', formMerek)
     formData.append('kkalPerSaji', String(formKkalPerSaji))
     formData.append('sendokPerSaji', String(formSendokPerSaji))
+    formData.append('satuanTakar', formSatuan)
     formData.append('densitasKkalPerMl', String(formDensitas))
     formData.append('mlAirPerSendok', String(formMlAirPerSendok))
     formData.append('mlPerSaji', String(formMlPerSaji))
@@ -457,7 +471,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                           {item.kkalPerSaji} kkal
                         </div>
                         <div className="text-[11px] text-tinta-500">
-                          per {item.sendokPerSaji} sendok takar
+                          per {item.sendokPerSaji} {namaSatuan(item.satuanTakar)}
                         </div>
                       </td>
 
@@ -466,7 +480,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                         <div className="inline-flex flex-col items-center">
                           <span className="inline-flex items-center gap-1 rounded-full bg-laut-100 px-2.5 py-1 font-mono text-xs font-black text-laut-800 ring-1 ring-laut-200">
                             <Flame className="size-3 text-amber-500" />
-                            {kkalSendok.toFixed(1)} kkal / sdk
+                            {kkalSendok.toFixed(1)} kkal / {namaSatuanPendek(item.satuanTakar)}
                           </span>
                           <span className="mt-0.5 text-[10px] text-tinta-400">
                             ({item.kkalPerSaji} ÷ {item.sendokPerSaji})
@@ -480,7 +494,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                           {item.densitasKkalPerMl.toFixed(2)} kkal/ml
                         </div>
                         <div className="text-[11px] text-tinta-500">
-                          {item.mlAirPerSendok} ml air / sendok
+                          {item.mlAirPerSendok} ml air / {namaSatuanPendek(item.satuanTakar)}
                         </div>
                       </td>
 
@@ -645,6 +659,28 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                   </span>
                 </div>
 
+                <div>
+                  <label htmlFor="satuanTakar" className="block text-xs font-semibold text-tinta-700">
+                    Satuan Takar <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="satuanTakar"
+                    value={formSatuan}
+                    onChange={(e) => setFormSatuan(e.target.value as SatuanTakar)}
+                    className="mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none focus:ring-2 focus:ring-laut-500/20"
+                  >
+                    {SATUAN_TAKAR.map((s) => (
+                      <option key={s} value={s}>
+                        {namaSatuan(s)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-tinta-500">
+                    Ikuti label kemasan. Pilih <strong>sachet</strong> bila satu saji memakai satu
+                    bungkus utuh (misalnya Transvita 40 g): takaran selalu dibulatkan ke sachet utuh.
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-semibold text-tinta-700">
@@ -668,7 +704,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
 
                   <div>
                     <label className="block text-xs font-semibold text-tinta-700">
-                      Jumlah Sendok Takar per Saji <span className="text-rose-500">*</span>
+                      Jumlah <span className="capitalize">{satuanForm}</span> per Saji <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -681,7 +717,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                       className="font-mono mt-1 h-11 w-full rounded-xl border border-kabut-200 bg-white px-3.5 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none focus:ring-2 focus:ring-laut-500/20"
                     />
                     <p className="mt-1 text-[11px] text-tinta-500">
-                      Berapa sendok takar untuk membuat 1 porsi saji di atas.
+                      Berapa {satuanForm} untuk membuat 1 porsi saji di atas.
                     </p>
                   </div>
                 </div>
@@ -691,17 +727,17 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-laut-700">
-                        Hasil Perhitungan Kalori per Sendok Takar
+                        Hasil Perhitungan Kalori per <span>{satuanForm}</span>
                       </span>
                       <p className="text-xs text-tinta-500">
-                        {formKkalPerSaji} kkal ÷ {formSendokPerSaji} sendok takar
+                        {formKkalPerSaji} kkal ÷ {formSendokPerSaji} {satuanForm}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-2xl font-black text-laut-800 sm:text-3xl">
                         {formKkalPerSendok.toFixed(1)}
                       </span>
-                      <span className="text-xs font-bold text-laut-700">kkal / sendok</span>
+                      <span className="text-xs font-bold text-laut-700">kkal / {satuanFormPendek}</span>
                     </div>
                   </div>
 
@@ -733,20 +769,20 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
 
                   <div>
                     <label className="block text-xs font-semibold text-tinta-700">
-                      Air per Sendok (ml) <span className="text-rose-500">*</span>
+                      Air per <span className="capitalize">{satuanFormPendek}</span> (ml) <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
                       required
-                      min={10}
-                      max={100}
+                      min={5}
+                      max={200}
                       step={0.5}
                       value={formMlAirPerSendok}
                       onChange={(e) => setFormMlAirPerSendok(Number(e.target.value))}
                       className="font-mono mt-1 h-10 w-full rounded-xl border border-kabut-200 bg-white px-3 text-xs font-bold text-tinta-900 focus:border-laut-500 focus:outline-none"
                     />
                     <p className="mt-1 text-[10px] text-tinta-500">
-                      Air hangat yang DITUANG per 1 sendok takar — sebelum bubuk larut.
+                      Air hangat yang DITUANG per 1 {satuanForm} — sebelum bubuk larut.
                     </p>
                   </div>
 
@@ -823,7 +859,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
 
                   <div>
                     <label className="block text-xs font-semibold text-tinta-700">
-                      Gram/Sendok (g)
+                      Gram/<span className="capitalize">{satuanFormPendek}</span> (g)
                     </label>
                     <input
                       type="number"
@@ -893,7 +929,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                     <div className="rounded-xl bg-white p-2.5 text-center shadow-xs">
                       <span className="text-[10px] text-tinta-500">Takaran per Minum</span>
                       <p className="font-mono text-xs font-bold text-laut-700">
-                        {previewSimulasi.sendokPerSaji} sendok
+                        {previewSimulasi.sendokPerSaji} {satuanFormPendek}
                       </p>
                     </div>
                     {/* Energi NYATA, bukan target. Inilah invarian T-1. */}
@@ -971,7 +1007,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                     Simulator Resep: {simulatorTarget.nama}
                   </h3>
                   <p className="text-xs text-tinta-500">
-                    Kkal per sendok: {simulatorTarget.kkalPerSendok} kkal
+                    Kkal per {namaSatuan(simulatorTarget.satuanTakar)}: {simulatorTarget.kkalPerSendok} kkal
                   </p>
                 </div>
               </div>
@@ -1049,10 +1085,10 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                       <div className="rounded-xl bg-white p-3 shadow-xs">
                         <span className="text-[10px] text-tinta-500">Takaran Tiap Minum</span>
                         <p className="font-mono text-base font-extrabold text-laut-800">
-                          {res.sendokPerSaji} sendok takar
+                          {res.sendokPerSaji} {namaSatuan(simulatorTarget.satuanTakar)}
                         </p>
                         <p className="text-[10px] text-tinta-400">
-                          {res.frekuensiPerHari}x sehari — total {res.sendokPerHari} sendok/hari
+                          {res.frekuensiPerHari}x sehari — total {res.sendokPerHari} {namaSatuanPendek(simulatorTarget.satuanTakar)}/hari
                         </p>
                       </div>
 
@@ -1086,7 +1122,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                           {res.mlLarutanPerSaji} ml
                         </p>
                         <p className="text-[10px] text-tinta-400">
-                          Air per sendok menurut label: {simulatorTarget.mlAirPerSendok ?? '-'} ml
+                          Air per {namaSatuanPendek(simulatorTarget.satuanTakar)} menurut label: {simulatorTarget.mlAirPerSendok ?? '-'} ml
                         </p>
                       </div>
                       <div className="rounded-xl bg-white p-3 shadow-xs">
@@ -1095,7 +1131,7 @@ export function TabelManajemenPKMK({ daftarProduk }: Props) {
                           {res.mlLarutanPerHari} ml
                         </p>
                         <p className="text-[10px] text-tinta-400">
-                          {res.kkalPerSendok.toFixed(1)} kkal per sendok takar
+                          {res.kkalPerSendok.toFixed(1)} kkal per {namaSatuan(simulatorTarget.satuanTakar)}
                         </p>
                       </div>
                     </div>
