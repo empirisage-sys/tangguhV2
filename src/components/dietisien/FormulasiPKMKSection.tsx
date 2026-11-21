@@ -21,8 +21,15 @@ import {
 import {
   bacaSeluruhPeringatan,
   keteranganProduk,
+  ringkasanKebutuhan,
   ringkasanTakaran,
 } from '@/lib/pkmk/teks'
+import {
+  DURASI_BAWAAN_HARI,
+  PILIHAN_DURASI_HARI,
+  UKURAN_KEMASAN_UMUM_GRAM,
+  hitungKebutuhanKemasan,
+} from '@/lib/pkmk/kebutuhan'
 
 export type DataAsuhanGiziPKMK = {
   tataLaksana: string
@@ -82,6 +89,12 @@ export type FormulasiPKMKProps = {
    * peresepan — termasuk penonaktifan produk yang ditarik dari peredaran.
    */
   daftarProduk?: ProdukPKMK[]
+  /**
+   * Menampilkan perhitungan jumlah kemasan (kaleng/boks) untuk masa peresepan.
+   * Hanya untuk petugas yang meresepkan (dokter, dietisien), tidak untuk
+   * Skrining Tamu publik.
+   */
+  tampilkanKebutuhanKemasan?: boolean
 }
 
 type StatusMuatProduk = 'memuat' | 'siap' | 'cadangan'
@@ -105,6 +118,7 @@ export function FormulasiPKMKSection({
   aksiSimpan,
   onSimpan,
   daftarProduk,
+  tampilkanKebutuhanKemasan = false,
 }: FormulasiPKMKProps) {
   // ==========================================================================
   // MASTER DATA PRODUK
@@ -234,6 +248,23 @@ export function FormulasiPKMKSection({
   )
 
   const peringatan = bacaSeluruhPeringatan(hasil)
+
+  // Kebutuhan kemasan untuk masa peresepan. Ukuran kemasan dipilih dokter
+  // setiap kali meresepkan (400 g, 800 g, atau ukuran lain).
+  const [durasiHari, setDurasiHari] = useState<number>(DURASI_BAWAAN_HARI)
+  const [pilihanKemasan, setPilihanKemasan] = useState<string>('400')
+  const [kemasanLainGram, setKemasanLainGram] = useState<string>('')
+  const gramPerKemasan =
+    pilihanKemasan === 'lain'
+      ? Number(kemasanLainGram.replace(',', '.'))
+      : Number(pilihanKemasan)
+  const kebutuhan = hitungKebutuhanKemasan({
+    satuanPerHari: hasil.sendokPerHari,
+    gramPerSatuan: produkAman.gramPerSendokTakar,
+    hari: durasiHari,
+    gramPerKemasan,
+  })
+  const teksKebutuhan = ringkasanKebutuhan(kebutuhan, produkAman.satuanTakar)
   const sisaMakanan = sisaDariMakanan(kebutuhanKkal, hasil)
   const daftarPilihan = useMemo(
     () => (mode === 'dari_target' && produk ? pilihanTakaran(produk, targetKkal) : []),
@@ -704,6 +735,52 @@ export function FormulasiPKMKSection({
           </div>
         </div>
       </div>
+
+      {/* 4b. Jumlah kemasan untuk masa peresepan (hanya petugas) */}
+      {tampilkanKebutuhanKemasan && (
+        <div className="rounded-xl border border-laut-200 bg-white p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-laut-800">
+            Kebutuhan susu untuk diresepkan
+          </p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="durasiResep" className="block text-xs font-semibold text-tinta-700">
+                Masa peresepan
+              </label>
+              <select id="durasiResep" value={durasiHari}
+                onChange={(e) => setDurasiHari(Number(e.target.value))} className={kelasSelect}>
+                {PILIHAN_DURASI_HARI.map((h) => (
+                  <option key={h} value={h}>{h} hari{h === 14 ? ' (2 minggu)' : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="ukuranKemasan" className="block text-xs font-semibold text-tinta-700">
+                Ukuran kemasan
+              </label>
+              <select id="ukuranKemasan" value={pilihanKemasan}
+                onChange={(e) => setPilihanKemasan(e.target.value)} className={kelasSelect}>
+                {UKURAN_KEMASAN_UMUM_GRAM.map((g) => (
+                  <option key={g} value={String(g)}>{g} g</option>
+                ))}
+                <option value="lain">Ukuran lain…</option>
+              </select>
+            </div>
+            {pilihanKemasan === 'lain' && (
+              <div>
+                <label htmlFor="kemasanLain" className="block text-xs font-semibold text-tinta-700">
+                  Isi kemasan (gram)
+                </label>
+                <input id="kemasanLain" inputMode="decimal" value={kemasanLainGram}
+                  onChange={(e) => setKemasanLainGram(e.target.value)} placeholder="mis. 380"
+                  className={kelasSelect} />
+              </div>
+            )}
+          </div>
+          <p className="mt-3 font-display text-base font-black text-laut-900">{teksKebutuhan.judul}</p>
+          <p className="angka mt-1 text-xs text-tinta-600">{teksKebutuhan.rincian}</p>
+        </div>
+      )}
 
       {/* 5. Peringatan — seluruhnya, tanpa disaring */}
       {peringatan.length > 0 && (

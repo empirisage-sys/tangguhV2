@@ -383,8 +383,11 @@ export async function adminResetPasswordManual(
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
+    // Sandi yang ditetapkan admin adalah sandi SEMENTARA: pemiliknya wajib
+    // menggantinya saat masuk berikutnya (lihat /ganti-sandi).
     const { error } = await adminAuth.auth.admin.updateUserById(penggunaId, {
       password: hasil.data.sandiBaru,
+      app_metadata: { wajib_ganti_sandi: true },
     })
 
     if (error) {
@@ -399,6 +402,6 @@ export async function adminResetPasswordManual(
   revalidatePath('/admin/pengguna')
   return {
     ok: true,
-    pesan: 'Kata sandi pengguna berhasil diatur ulang. Pengguna dapat langsung masuk dengan kata sandi baru tersebut.',
+    pesan: 'Kata sandi pengguna berhasil diatur ulang. Pengguna dapat masuk dengan kata sandi tersebut dan akan diminta menggantinya saat masuk.',
   }
 }

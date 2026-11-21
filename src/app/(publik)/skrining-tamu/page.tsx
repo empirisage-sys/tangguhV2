@@ -36,7 +36,7 @@ import { LencanaStatus } from '@/components/ui/LencanaStatus'
 import { PitaZScore } from '@/components/skrining/PitaZScore'
 import { PanelKurva } from '@/components/grafik/PanelKurva'
 import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSection'
-import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
+import { formatTanggal, formatZ, formatGramBertanda, formatBerat, formatPanjang } from '@/lib/tampilan/format'
 import { Button } from '@/components/ui/Button'
 import type { KunjunganRiwayat } from '@/lib/grafik/seri'
 import {
@@ -907,8 +907,8 @@ export default function HalamanSkriningTamu() {
 
               {/* Energi */}
               <div className="mt-6 grid grid-cols-2 gap-4 rounded-2xl bg-laut-50 p-4 text-xs ring-1 ring-laut-200 sm:grid-cols-4">
-                <div><p className="text-laut-700">Berat Terukur</p><p className="angka text-base font-bold text-laut-900">{beratKg} kg</p></div>
-                <div><p className="text-laut-700">Tinggi Terkoreksi</p><p className="angka text-base font-bold text-laut-900">{hasil.panjangTerkoreksiCm} cm</p></div>
+                <div><p className="text-laut-700">Berat Terukur</p><p className="angka text-base font-bold text-laut-900">{formatBerat(parseFloat(beratKg.replace(',', '.')))}</p></div>
+                <div><p className="text-laut-700">Tinggi Terkoreksi</p><p className="angka text-base font-bold text-laut-900">{formatPanjang(hasil.panjangTerkoreksiCm)}</p></div>
                 <div><p className="text-laut-700">Energi Pemeliharaan</p><p className="angka text-base font-bold text-laut-900">{hasil.gizi?.kaloriPemeliharaanKkal ?? '—'} kkal/hari</p></div>
                 <div><p className="text-laut-700">Target Tumbuh Kejar</p><p className="angka text-base font-bold text-amber-800">{hasil.gizi?.kaloriCatchUpKkal ?? '—'} kkal/hari</p></div>
                 {lilaCm && (
@@ -976,7 +976,7 @@ export default function HalamanSkriningTamu() {
                         </span>
                       </div>
                       <p className="text-xs text-tinta-600 mt-0.5">
-                        Membandingkan penimbangan {formatTanggal(tanggalSebelumnya)} ({beratSebelumnyaKg} kg) ➔ {formatTanggal(tanggalPeriksa)} ({beratKg} kg)
+                        Membandingkan penimbangan {formatTanggal(tanggalSebelumnya)} ({formatBerat(parseFloat(beratSebelumnyaKg.replace(',', '.')))}) ➔ {formatTanggal(tanggalPeriksa)} ({formatBerat(parseFloat(beratKg.replace(',', '.')))})
                       </p>
                     </div>
                   </div>

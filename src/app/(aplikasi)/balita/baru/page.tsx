@@ -22,6 +22,21 @@ import { FormulirBalitaBaru } from './formulir'
 export default async function HalamanBalitaBaru() {
   const profil = await ambilProfil()
 
+  if (profil?.peran === 'admin') {
+    return (
+      <div className="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-[var(--shadow-kartu)]">
+        <p className="font-bold text-tinta-900">Akun administrator tidak mendaftarkan balita</p>
+        <p className="mt-2 text-sm text-tinta-600">
+          Pendaftaran balita dilakukan oleh kader, dokter, dietisien, atau dokter spesialis anak.
+          Untuk mencoba alur ini, buat akun petugas uji di menu Manajemen Akun.
+        </p>
+        <Link href="/balita" className="mt-4 inline-block text-sm font-bold text-laut-700">
+          Kembali ke Data Balita
+        </Link>
+      </div>
+    )
+  }
+
   const perluPilih = profil ? perluMemilihPosyandu(profil) : false
   const daftarPosyandu = perluPilih && profil ? await daftarPosyanduWilayah(profil) : []
 

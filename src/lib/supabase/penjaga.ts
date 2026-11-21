@@ -28,6 +28,12 @@ export type ProfilAktif = {
   kabupatenId: string | null
   provinsiId: string | null
   jenisFaskes: 'puskesmas' | 'rumah_sakit' | null
+  /**
+   * `true` bila akun masih memakai kata sandi sementara dari administrator.
+   * Dibaca dari `app_metadata`, yang hanya dapat diubah server dengan kunci
+   * rahasia, bukan dari `user_metadata` yang dapat diubah pengguna sendiri.
+   */
+  wajibGantiSandi: boolean
 }
 
 export class TidakBerwenangError extends Error {
@@ -52,6 +58,7 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
   const { data: klaim } = await supabase.auth.getClaims()
   const penggunaId = klaim?.claims?.sub
   if (!penggunaId) return null
+  const wajibGantiSandi = bacaWajibGantiSandi(klaim?.claims)
 
   const { data } = await supabase
     .from('profiles')
@@ -101,7 +108,16 @@ export async function ambilProfil(): Promise<ProfilAktif | null> {
     kabupatenId: data.kabupaten_id,
     provinsiId: data.provinsi_id,
     jenisFaskes: data.jenis_faskes as ProfilAktif['jenisFaskes'],
+    wajibGantiSandi,
   }
+}
+
+/** Membaca penanda kata sandi sementara dari klaim JWT. Tidak pernah melempar. */
+export function bacaWajibGantiSandi(klaim: unknown): boolean {
+  if (!klaim || typeof klaim !== 'object') return false
+  const app = (klaim as { app_metadata?: unknown }).app_metadata
+  if (!app || typeof app !== 'object') return false
+  return (app as Record<string, unknown>).wajib_ganti_sandi === true
 }
 
 /**
@@ -129,6 +145,12 @@ export async function wajibPeran(peran: Peran[]): Promise<ProfilAktif> {
   if (!profil) {
     throw new TidakBerwenangError(
       'Akun Anda belum diverifikasi admin, sehingga tindakan ini belum dapat dilakukan.',
+    )
+  }
+
+  if (profil.wajibGantiSandi) {
+    throw new TidakBerwenangError(
+      'Akun Anda masih memakai kata sandi sementara. Ganti kata sandi terlebih dahulu.',
     )
   }
 
@@ -213,6 +235,39 @@ export async function wilayahUntukMenulisBalita(
   profil: ProfilAktif,
   posyanduIdPilihan: string | null,
 ): Promise<WilayahTulis> {
+  // ==========================================================================
+  // DOKTER SPESIALIS ANAK (temuan audit 21 November 2026)
+  //
+  // Profil spesialis anak bertugas di rumah sakit dan sengaja TIDAK memiliki
+  // puskesmas. Pemeriksaan puskesmas di bawah karena itu selalu menolaknya
+  // ("wilayah kerja belum lengkap"), padahal perannya diizinkan mendaftarkan
+  // balita dan policy RLS "tambah balita sesuai cakupan" mengizinkannya untuk
+  // posyandu mana pun. Wilayah balita mengikuti posyandu asal anak, yang
+  // dipilih dari seluruh posyandu; puskesmas dan kabupaten diambil dari data
+  // induk posyandu itu, tidak dari formulir.
+  // ==========================================================================
+  if (profil.peran === 'dokter_spesialis_anak') {
+    if (!posyanduIdPilihan || !POLA_UUID.test(posyanduIdPilihan)) {
+      throw new TidakBerwenangError('Pilih dulu posyandu asal balita ini.')
+    }
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('posyandu')
+      .select('id, puskesmas_id, puskesmas:puskesmas_id ( kabupaten_id )')
+      .eq('id', posyanduIdPilihan)
+      .maybeSingle()
+    const induk = Array.isArray(data?.puskesmas) ? data?.puskesmas[0] : data?.puskesmas
+    const kabupatenId = (induk as { kabupaten_id?: string } | null | undefined)?.kabupaten_id
+    if (!data?.puskesmas_id || !kabupatenId) {
+      throw new TidakBerwenangError('Posyandu yang dipilih tidak ditemukan di data induk.')
+    }
+    return {
+      posyanduId: data.id as string,
+      puskesmasId: data.puskesmas_id as string,
+      kabupatenId,
+    }
+  }
+
   if (!profil.puskesmasId || !profil.kabupatenId) {
     throw new TidakBerwenangError(
       'Wilayah kerja pada profil Anda belum lengkap. Hubungi admin untuk melengkapinya.',
@@ -262,6 +317,26 @@ export async function wilayahUntukMenulisBalita(
 export async function daftarPosyanduWilayah(
   profil: ProfilAktif,
 ): Promise<{ id: string; nama: string; desa: string | null }[]> {
+  // Spesialis anak memilih dari seluruh posyandu (posyandu asal pasien),
+  // dengan nama puskesmasnya agar posyandu bernama sama dapat dibedakan.
+  if (profil.peran === 'dokter_spesialis_anak') {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('posyandu')
+      .select('id, nama, desa, puskesmas:puskesmas_id ( nama )')
+      .order('nama')
+    return (data ?? []).map((p) => {
+      const pkm = Array.isArray(p.puskesmas) ? p.puskesmas[0] : p.puskesmas
+      const namaPkm = (pkm as { nama?: string } | null)?.nama
+      const desa = (p.desa as string | null) ?? null
+      return {
+        id: p.id as string,
+        nama: p.nama as string,
+        desa: [desa, namaPkm ? `Pkm ${namaPkm}` : null].filter(Boolean).join(' · ') || null,
+      }
+    })
+  }
+
   if (!profil.puskesmasId) return []
 
   const supabase = await createClient()

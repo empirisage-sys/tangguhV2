@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { hitungRekap, persen } from '@/lib/rekap/agregat'
 import {
   BarChart3,
   Calendar,
@@ -12,7 +13,7 @@ import {
   Sparkles,
   TrendingDown,
 } from 'lucide-react'
-import { KABUPATEN_GORONTALO, getPuskesmasByKabupaten, getPosyanduByPuskesmas } from '@/lib/db/wilayah'
+import { KABUPATEN_GORONTALO } from '@/lib/db/wilayah'
 import type { BalitaDetail } from '@/lib/db/balita'
 import { Button } from '@/components/ui/Button'
 
@@ -39,40 +40,49 @@ export function PanelRekapitulasi({
   daftarBalita: BalitaDetail[]
   galatBaca: string | null
 }) {
-  const [kabupatenId, setKabupatenId] = useState<string>('kab-7571')
-  const [bulan, setBulan] = useState<string>('2026-08')
+  // Bulan bawaan: bulan berjalan menurut jam perangkat. Dahulu dipatok
+  // '2026-08' dan kabupaten 'kab-7571', dan keduanya tidak dipakai menghitung.
+  const [kabupaten, setKabupaten] = useState<string>('semua')
+  const [bulan, setBulan] = useState<string>(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
   const [sedangUnduh, setSedangUnduh] = useState<boolean>(false)
 
-  const totalBalita = daftarBalita.length
-  const totalSkrining = daftarBalita.reduce((acc, b) => acc + b.riwayat.length, 0)
-
-  // Hitung jumlah stunting & wasting dengan pembilang/penyebut
-  let countStunting = 0
-  let countWasting = 0
-  let countRedFlag = 0
-
-  for (const b of daftarBalita) {
-    const s = b.riwayat[b.riwayat.length - 1]
-    if (s) {
-      if (s.statusTBU === 'pendek' || s.statusTBU === 'sangat_pendek') countStunting++
-      if (s.statusBBTB === 'gizi_kurang' || s.statusBBTB === 'gizi_buruk') countWasting++
-      if (s.statusBBTB === 'gizi_buruk' || s.statusTBU === 'sangat_pendek') countRedFlag++
-    }
-  }
-
-  const pStunting = totalBalita > 0 ? ((countStunting / totalBalita) * 100).toFixed(1) : '0.0'
-  const pWasting = totalBalita > 0 ? ((countWasting / totalBalita) * 100).toFixed(1) : '0.0'
-  const pRedFlag = totalBalita > 0 ? ((countRedFlag / totalBalita) * 100).toFixed(1) : '0.0'
+  const rekap = useMemo(() => hitungRekap(daftarBalita, { bulan, kabupaten }), [daftarBalita, bulan, kabupaten])
+  const totalBalita = rekap.balitaDitimbang
+  const totalSkrining = rekap.jumlahPengukuran
+  const countStunting = rekap.stunting
+  const countWasting = rekap.wasting
+  const countRedFlag = rekap.rujukan
+  const tampilPersen = (n: number | null) =>
+    n === null ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const pStunting = tampilPersen(persen(countStunting, totalBalita))
+  const pWasting = tampilPersen(persen(countWasting, totalBalita))
+  const pRedFlag = tampilPersen(persen(countRedFlag, totalBalita))
+  const pilihanKabupaten = useMemo(() => {
+    const nama = new Set<string>(KABUPATEN_GORONTALO.map((k) => k.nama))
+    for (const b of daftarBalita) if (b.namaKabupaten) nama.add(b.namaKabupaten)
+    return [...nama].sort()
+  }, [daftarBalita])
 
   const unduhExcel = async () => {
     setSedangUnduh(true)
     try {
       const response = await fetch('/api/ekspor/excel')
+      // Dahulu jawaban galat (mis. "tidak ada balita", 404) ikut diunduh
+      // sebagai berkas .xlsx berisi JSON yang tidak dapat dibuka.
+      if (!response.ok) {
+        const isi = await response.json().catch(() => null)
+        window.alert(isi?.error ?? 'Berkas Excel belum dapat dibuat. Coba lagi.')
+        return
+      }
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Rekap_TANGGUH_Gorontalo_${bulan}.xlsx`
+      // Berkas Excel memuat SELURUH data dalam cakupan, tidak mengikuti filter.
+      a.download = `Data_TANGGUH_Gorontalo_${new Date().toISOString().slice(0, 10)}.xlsx`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -121,7 +131,7 @@ export function PanelRekapitulasi({
             varian="utama"
           >
             <Download className="size-4" />
-            Unduh Excel (.xlsx)
+            Unduh Excel (seluruh data)
           </Button>
         </div>
       </div>
@@ -145,14 +155,14 @@ export function PanelRekapitulasi({
             Kabupaten / Kota
           </label>
           <select
-            value={kabupatenId}
-            onChange={(e) => setKabupatenId(e.target.value)}
+            value={kabupaten}
+            onChange={(e) => setKabupaten(e.target.value)}
             className="mt-1 h-11 w-full rounded-xl bg-kabut-50 px-3 text-xs font-semibold text-tinta-900 ring-1 ring-kabut-200 focus:outline-none"
           >
             <option value="semua">Semua 6 Kabupaten/Kota</option>
-            {KABUPATEN_GORONTALO.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.nama}
+            {pilihanKabupaten.map((k) => (
+              <option key={k} value={k}>
+                {k}
               </option>
             ))}
           </select>
@@ -170,7 +180,9 @@ export function PanelRekapitulasi({
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {/* Card 1: Total Balita */}
         <div className="rounded-2xl bg-white p-5 shadow-[var(--shadow-kartu)]">
-          <p className="text-xs font-bold uppercase tracking-wider text-tinta-400">Total Balita Terdata</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-tinta-400">
+            {bulan ? 'Balita Ditimbang Bulan Ini' : 'Total Balita Terdata'}
+          </p>
           <p className="angka mt-2 text-3xl font-extrabold text-tinta-900">{totalBalita}</p>
           <p className="mt-1 text-xs text-tinta-600">
             Total <span className="font-bold text-tinta-900">{totalSkrining}</span> kali pengukuran KMS
@@ -207,7 +219,7 @@ export function PanelRekapitulasi({
             <span className="text-xs font-bold text-tinta-600">Anak</span>
           </div>
           <p className="mt-1 text-xs text-tinta-600">
-            {pRedFlag}% dari total sasaran (Z &lt; -3 SD)
+            {pRedFlag}% dari balita ditimbang (penanda rujukan mesin)
           </p>
         </div>
       </div>
@@ -220,7 +232,7 @@ export function PanelRekapitulasi({
               Agregat Posyandu & Puskesmas
             </h2>
             <p className="text-xs text-tinta-600">
-              Setiap persentase disajikan bersama pembilang dan penyebut sesuai view <code>v_rekap_bulanan</code>
+              Per posyandu, pengukuran terakhir tiap balita {bulan ? `pada bulan ${bulan}` : 'sepanjang waktu'}; persentase disertai pembilang dan penyebut
             </p>
           </div>
         </div>
@@ -246,15 +258,20 @@ export function PanelRekapitulasi({
                   </td>
                 </tr>
               ) : (
-                <tr className="hover:bg-kabut-50">
-                  <td className="p-3 font-bold text-tinta-900">Rekapitulasi Wilayah</td>
-                  <td className="p-3 text-tinta-600">Gorontalo</td>
-                  <td className="angka p-3 font-bold">{totalBalita} balita</td>
-                  <td className="angka p-3 text-waspada-teks font-bold">{countStunting} anak</td>
-                  <td className="angka p-3 font-bold text-waspada-teks">{pStunting}% ({countStunting}/{totalBalita})</td>
-                  <td className="angka p-3 text-bahaya-teks font-bold">{countWasting} anak</td>
-                  <td className="angka p-3 font-bold text-bahaya-teks">{pWasting}% ({countWasting}/{totalBalita})</td>
-                </tr>
+                rekap.perPosyandu.map((r) => (
+                  <tr key={r.kunci} className="hover:bg-kabut-50">
+                    <td className="p-3 font-bold text-tinta-900">
+                      {r.posyandu || '-'}
+                      <span className="block text-[11px] font-normal text-tinta-500">{r.puskesmas}</span>
+                    </td>
+                    <td className="p-3 text-tinta-600">{r.kabupaten}</td>
+                    <td className="angka p-3 font-bold">{r.balita} balita</td>
+                    <td className="angka p-3 text-waspada-teks font-bold">{r.stunting} anak</td>
+                    <td className="angka p-3 font-bold text-waspada-teks">{tampilPersen(persen(r.stunting, r.balita))}% ({r.stunting}/{r.balita})</td>
+                    <td className="angka p-3 text-bahaya-teks font-bold">{r.wasting} anak</td>
+                    <td className="angka p-3 font-bold text-bahaya-teks">{tampilPersen(persen(r.wasting, r.balita))}% ({r.wasting}/{r.balita})</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

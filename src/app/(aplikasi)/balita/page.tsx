@@ -15,6 +15,8 @@ export default async function HalamanDaftarBalita({
   searchParams: Promise<{ q?: string; status?: string }>
 }) {
   const profil = await ambilProfil()
+  // Akun administrator tidak mendaftarkan balita (lihat balita/baru/actions.ts).
+  const bolehDaftar = profil?.peran !== 'admin'
   const daftarRujukan = await bacaRujukanUntukAkses()
   const isDokter = profil?.peran === 'dokter'
   const isRumahSakit = profil?.jenisFaskes === 'rumah_sakit'
@@ -68,6 +70,7 @@ export default async function HalamanDaftarBalita({
           </p>
         </div>
 
+        {bolehDaftar && (
         <Link
           href="/balita/baru"
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-laut-600 px-5 text-sm font-bold text-white shadow-md shadow-laut-600/20 transition-all hover:bg-laut-700 active:scale-95"
@@ -75,6 +78,7 @@ export default async function HalamanDaftarBalita({
           <UserPlus className="size-4" />
           Tambah Balita Baru
         </Link>
+        )}
       </div>
 
       {/* Pemberitahuan Cakupan Data Khusus Akun Dokter */}
@@ -165,9 +169,11 @@ export default async function HalamanDaftarBalita({
             <p className="mt-1 text-xs text-tinta-600">
               {kueri || status
                 ? 'Tidak ada balita yang sesuai kriteria pencarian atau filter.'
-                : 'Mulai catat pertumbuhan anak dengan menekan tombol Tambah Balita Baru.'}
+                : bolehDaftar
+                  ? 'Mulai catat pertumbuhan anak dengan menekan tombol Tambah Balita Baru.'
+                  : 'Balita didaftarkan oleh kader, dokter, dietisien, atau dokter spesialis anak.'}
             </p>
-            {!kueri && !status && (
+            {!kueri && !status && bolehDaftar && (
               <div className="mt-4">
                 <Link
                   href="/balita/baru"

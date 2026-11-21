@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/masuk?galat=tautan-kedaluwarsa`)
   }
 
+  // Tautan pemulihan sandi meminta diteruskan ke halaman sandi baru. Hanya
+  // jalur internal yang diterima, agar tautan ini tidak dapat dipakai untuk
+  // mengalihkan ke situs lain.
+  const lanjut = searchParams.get('lanjut') ?? ''
+  if (lanjut === '/atur-ulang-sandi') {
+    return NextResponse.redirect(`${origin}${lanjut}`)
+  }
+
   // Seluruh peran menunggu verifikasi setelah email dikonfirmasi.
   return NextResponse.redirect(`${origin}/menunggu-verifikasi`)
 }

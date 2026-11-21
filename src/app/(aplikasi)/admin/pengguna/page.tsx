@@ -7,6 +7,7 @@ import {
   type OpsiPosyandu,
 } from './TabelManajemenPengguna'
 import { Users, UserCheck, Clock, UserX } from 'lucide-react'
+import { TambahPengguna } from './TambahPengguna'
 
 export const metadata = {
   title: 'Manajemen Pengguna & Akun | Administrator TANGGUH',
@@ -20,6 +21,7 @@ export default async function HalamanManajemenPengguna() {
   let daftarPuskesmas: OpsiWilayah[] = []
   let daftarRumahSakit: OpsiWilayah[] = []
   let daftarPosyandu: OpsiPosyandu[] = []
+  let daftarKabupaten: OpsiWilayah[] = []
 
   try {
     // Medan wilayah WAJIB ikut dimuat. Sebelumnya formulir edit tidak
@@ -76,11 +78,16 @@ export default async function HalamanManajemenPengguna() {
   // `puskesmas` karena kolom `profiles.puskesmas_id` berkunci-asing ke sana;
   // rumah sakit diambil dari `faskes` karena hanya di sana rumah sakit ada.
   try {
-    const [pkm, rs, pos] = await Promise.all([
+    const [pkm, rs, pos, kab] = await Promise.all([
       supabase.from('puskesmas').select('id, nama').order('nama'),
       supabase.from('faskes').select('id, nama').eq('jenis', 'rumah_sakit').order('nama'),
       supabase.from('posyandu').select('id, nama, desa, puskesmas_id').order('nama'),
+      supabase.from('kabupaten').select('id, nama').order('nama'),
     ])
+    daftarKabupaten = (kab.data ?? []).map((k: Record<string, any>) => ({
+      id: k.id as string,
+      nama: k.nama as string,
+    }))
 
     daftarPuskesmas = (pkm.data ?? []).map((p: Record<string, any>) => ({
       id: p.id as string,
@@ -122,6 +129,12 @@ export default async function HalamanManajemenPengguna() {
             Kelola data akun tenaga kesehatan, dokter, dietisien, dan kader posyandu yang terdaftar di sistem.
           </p>
         </div>
+        <TambahPengguna
+          daftarPuskesmas={daftarPuskesmas}
+          daftarPosyandu={daftarPosyandu}
+          daftarRumahSakit={daftarRumahSakit}
+          daftarKabupaten={daftarKabupaten}
+        />
       </div>
 
       {/* Summary KPI Cards */}

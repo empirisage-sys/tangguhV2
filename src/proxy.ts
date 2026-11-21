@@ -17,6 +17,9 @@ const JALUR_PUBLIK = ['/', '/masuk', '/daftar', '/lupa-sandi', '/atur-ulang-sand
 /** Halaman yang boleh dibuka pengguna yang akunnya belum disetujui. */
 const JALUR_MENUNGGU = ['/menunggu-verifikasi', '/profil', '/keluar']
 
+/** Halaman untuk mengganti kata sandi sementara dari administrator. */
+const JALUR_GANTI_SANDI = '/ganti-sandi'
+
 function cocok(path: string, daftar: string[]): boolean {
   return daftar.some((p) => path === p || path.startsWith(`${p}/`))
 }
@@ -61,6 +64,26 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/masuk'
     url.searchParams.set('lanjut', path)
+    return NextResponse.redirect(url)
+  }
+
+  // Akun dengan kata sandi sementara dari administrator wajib menggantinya
+  // lebih dulu. Penanda ada di app_metadata, yang hanya dapat diubah server.
+  // Ini hanya navigasi: penjaga.ts menolak setiap tindakan selama penanda aktif.
+  const appMeta = (data?.claims as { app_metadata?: Record<string, unknown> } | undefined)
+    ?.app_metadata
+  const wajibGanti = appMeta?.wajib_ganti_sandi === true
+  if (wajibGanti) {
+    if (path === JALUR_GANTI_SANDI || cocok(path, ['/auth', '/api', '/keluar'])) return response
+    const url = request.nextUrl.clone()
+    url.pathname = JALUR_GANTI_SANDI
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+  if (path === JALUR_GANTI_SANDI) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dasbor'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

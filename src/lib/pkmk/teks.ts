@@ -9,6 +9,7 @@ import type { HasilTakaran, Peringatan } from './hitung'
 import type { Jadwal, SlotJadwal } from './jadwal'
 import type { KelompokProtein } from './protein'
 import { namaSatuan, namaSatuanPendek, type SatuanTakar } from './produk'
+import type { HasilKebutuhan } from './kebutuhan'
 
 function angka(nilai: number): string {
   const dibulatkan = Math.round(nilai * 10) / 10
@@ -130,5 +131,36 @@ export function bacaSlotJadwal(
       }
     case 'asi':
       return { tebal: '', biasa: 'ASI sesuai permintaan anak' }
+  }
+}
+
+/** Angka bulat dengan pemisah ribuan titik, gaya Indonesia (1.386). */
+function ribuan(n: number): string {
+  return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
+/**
+ * Kalimat resep jumlah kemasan PKMK, misalnya
+ * "Resepkan 2 kemasan 800 g untuk 14 hari (kebutuhan 1.386 g; cukup 16 hari)."
+ */
+export function ringkasanKebutuhan(
+  k: HasilKebutuhan,
+  satuanTakar?: SatuanTakar,
+): { judul: string; rincian: string } {
+  if (!k.dapatDihitung) {
+    return k.alasan === 'gram_per_satuan_kosong'
+      ? {
+          judul: 'Jumlah kemasan belum dapat dihitung',
+          rincian: `Berat per ${namaSatuan(satuanTakar)} (gram) produk ini belum diisi di master produk PKMK. Minta admin melengkapinya dari label kemasan.`,
+        }
+      : { judul: 'Jumlah kemasan belum dapat dihitung', rincian: 'Periksa kembali takaran, masa, dan ukuran kemasan.' }
+  }
+  const pendek = namaSatuanPendek(satuanTakar)
+  return {
+    judul: `Resepkan ${k.jumlahKemasan} kemasan ${ribuan(k.gramPerKemasan)} g untuk ${k.hari} hari`,
+    rincian:
+      `${angka(k.satuanTotal)} ${pendek} × ${angka(k.gramPerSatuan)} g = ${ribuan(k.gramTotal)} g ` +
+      `(${ribuan(k.gramPerHari)} g/hari). ${k.jumlahKemasan} × ${ribuan(k.gramPerKemasan)} g = ` +
+      `${ribuan(k.gramTersedia)} g, sisa ${ribuan(k.sisaGram)} g, cukup ${k.hariCukup} hari.`,
   }
 }
