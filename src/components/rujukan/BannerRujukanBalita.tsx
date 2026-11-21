@@ -37,6 +37,7 @@ export function BannerRujukanBalita({ balita, peran, rujukan, rumahSakit, namaPe
   const [modalTerbitBuka, setModalTerbitBuka] = useState<boolean>(false)
   const [modalBalasBuka, setModalBalasBuka] = useState<boolean>(false)
   const [galatBatal, setGalatBatal] = useState<string | null>(null)
+  const [pesanBerhasil, setPesanBerhasil] = useState<string | null>(null)
   const [sedangBatal, mulaiBatal] = useTransition()
 
   const bolehTerbit = PERAN_PENERBIT.includes(peran)
@@ -49,7 +50,10 @@ export function BannerRujukanBalita({ balita, peran, rujukan, rumahSakit, namaPe
     mulaiBatal(async () => {
       const hasil = await batalkanRujukan(rujukan.id)
       if (!hasil.ok) setGalatBatal(hasil.pesan ?? 'Rujukan gagal dibatalkan.')
-      else perbarui()
+      else {
+        setPesanBerhasil(hasil.pesan ?? 'Rujukan dibatalkan.')
+        perbarui()
+      }
     })
   }
 
@@ -61,6 +65,15 @@ export function BannerRujukanBalita({ balita, peran, rujukan, rumahSakit, namaPe
 
   return (
     <div className="space-y-4">
+      {pesanBerhasil && (
+        <div role="status" aria-live="polite"
+          className="flex items-start justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-200">
+          <span>{pesanBerhasil}</span>
+          <button type="button" onClick={() => setPesanBerhasil(null)} className="font-bold text-emerald-800">
+            Tutup
+          </button>
+        </div>
+      )}
       {/* Kasus 1: Rujukan Aktif Sudah Diterbitkan */}
       {rujukan && (
         <div className="rounded-2xl border-2 border-laut-200 bg-white p-5 shadow-[var(--shadow-kartu)] space-y-4">
@@ -256,7 +269,10 @@ export function BannerRujukanBalita({ balita, peran, rujukan, rumahSakit, namaPe
         balita={balita}
         terbuka={modalTerbitBuka}
         onTutup={() => setModalTerbitBuka(false)}
-        onSukses={perbarui}
+        onSukses={(pesan) => {
+          setPesanBerhasil(pesan)
+          perbarui()
+        }}
         rumahSakit={rumahSakit}
       />
 

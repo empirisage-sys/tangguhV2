@@ -514,6 +514,13 @@ export interface Database {
       }
     }
     Functions: {
+      hapus_balita: {
+        Args: {
+          p_balita_id: string
+          p_alasan: string
+        }
+        Returns: undefined
+      }
       verifikasi_pengguna: {
         Args: {
           p_pengguna_id: string

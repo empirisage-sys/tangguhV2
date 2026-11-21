@@ -92,7 +92,7 @@ export default async function HalamanDaftarBalita({
               Cakupan Data Rekam Medis (Akun Dokter):
             </p>
             <p className="mt-0.5 text-sky-800 leading-relaxed">
-              Sesuai standar kerahasiaan medis, Anda hanya dapat melihat data pasien balita yang <strong>Anda input sendiri</strong>, pasien yang <strong>dirujuk ke Puskesmas wilayah Anda</strong>, atau pasien yang <strong>dirujuk ke Rumah Sakit tempat bertugas</strong>.
+              Anda dapat melihat seluruh balita di <strong>puskesmas tempat Anda bertugas</strong>, baik yang diinput dokter, kader, maupun petugas gizi puskesmas tersebut, serta pasien yang <strong>dirujuk</strong> kepada Anda.
             </p>
           </div>
         </div>

@@ -27,6 +27,7 @@ import {
 } from '@/lib/zscore'
 import { ArrowLeft, Download, FileText, Plus, Sparkles, Utensils, TrendingUp, Scale, AlertTriangle, CheckCircle2, AlertOctagon, Calculator } from 'lucide-react'
 import { BannerRujukanBalita } from '@/components/rujukan/BannerRujukanBalita'
+import { TombolHapusBalita } from '@/components/balita/TombolHapusBalita'
 
 export default async function HalamanDetailBalita({
   params,
@@ -170,6 +171,7 @@ export default async function HalamanDetailBalita({
             <Plus className="size-4" />
             Catat Pengukuran Baru
           </Link>
+          <TombolHapusBalita balitaId={balita.id} namaBalita={balita.nama} />
           {perluPKMKBalita && (
             <Link
               href="/dietisien"

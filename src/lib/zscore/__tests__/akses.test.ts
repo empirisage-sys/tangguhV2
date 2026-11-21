@@ -157,9 +157,9 @@ describe('cakupan data balita per peran dan fasilitas', () => {
     expect(cakupanData('dietisien', 'puskesmas')).toBe('faskes')
   })
 
-  it('dokter mencakup pasien input sendiri dan rujukan faskesnya', () => {
-    expect(cakupanData('dokter')).toBe('input_sendiri_dan_rujukan')
-    expect(cakupanData('dokter', 'puskesmas')).toBe('input_sendiri_dan_rujukan')
+  it('dokter puskesmas mencakup seluruh puskesmasnya; dokter di RS hanya input sendiri dan rujukan', () => {
+    expect(cakupanData('dokter')).toBe('faskes')
+    expect(cakupanData('dokter', 'puskesmas')).toBe('faskes')
     expect(cakupanData('dokter', 'rumah_sakit')).toBe('input_sendiri_dan_rujukan')
   })
 
@@ -216,6 +216,18 @@ describe('aturan akses data balita untuk dokter (input sendiri, rujukan pkm, ruj
       { balitaId: 'bal-03', puskesmasId: 'pus-7502-01', rsTujuanId: 'rs-7571-01' },
     ]
     expect(dokterBolehLihatBalita(balitaPasien, dokterSpesialisRS, daftarRujukan)).toBe(true)
+  })
+
+  it('dokter puskesmas melihat balita yang diinput kader atau petugas gizi di puskesmas yang sama', () => {
+    const balitaKader = { id: 'bal-10', createdBy: 'kader-01', puskesmasId: 'pus-7571-01' }
+    const balitaGizi = { id: 'bal-11', createdBy: 'gizi-01', puskesmasId: 'pus-7571-01' }
+    expect(dokterBolehLihatBalita(balitaKader, dokterA, [])).toBe(true)
+    expect(dokterBolehLihatBalita(balitaGizi, dokterA, [])).toBe(true)
+  })
+
+  it('dokter puskesmas TIDAK melihat balita puskesmas lain tanpa rujukan', () => {
+    const balitaLain = { id: 'bal-12', createdBy: 'kader-02', puskesmasId: 'pus-7571-02' }
+    expect(dokterBolehLihatBalita(balitaLain, dokterA, [])).toBe(false)
   })
 
   it('dokter TIDAK boleh melihat pasien luar yang bukan inputannya dan tanpa rujukan', () => {
