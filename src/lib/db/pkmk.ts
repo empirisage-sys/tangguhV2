@@ -36,6 +36,7 @@ import {
   produkById,
   produkUntukUmur,
   PERINGATAN_DATA_PRODUK,
+  satuanSah,
 } from '@/lib/pkmk/produk'
 
 export type ProdukPKMK = ProdukPKMKCore & {
@@ -138,6 +139,7 @@ export function petakanProdukDbKeModel(row: unknown): ProdukPKMK | null {
     nama: String(r.nama ?? ''),
     merek: typeof r.merek === 'string' ? r.merek : '',
     sendokPerSaji,
+    satuanTakar: satuanSah(r.satuan_takar),
     kkalPerSaji,
     mlLarutanPerSaji,
     mlPerSaji: mlLarutanPerSaji,

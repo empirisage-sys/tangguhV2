@@ -418,6 +418,7 @@ export interface Database {
           merek: string
           kkal_per_ml: number
           sendok_per_saji: number | null
+          satuan_takar: string
           kkal_per_saji: number | null
           ml_per_saji: number | null
           ml_air_per_sendok: number | null
@@ -437,6 +438,7 @@ export interface Database {
           merek: string
           kkal_per_ml: number
           sendok_per_saji?: number | null
+          satuan_takar?: string
           kkal_per_saji?: number | null
           ml_per_saji?: number | null
           ml_air_per_sendok?: number | null
@@ -455,6 +457,7 @@ export interface Database {
           merek?: string
           kkal_per_ml?: number
           sendok_per_saji?: number | null
+          satuan_takar?: string
           kkal_per_saji?: number | null
           ml_per_saji?: number | null
           ml_air_per_sendok?: number | null
