@@ -15,6 +15,7 @@ import {
   banyakSlotPkmk,
   banyakMakanUtama,
   sebarPkmkTanpaMenghapusMakan,
+  kisiJamUntuk,
   JAM_JADWAL,
 } from '@/lib/pkmk/jadwal'
 import type { ProdukPKMK } from '@/lib/pkmk/produk'
@@ -124,9 +125,26 @@ describe('P-5 jadwal tidak lagi menghapus seluruh waktu makan utama', () => {
   })
 
   it('aturan yang mengikat tetap dipenuhi pada setiap frekuensi', () => {
-    for (let f = 1; f <= 6; f += 1) {
+    for (let f = 1; f <= 8; f += 1) {
       const jadwal = jadwalUntuk(f)
       expect(banyakSlotPkmk(jadwal)).toBe(f)
+    }
+  })
+
+  it('pada 7x dan 8x sehari, kisi malam ditambah dan dua makan utama bertahan', () => {
+    const tujuh = jadwalUntuk(7)
+    const delapan = jadwalUntuk(8)
+    expect(tujuh.slot.map((s) => s.jam)).toEqual([...JAM_JADWAL, '22.00'])
+    expect(delapan.slot.map((s) => s.jam)).toEqual([...JAM_JADWAL, '22.00', '00.00'])
+    expect(banyakSlotPkmk(tujuh)).toBe(7)
+    expect(banyakSlotPkmk(delapan)).toBe(8)
+    expect(banyakMakanUtama(tujuh)).toBe(2)
+    expect(banyakMakanUtama(delapan)).toBe(2)
+  })
+
+  it('sampai 6x sehari, kisi jam tidak berubah', () => {
+    for (let f = 1; f <= 6; f += 1) {
+      expect(jadwalUntuk(f).slot.map((s) => s.jam)).toEqual([...JAM_JADWAL])
     }
   })
 
@@ -146,8 +164,8 @@ describe('P-5 jadwal tidak lagi menghapus seluruh waktu makan utama', () => {
   })
 
   it('jam PKMK tidak pernah ganda', () => {
-    for (let f = 1; f <= 6; f += 1) {
-      const indeks = sebarPkmkTanpaMenghapusMakan(f, JAM_JADWAL.length)
+    for (let f = 1; f <= 8; f += 1) {
+      const indeks = sebarPkmkTanpaMenghapusMakan(f, kisiJamUntuk(f).length)
       expect(new Set(indeks).size).toBe(indeks.length)
     }
   })

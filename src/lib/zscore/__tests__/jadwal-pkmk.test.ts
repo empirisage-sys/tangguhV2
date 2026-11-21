@@ -72,8 +72,8 @@ describe('susunJadwal', () => {
     expect(total).toBe(hasil3x.kkalDiberikan)
   })
 
-  it('jadwal dan takaran tidak pernah berselisih untuk frekuensi 1 sampai 6', () => {
-    for (let f = 1; f <= 6; f++) {
+  it('jadwal dan takaran tidak pernah berselisih untuk frekuensi 1 sampai 8', () => {
+    for (let f = 1; f <= 8; f++) {
       const h = hitungTakaran({
         produk: optigrow, mode: 'dari_takaran', frekuensiPerHari: f, sendokPerSaji: 4, targetKkal: 700,
       })

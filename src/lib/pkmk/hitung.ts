@@ -31,28 +31,28 @@ export const BATAS = {
   /**
    * Batas atas sendok takar per saji.
    *
-   * Diturunkan dari 15 menjadi 6 atas keputusan pemilik aplikasi. Enam sendok
-   * per saji sudah menghasilkan volume larutan yang besar untuk balita, dan
-   * angka di atasnya lebih menandakan pilihan produk yang kurang tepat
-   * daripada takaran yang benar.
+   * Riwayat keputusan pemilik aplikasi: 15 -> 6 -> 10 (22 November 2026).
+   * Batas 6 membuat target tumbuh kejar tidak tercapai pada produk
+   * berdensitas rendah dan pada formula bayi (misalnya Infatrini). Batas 10
+   * memberi ruang itu, sementara peringatan `volume_per_saji_berlebih` tetap
+   * terbit bila volume larutan satu saji melewati `mlPerSajiWajarMaks`.
    *
    * Konstanta ini adalah SATU-SATUNYA tempat angka itu ditulis. Ia mengatur
    * sekaligus: pilihan pada dropdown dietisien, penjepitan pada mode
    * `dari_target`, peringatan `target_tidak_tercapai`, dan batas maksimum pada
-   * skema validasi server `asuhan-gizi.ts`.
-   *
-   * AKIBAT YANG PERLU DIKETAHUI: pada produk berdensitas rendah, target tumbuh
-   * kejar yang tinggi kini bisa tidak tercapai — misalnya SGM Gain 100
-   * (20 kkal/sendok) pada 3x sehari hanya mencapai 6 x 3 x 20 = 360 kkal.
-   * Bila itu terjadi, peringatan `target_tidak_tercapai` akan terbit dan
-   * dietisien perlu menambah frekuensi atau memilih produk yang lebih padat
-   * energi. Perilaku itu memang yang diinginkan: lebih baik menyatakan target
-   * tidak tercapai daripada diam-diam menuliskan takaran yang tidak wajar.
+   * skema validasi server `asuhan-gizi.ts`. Kendala database
+   * `sendok_per_saji between 1 and 30` sudah menampungnya.
    */
-  sendokPerSajiMaks: 6,
+  sendokPerSajiMaks: 10,
   sendokPerSajiMin: 1,
   frekuensiMin: 1,
-  frekuensiMaks: 6,
+  /**
+   * Batas atas frekuensi pemberian per hari: 8 kali (keputusan pemilik
+   * aplikasi, 22 November 2026; sebelumnya 6). Untuk frekuensi 7 dan 8,
+   * jadwal harian menambah kisi malam (22.00 dan 00.00) agar waktu makan
+   * utama tidak habis; lihat `jadwal.ts`.
+   */
+  frekuensiMaks: 8,
 } as const
 
 export type ModeTakaran = 'dari_takaran' | 'dari_target'

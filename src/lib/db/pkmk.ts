@@ -35,7 +35,6 @@ import {
   type LabelProdukPKMK,
   produkById,
   produkUntukUmur,
-  PERINGATAN_DATA_PRODUK,
   satuanSah,
 } from '@/lib/pkmk/produk'
 
@@ -53,7 +52,7 @@ export type ProdukPKMK = ProdukPKMKCore & {
 }
 
 export const PRODUK_PKMK_LIST: ProdukPKMK[] = PRODUK_PKMK as ProdukPKMK[]
-export { produkById, produkUntukUmur, PERINGATAN_DATA_PRODUK }
+export { produkById, produkUntukUmur }
 
 /** Nilai bawaan yang dipakai HANYA bila kolom label benar-benar kosong. */
 const ML_PER_SAJI_BAWAAN = 180

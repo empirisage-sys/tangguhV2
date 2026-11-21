@@ -32,6 +32,22 @@ export const JAM_JADWAL = [
   '20.00',
 ] as const
 
+/**
+ * Kisi malam tambahan, hanya dipakai bila frekuensi PKMK lebih dari 6 kali
+ * sehari (batas frekuensi dinaikkan menjadi 8 pada 22 November 2026).
+ *
+ * Tanpa kisi ini, 8 kali pemberian pada 8 kisi jam akan menghabiskan ketiga
+ * waktu makan utama. Dengan satu kisi tambahan per pemberian di atas 6,
+ * perilakunya sama dengan 6x sehari pada kisi biasa: dua makan utama bertahan.
+ */
+export const JAM_MALAM_TAMBAHAN = ['22.00', '00.00'] as const
+
+/** Kisi jam untuk frekuensi tertentu: kisi anjuran, ditambah kisi malam bila perlu. */
+export function kisiJamUntuk(frekuensiPerHari: number): string[] {
+  const tambahan = Math.max(0, Math.min(frekuensiPerHari - 6, JAM_MALAM_TAMBAHAN.length))
+  return [...JAM_JADWAL, ...JAM_MALAM_TAMBAHAN.slice(0, tambahan)]
+}
+
 /** Indeks kisi yang secara anjuran menjadi makan utama, bila tidak terpakai PKMK. */
 const INDEKS_MAKAN_UTAMA = [1, 3, 6] // 08.00, 12.00, 18.00
 
@@ -133,13 +149,12 @@ export function sebarPkmkTanpaMenghapusMakan(banyak: number, panjang: number): n
  * Seluruh angka PKMK pada jadwal berasal dari `hasil`, tidak dihitung ulang.
  */
 export function susunJadwal({ hasil, masihASI }: MasukanJadwal): Jadwal {
-  const indeksPkmk = new Set(
-    sebarPkmkTanpaMenghapusMakan(hasil.frekuensiPerHari, JAM_JADWAL.length),
-  )
+  const kisi = kisiJamUntuk(hasil.frekuensiPerHari)
+  const indeksPkmk = new Set(sebarPkmkTanpaMenghapusMakan(hasil.frekuensiPerHari, kisi.length))
 
   const kkalPerSaji = hasil.sendokPerSaji * hasil.kkalPerSendok
 
-  const slot: SlotJadwal[] = JAM_JADWAL.map((jam, i) => {
+  const slot: SlotJadwal[] = kisi.map((jam, i) => {
     if (indeksPkmk.has(i)) {
       return {
         jam,
