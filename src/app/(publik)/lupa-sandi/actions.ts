@@ -21,7 +21,11 @@ export async function mintaResetSandi(formData: FormData): Promise<HasilTindakan
 
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(hasil.data.email, {
-      redirectTo: `${siteUrl}/atur-ulang-sandi`,
+      // Tautan email membawa `?code=` (alur PKCE). Kode itu harus ditukar
+      // menjadi sesi lebih dulu; halaman /atur-ulang-sandi tidak dapat
+      // melakukannya sendiri, sehingga dahulu penggantian sandi selalu gagal
+      // karena tidak ada sesi (temuan audit 21 November 2026).
+      redirectTo: `${siteUrl}/auth/konfirmasi?lanjut=/atur-ulang-sandi`,
     })
 
     if (error) {

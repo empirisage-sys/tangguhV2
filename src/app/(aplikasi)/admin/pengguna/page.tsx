@@ -7,7 +7,7 @@ import {
   type OpsiPosyandu,
 } from './TabelManajemenPengguna'
 import { Users, UserCheck, Clock, UserX } from 'lucide-react'
-import { TambahDokterSpesialisAnak } from './TambahDokterSpesialisAnak'
+import { TambahPengguna } from './TambahPengguna'
 
 export const metadata = {
   title: 'Manajemen Pengguna & Akun | Administrator TANGGUH',
@@ -129,7 +129,9 @@ export default async function HalamanManajemenPengguna() {
             Kelola data akun tenaga kesehatan, dokter, dietisien, dan kader posyandu yang terdaftar di sistem.
           </p>
         </div>
-        <TambahDokterSpesialisAnak
+        <TambahPengguna
+          daftarPuskesmas={daftarPuskesmas}
+          daftarPosyandu={daftarPosyandu}
           daftarRumahSakit={daftarRumahSakit}
           daftarKabupaten={daftarKabupaten}
         />

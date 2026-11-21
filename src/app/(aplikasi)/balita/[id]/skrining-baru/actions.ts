@@ -157,6 +157,11 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
   // penanda `simpanKeOutbox`, agar halaman dapat menyimpannya ke antrean lokal
   // alih-alih membuangnya.
   // ======================================================================
+  // `redirect()` bekerja dengan MELEMPAR. Bila dipanggil di dalam `try` di
+  // bawah, lemparannya tertangkap `catch` dan berubah menjadi pesan "server
+  // tidak dapat dihubungi" — data yang sudah tersimpan malah masuk antrean
+  // offline (temuan audit 21 November 2026). Karena itu keputusan diambil di
+  // dalam `try`, pengalihannya di luar.
   try {
     const { error: insertErr } = await supabase.from('skrining').insert(baris)
 
@@ -166,26 +171,23 @@ export async function simpanSkrining(formData: FormData): Promise<HasilTindakan>
       // Duplikat `client_uuid` berarti baris ini memang sudah tersimpan,
       // biasanya karena tombol ditekan dua kali. Itu keberhasilan.
       if (insertErr.code === '23505' && jejak.includes('client_uuid')) {
-        revalidatePath(`/balita/${balita.id}`)
-        redirect(`/balita/${balita.id}`)
-      }
-
-      // Duplikat (balita_id, tanggal_periksa): penimbangan lain sudah ada hari
-      // itu. Bukan keberhasilan, dan menyimpannya ke antrean pun tidak menolong
-      // karena server akan menolaknya lagi dengan alasan yang sama.
-      if (insertErr.code === '23505') {
+        // Tidak ada yang perlu dilakukan: lanjut ke pengalihan di bawah.
+      } else if (insertErr.code === '23505') {
+        // Duplikat (balita_id, tanggal_periksa): penimbangan lain sudah ada hari
+        // itu. Bukan keberhasilan, dan menyimpannya ke antrean pun tidak menolong
+        // karena server akan menolaknya lagi dengan alasan yang sama.
         return {
           ok: false,
           pesan:
             'Sudah ada penimbangan untuk balita ini pada tanggal tersebut. Buka penimbangan ' +
             'yang sudah tercatat lalu perbaiki angkanya, jangan menambah baris baru.',
         }
-      }
-
-      return {
-        ok: false,
-        pesan: `Gagal menyimpan ke server: ${insertErr.message}`,
-        simpanKeOutbox: true,
+      } else {
+        return {
+          ok: false,
+          pesan: `Gagal menyimpan ke server: ${insertErr.message}`,
+          simpanKeOutbox: true,
+        }
       }
     }
   } catch (err) {

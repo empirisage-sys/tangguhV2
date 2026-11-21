@@ -13,6 +13,14 @@ export default async function AppLayout({
   // Jika belum masuk atau belum disetujui, proxy.ts sudah mengurus pengalihan.
   // Sebagai pertahanan sekunder:
   if (!profil) {
+    // Tanpa sesi yang sah di aplikasi yang tersambung ke Supabase: ke halaman
+    // masuk. Dahulu cabang ini SELALU menampilkan profil "Petugas Demo",
+    // termasuk di produksi bagi siapa pun yang belum login atau sesinya habis
+    // (temuan audit 21 November 2026). Profil demo kini hanya untuk pratinjau
+    // lokal tanpa variabel Supabase.
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      redirect('/masuk')
+    }
     // Fallback profil untuk tampilan pratinjau lokal bila tanpa koneksi supabase
     const demoProfil = {
       id: 'demo-user',

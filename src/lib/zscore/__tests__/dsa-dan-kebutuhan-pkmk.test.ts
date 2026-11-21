@@ -5,7 +5,8 @@ import {
   buatSandiSementara,
   RS_BARU,
   skemaGantiSandiSementara,
-  skemaTambahDsaAdmin,
+  POSYANDU_BARU,
+  skemaTambahPenggunaAdmin,
 } from '@/lib/validasi/pendaftaran'
 import { bacaWajibGantiSandi } from '@/lib/supabase/penjaga'
 
@@ -54,8 +55,9 @@ describe('hitungKebutuhanKemasan', () => {
   })
 })
 
-describe('akun Dokter Spesialis Anak oleh admin', () => {
+describe('akun petugas dibuat admin', () => {
   const dasar = {
+    peran: 'dokter_spesialis_anak',
     namaLengkap: 'dr. Uji, Sp.A',
     email: 'Uji@RS.go.id',
     noHp: '081234567890',
@@ -67,20 +69,43 @@ describe('akun Dokter Spesialis Anak oleh admin', () => {
   }
 
   it('isian lengkap diterima dan email dinormalkan', () => {
-    const h = skemaTambahDsaAdmin.safeParse(dasar)
+    const h = skemaTambahPenggunaAdmin.safeParse(dasar)
     expect(h.success).toBe(true)
     expect(h.success && h.data.email).toBe('uji@rs.go.id')
   })
 
   it('STR wajib', () => {
-    expect(skemaTambahDsaAdmin.safeParse({ ...dasar, noStr: '12' }).success).toBe(false)
+    expect(skemaTambahPenggunaAdmin.safeParse({ ...dasar, noStr: '12' }).success).toBe(false)
   })
 
   it('rumah sakit baru wajib nama dan kabupaten', () => {
-    const h = skemaTambahDsaAdmin.safeParse({ ...dasar, rumahSakitId: RS_BARU })
+    const h = skemaTambahPenggunaAdmin.safeParse({ ...dasar, rumahSakitId: RS_BARU })
     expect(h.success).toBe(false)
     const medan = h.success ? [] : h.error.issues.map((i) => i.path[0])
     expect(medan).toEqual(expect.arrayContaining(['namaRsBaru', 'kabupatenId']))
+  })
+
+  const PKM = '22222222-2222-4222-8222-222222222222'
+  const POS = '33333333-3333-4333-8333-333333333333'
+
+  it('dokter puskesmas wajib puskesmas dan STR, tanpa rumah sakit', () => {
+    const d = { ...dasar, peran: 'dokter', rumahSakitId: '' }
+    expect(skemaTambahPenggunaAdmin.safeParse(d).success).toBe(false)
+    expect(skemaTambahPenggunaAdmin.safeParse({ ...d, puskesmasId: PKM }).success).toBe(true)
+  })
+
+  it('kader tidak wajib STR tetapi wajib posyandu', () => {
+    const k = { ...dasar, peran: 'kader', noStr: '', rumahSakitId: '', puskesmasId: PKM }
+    expect(skemaTambahPenggunaAdmin.safeParse(k).success).toBe(false)
+    expect(skemaTambahPenggunaAdmin.safeParse({ ...k, posyanduId: POS }).success).toBe(true)
+    expect(skemaTambahPenggunaAdmin.safeParse({ ...k, posyanduId: POSYANDU_BARU }).success).toBe(false)
+    expect(
+      skemaTambahPenggunaAdmin.safeParse({ ...k, posyanduId: POSYANDU_BARU, namaPosyanduBaru: 'Melati SIM' }).success,
+    ).toBe(true)
+  })
+
+  it('peran admin tidak dapat dibuat', () => {
+    expect(skemaTambahPenggunaAdmin.safeParse({ ...dasar, peran: 'admin' }).success).toBe(false)
   })
 
   it('sandi sementara acak 12 karakter, tanpa huruf yang mudah tertukar', () => {

@@ -22,6 +22,7 @@ import {
   formatTanggal,
   formatGramBertanda,
   formatKiloBertanda,
+  formatBerat,
 } from '@/lib/tampilan/format'
 import type { BalitaDetail } from '@/lib/db/balita'
 
@@ -255,13 +256,13 @@ export function PanelVelocity({
                         <div className="flex justify-between text-tinta-600">
                           <span>1. {formatTanggal(balita.riwayat[balita.riwayat.length - 2].tanggal)}:</span>
                           <span className="font-bold text-tinta-900">
-                            {balita.riwayat[balita.riwayat.length - 2].beratKg} kg
+                            {formatBerat(balita.riwayat[balita.riwayat.length - 2].beratKg)}
                           </span>
                         </div>
                         <div className="flex justify-between text-tinta-600">
                           <span>2. {formatTanggal(balita.riwayat[balita.riwayat.length - 1].tanggal)}:</span>
                           <span className="font-bold text-laut-700">
-                            {balita.riwayat[balita.riwayat.length - 1].beratKg} kg
+                            {formatBerat(balita.riwayat[balita.riwayat.length - 1].beratKg)}
                           </span>
                         </div>
                       </div>
@@ -494,7 +495,7 @@ export function PanelVelocity({
                     {hasil.kenaikanAktualGram > 0 ? `+${hasil.kenaikanAktualGram}` : hasil.kenaikanAktualGram} g
                   </p>
                   <p className="text-[11px] text-tinta-400 mt-0.5">
-                    ({(hasil.kenaikanAktualGram / 1000).toFixed(2)} kg)
+                    ({(hasil.kenaikanAktualGram / 1000).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg)
                   </p>
                 </div>
 
@@ -525,7 +526,7 @@ export function PanelVelocity({
                     {hasil.selisihHari} hari
                   </p>
                   <p className="text-[11px] text-tinta-400 mt-0.5">
-                    Umur awal: {hasil.umurAwalBulan} bln
+                    Umur awal: {hasil.umurAwalBulan.toLocaleString('id-ID', { maximumFractionDigits: 1 })} bln
                   </p>
                 </div>
               </div>

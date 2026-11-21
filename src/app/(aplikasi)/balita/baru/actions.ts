@@ -106,7 +106,14 @@ export async function simpanBalita(formData: FormData): Promise<HasilTindakan> {
   const d = hasil.data
   const supabase = await createClient()
 
-  let balitaId = 'bal-01'
+  // ==========================================================================
+  // TIDAK ADA LAGI KEBERHASILAN PALSU (temuan audit 21 November 2026)
+  //
+  // Bentuk lama memulai dengan `balitaId = 'bal-01'`, lalu pada galat apa pun
+  // selain data ganda — termasuk penolakan RLS dan jaringan putus — tetap
+  // mengalihkan ke /balita/bal-01. Petugas mengira balita tersimpan.
+  // ==========================================================================
+  let balitaId: string | null = null
 
   try {
     const { data: inserted, error } = await supabase
@@ -138,11 +145,23 @@ export async function simpanBalita(formData: FormData): Promise<HasilTindakan> {
             'Balita dengan nama dan tanggal lahir ini sudah terdaftar di posyandu Anda.',
         }
       }
-    } else if (inserted) {
-      balitaId = inserted.id
+      console.error('[balita baru] insert gagal', { kode: error.code, pesan: error.message })
+      return {
+        ok: false,
+        pesan: `Balita belum tersimpan: ${error.message}`,
+      }
     }
+    balitaId = inserted?.id ?? null
   } catch (err) {
-    console.warn('Supabase offline/mock active.')
+    console.error('[balita baru] server tidak dapat dihubungi', err)
+    return {
+      ok: false,
+      pesan: 'Server tidak dapat dihubungi. Balita belum tersimpan; coba lagi saat jaringan stabil.',
+    }
+  }
+
+  if (!balitaId) {
+    return { ok: false, pesan: 'Balita belum tersimpan: server tidak mengembalikan nomor data.' }
   }
 
   revalidatePath('/balita')

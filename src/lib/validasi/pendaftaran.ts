@@ -405,16 +405,26 @@ export function normalkanNoHp(masukan: string): string {
 }
 
 /**
- * Pembuatan akun Dokter Spesialis Anak oleh administrator, dengan kata sandi
- * sementara yang WAJIB diganti saat masuk pertama kali.
+ * Pembuatan akun petugas oleh administrator, dengan kata sandi sementara yang
+ * WAJIB diganti saat masuk pertama kali.
  *
- * Spesialis anak selalu bertugas di rumah sakit (`chk_spesialis_anak_di_rs`).
- * Rumah sakit dipilih dari daftar, atau diketik bila belum ada; untuk yang
- * diketik, kabupaten wajib dipilih agar usulan rumah sakit tercatat di wilayah
- * yang benar.
+ * Aturan wilayah per peran sama dengan pendaftaran mandiri (dan ditegakkan
+ * lagi oleh trigger `handle_new_user` serta batasan Postgres):
+ *   - kader: puskesmas + posyandu (dipilih, atau nama posyandu diketik)
+ *   - dokter, dietisien: puskesmas
+ *   - dokter spesialis anak: rumah sakit (dipilih, atau nama diketik beserta
+ *     kabupatennya)
+ * STR wajib bagi seluruh peran kecuali kader.
  */
-export const skemaTambahDsaAdmin = z
+export const PERAN_DIBUAT_ADMIN = ['kader', 'dokter', 'dietisien', 'dokter_spesialis_anak'] as const
+export type PeranDibuatAdmin = (typeof PERAN_DIBUAT_ADMIN)[number]
+
+/** Nilai penanda pada dropdown posyandu: nama diketik manual. */
+export const POSYANDU_BARU = 'posyandu_baru' as const
+
+export const skemaTambahPenggunaAdmin = z
   .object({
+    peran: z.enum(PERAN_DIBUAT_ADMIN, { errorMap: () => ({ message: 'Pilih peran petugas.' }) }),
     namaLengkap: z
       .string()
       .trim()
@@ -430,38 +440,47 @@ export const skemaTambahDsaAdmin = z
       .refine((v) => v === undefined || /^(\+62|62|0)8\d{7,12}$/.test(v), {
         message: 'Nomor HP diawali 08 atau +628, contoh 081234567890',
       }),
-    noStr: z.string().trim().min(5, 'Nomor STR wajib diisi minimal 5 karakter.').max(50),
-    rumahSakitId: z.string().trim().min(1, 'Pilih rumah sakit tempat bertugas.'),
+    noStr: z.string().trim().max(50).optional().or(z.literal('')),
+    puskesmasId: uuidOpsional,
+    posyanduId: z.string().trim().optional().or(z.literal('')),
+    namaPosyanduBaru: z.string().trim().max(150).optional().or(z.literal('')),
+    rumahSakitId: z.string().trim().optional().or(z.literal('')),
     namaRsBaru: z.string().trim().max(150).optional().or(z.literal('')),
     kabupatenId: uuidOpsional,
     sandiSementara: sandi,
   })
   .superRefine((d, ctx) => {
-    if (d.rumahSakitId === RS_BARU) {
-      if (!d.namaRsBaru || d.namaRsBaru.length < 3) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['namaRsBaru'],
-          message: 'Tuliskan nama rumah sakit, minimal 3 huruf.',
-        })
-      }
-      if (!d.kabupatenId) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['kabupatenId'],
-          message: 'Pilih kabupaten/kota rumah sakit tersebut.',
-        })
-      }
-    } else if (!POLA_UUID_EDIT.test(d.rumahSakitId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['rumahSakitId'],
-        message: 'Pilihan rumah sakit tidak sah.',
-      })
+    const isu = (path: string, message: string) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message })
+
+    if (d.peran !== 'kader' && (!d.noStr || d.noStr.length < 5)) {
+      isu('noStr', 'Nomor STR wajib diisi minimal 5 karakter.')
+    }
+
+    if (d.peran === 'dokter_spesialis_anak') {
+      const rs = d.rumahSakitId ?? ''
+      if (!rs) isu('rumahSakitId', 'Pilih rumah sakit tempat bertugas.')
+      else if (rs === RS_BARU) {
+        if (!d.namaRsBaru || d.namaRsBaru.length < 3) isu('namaRsBaru', 'Tuliskan nama rumah sakit, minimal 3 huruf.')
+        if (!d.kabupatenId) isu('kabupatenId', 'Pilih kabupaten/kota rumah sakit tersebut.')
+      } else if (!POLA_UUID_EDIT.test(rs)) isu('rumahSakitId', 'Pilihan rumah sakit tidak sah.')
+      return
+    }
+
+    if (!d.puskesmasId) isu('puskesmasId', 'Pilih puskesmas tempat bertugas.')
+
+    if (d.peran === 'kader') {
+      const pos = d.posyanduId ?? ''
+      if (!pos) isu('posyanduId', 'Pilih posyandu kader.')
+      else if (pos === POSYANDU_BARU) {
+        if (!d.namaPosyanduBaru || d.namaPosyanduBaru.length < 3) {
+          isu('namaPosyanduBaru', 'Tuliskan nama posyandu, minimal 3 huruf.')
+        }
+      } else if (!POLA_UUID_EDIT.test(pos)) isu('posyanduId', 'Pilihan posyandu tidak sah.')
     }
   })
 
-export type MasukanTambahDsaAdmin = z.output<typeof skemaTambahDsaAdmin>
+export type MasukanTambahPenggunaAdmin = z.output<typeof skemaTambahPenggunaAdmin>
 
 /**
  * Membuat kata sandi sementara acak 12 karakter.

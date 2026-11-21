@@ -25,6 +25,7 @@ import { formatTanggal } from '@/lib/tampilan/format'
 
 export default async function DasborPage() {
   const profil = await ambilProfil()
+  const bolehDaftar = profil?.peran !== 'admin'
   const daftarRujukan = await bacaRujukanUntukAkses()
   const peran = profil?.peran ?? 'kader'
   const nama = profil?.namaLengkap ?? 'Pengguna TANGGUH'
@@ -141,6 +142,7 @@ export default async function DasborPage() {
               <Activity className="size-4 text-laut-600" />
               Ukur / Skrining
             </Link>
+            {bolehDaftar && (
             <Link
               href="/balita/baru"
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-laut-900/40 px-4 text-sm font-semibold text-white ring-1 ring-white/25 transition-all hover:bg-laut-900/60"
@@ -148,6 +150,7 @@ export default async function DasborPage() {
               <Plus className="size-4" />
               Balita Baru
             </Link>
+            )}
           </div>
         </div>
       </div>
@@ -239,6 +242,7 @@ export default async function DasborPage() {
                 <Baby className="mx-auto size-8 text-tinta-300" />
                 <p className="font-bold text-tinta-800">Belum Ada Pengukuran Balita</p>
                 <p>Mulai catat pertumbuhan balita pertama di wilayah binaan Anda.</p>
+                {bolehDaftar && (
                 <div className="pt-2">
                   <Link
                     href="/balita/baru"
@@ -248,6 +252,7 @@ export default async function DasborPage() {
                     Tambah Balita Baru
                   </Link>
                 </div>
+                )}
               </div>
             ) : (
               <div className="mt-4 divide-y divide-kabut-100">
