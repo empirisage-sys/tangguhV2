@@ -303,40 +303,56 @@ describe('kodeRedFlag tersedia untuk penyaringan', () => {
 })
 
 // =========================================================================
-// Batas 6 sendok takar per saji (keputusan pemilik aplikasi)
+// Batas 10 sendok takar per saji dan 8 kali sehari (keputusan pemilik aplikasi)
 // =========================================================================
-describe('batas sendok takar per saji', () => {
-  it('batasnya 6, dan itu satu-satunya sumber angka tersebut', () => {
-    expect(BATAS.sendokPerSajiMaks).toBe(6)
+describe('batas sendok takar per saji dan frekuensi', () => {
+  it('batasnya 10 sendok dan 8 kali sehari, dan itu satu-satunya sumber angka tersebut', () => {
+    expect(BATAS.sendokPerSajiMaks).toBe(10)
     expect(BATAS.sendokPerSajiMin).toBe(1)
+    expect(BATAS.frekuensiMaks).toBe(8)
+    expect(BATAS.frekuensiMin).toBe(1)
   })
 
-  it('mode dari_takaran menjepit masukan di atas 6', () => {
+  it('mode dari_takaran menerima 10 sendok dan menjepit masukan di atas 10', () => {
     const produk = PRODUK_PKMK_LIST.find((p) => p.nama === 'SGM Optigrow')!
-    for (const diminta of [7, 10, 15, 99]) {
+    const sepuluh = hitungTakaran({
+      produk, mode: 'dari_takaran', frekuensiPerHari: 3, sendokPerSaji: 10, targetKkal: 600,
+    })
+    expect(sepuluh.sendokPerSaji).toBe(10)
+    for (const diminta of [11, 15, 99]) {
       const h = hitungTakaran({
         produk, mode: 'dari_takaran', frekuensiPerHari: 3, sendokPerSaji: diminta, targetKkal: 600,
       })
-      expect(h.sendokPerSaji, `diminta ${diminta}`).toBe(6)
+      expect(h.sendokPerSaji, `diminta ${diminta}`).toBe(10)
       // Energi tetap turunan takaran AKHIR, bukan takaran yang diminta.
-      expect(h.kkalDiberikan).toBe(6 * 3 * produk.kkalPerSendok)
+      expect(h.kkalDiberikan).toBe(10 * 3 * produk.kkalPerSendok)
     }
   })
 
-  it('mode dari_target menjepit ke 6 dan MENYATAKAN target tidak tercapai', () => {
+  it('frekuensi 8 diterima, di atasnya dijepit ke 8', () => {
+    const produk = PRODUK_PKMK_LIST.find((p) => p.nama === 'SGM Optigrow')!
+    for (const [diminta, harap] of [[8, 8], [9, 8], [12, 8]] as const) {
+      const h = hitungTakaran({
+        produk, mode: 'dari_takaran', frekuensiPerHari: diminta, sendokPerSaji: 2, targetKkal: 600,
+      })
+      expect(h.frekuensiPerHari, `diminta ${diminta}`).toBe(harap)
+    }
+  })
+
+  it('mode dari_target menjepit ke 10 dan MENYATAKAN target tidak tercapai', () => {
     const produk = PRODUK_PKMK_LIST.find((p) => p.nama === 'SGM Gain 100')! // 20 kkal/sendok
     const h = hitungTakaran({ produk, mode: 'dari_target', frekuensiPerHari: 3, targetKkal: 900 })
-    expect(h.sendokPerSaji).toBe(6)
-    expect(h.kkalDiberikan).toBe(360) // 6 x 3 x 20
+    expect(h.sendokPerSaji).toBe(10)
+    expect(h.kkalDiberikan).toBe(600) // 10 x 3 x 20
     expect(h.peringatan.map((p) => p.kode)).toContain('target_tidak_tercapai')
   })
 
-  it('tidak pernah menghasilkan takaran di atas 6 pada kombinasi apa pun', () => {
+  it('tidak pernah menghasilkan takaran di atas 10 pada kombinasi apa pun', () => {
     for (const produk of PRODUK_PKMK_LIST) {
       for (let target = 50; target <= 1500; target += 50) {
         for (let f = BATAS.frekuensiMin; f <= BATAS.frekuensiMaks; f++) {
           const h = hitungTakaran({ produk, mode: 'dari_target', frekuensiPerHari: f, targetKkal: target })
-          expect(h.sendokPerSaji, `${produk.nama} ${target} kkal ${f}x`).toBeLessThanOrEqual(6)
+          expect(h.sendokPerSaji, `${produk.nama} ${target} kkal ${f}x`).toBeLessThanOrEqual(10)
           expect(h.sendokPerSaji).toBeGreaterThanOrEqual(1)
         }
       }

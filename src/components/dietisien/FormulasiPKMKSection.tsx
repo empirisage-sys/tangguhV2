@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, Calculator, CheckCircle2, Info, Printer, ShieldAlert, Utensils } from 'lucide-react'
+import { AlertTriangle, Calculator, CheckCircle2, Printer, ShieldAlert, Utensils } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import {
-  PERINGATAN_DATA_PRODUK,
   PRODUK_PKMK,
   type ProdukPKMK,
   produkSesuaiUmur,
@@ -846,12 +845,6 @@ export function FormulasiPKMKSection({
           </table>
         </div>
       )}
-
-      {/* Peringatan data produk, wajib di setiap layar dan setiap cetakan */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-waspada-garis/40 bg-waspada-bg p-3 text-[11px] text-waspada-teks">
-        <Info className="mt-0.5 size-4 shrink-0" />
-        <span>{PERINGATAN_DATA_PRODUK}</span>
-      </div>
 
       <div className="space-y-2 pt-1">
         {/*

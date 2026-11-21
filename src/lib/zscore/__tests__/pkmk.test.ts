@@ -3,7 +3,6 @@ import {
   PRODUK_PKMK,
   produkUntukUmur,
   produkById,
-  PERINGATAN_DATA_PRODUK,
 } from '@/lib/pkmk/produk'
 import {
   BATAS,
@@ -70,9 +69,6 @@ describe('produk.ts — angka turunan, bukan angka patokan', () => {
     expect(produkById('tidak-ada')).toBeNull()
   })
 
-  it('peringatan data produk tersedia untuk dicetak di setiap layar', () => {
-    expect(PERINGATAN_DATA_PRODUK).toMatch(/belum diverifikasi/i)
-  })
 })
 
 describe('hitungTakaran — mode dari_takaran', () => {
@@ -151,20 +147,16 @@ describe('hitungTakaran — mode dari_target dan pembulatan sendok', () => {
     expect(hasil.persenTerhadapTarget).toBe(106.7)
   })
 
-  it('sesuai tabel telaah untuk frekuensi 2x dan 4x, dengan batas 6 sendok', () => {
-    // Frekuensi 2x: takaran ideal 675 / (2 x 40) = 8,44 sendok.
-    //
-    // Sebelum batas diturunkan menjadi 6, hasilnya 8 sendok / 640 kkal / 360 ml.
-    // Sekarang sendoknya dijepit ke 6, sehingga energinya turun ke 480 kkal —
-    // DAN peringatan `target_tidak_tercapai` WAJIB terbit. Justru itu inti
-    // penurunan batas ini: lebih baik menyatakan target tidak tercapai
-    // daripada menuliskan 8 sendok dalam satu saji.
+  it('sesuai tabel telaah untuk frekuensi 2x dan 4x, dengan batas 10 sendok', () => {
+    // Frekuensi 2x: takaran ideal 675 / (2 x 40) = 8,44 sendok -> 8 sendok.
+    // Dengan batas 10 sendok (sebelumnya 6), angka ini tidak lagi dijepit,
+    // jadi target tercapai, tetapi volume per saji tetap diberi peringatan.
     const dua = hitungTakaran({ produk: optigrow, mode: 'dari_target', frekuensiPerHari: 2, targetKkal: 675 })
-    expect([dua.sendokPerSaji, dua.kkalDiberikan, dua.mlLarutanPerSaji]).toEqual([6, 480, 270])
-    expect(dua.peringatan.map((p) => p.kode)).toContain('target_tidak_tercapai')
+    expect([dua.sendokPerSaji, dua.kkalDiberikan, dua.mlLarutanPerSaji]).toEqual([8, 640, 360])
+    expect(dua.peringatan.map((p) => p.kode)).not.toContain('target_tidak_tercapai')
+    expect(dua.peringatan.map((p) => p.kode)).toContain('volume_per_saji_berlebih')
 
-    // Frekuensi 4x: ideal 675 / (4 x 40) = 4,22 sendok — masih di bawah batas,
-    // jadi hasilnya tidak berubah sama sekali.
+    // Frekuensi 4x: ideal 675 / (4 x 40) = 4,22 sendok.
     const empat = hitungTakaran({ produk: optigrow, mode: 'dari_target', frekuensiPerHari: 4, targetKkal: 675 })
     expect([empat.sendokPerSaji, empat.kkalDiberikan, empat.mlLarutanPerSaji]).toEqual([4, 640, 180])
     expect(empat.peringatan.map((p) => p.kode)).not.toContain('target_tidak_tercapai')

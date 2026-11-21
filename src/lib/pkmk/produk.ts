@@ -162,15 +162,6 @@ function turunkan(label: LabelProdukPKMK): ProdukPKMK {
 export const PRODUK_PKMK: ProdukPKMK[] = LABEL_PRODUK.map(turunkan)
 
 /**
- * Peringatan yang WAJIB tampil pada setiap layar yang memuat angka takaran PKMK.
- *
- * Tidak dicetak pada lembar asuhan gizi PDF, atas permintaan pemilik aplikasi.
- */
-export const PERINGATAN_DATA_PRODUK =
-  'Data produk (kalori dan volume per sendok takar) belum diverifikasi terhadap ' +
-  'label kemasan yang beredar. Cocokkan dengan kemasan sebelum dipakai.'
-
-/**
  * `true` bila umur balita berada di dalam rentang indikasi produk.
  *
  * ==========================================================================

@@ -1041,12 +1041,15 @@ export default function HalamanSkriningTamu() {
 
             {/* Formulasi PKMK atau Edukasi Gizi Seimbang */}
             {perluPKMK ? (
-              <FormulasiPKMKSection
-                namaBalita={nama || 'Balita'}
-                umurBulan={hasil.umurBulan}
-                beratKg={parseFloat(beratKg) || 8}
-                targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal ?? null}
-              />
+              <div className="space-y-4">
+                <DisclaimerPkmkPublik />
+                <FormulasiPKMKSection
+                  namaBalita={nama || 'Balita'}
+                  umurBulan={hasil.umurBulan}
+                  beratKg={parseFloat(beratKg) || 8}
+                  targetEnergiDefaultKkal={hasil.gizi?.kaloriCatchUpKkal ?? null}
+                />
+              </div>
             ) : (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 shadow-sm">
                 <div className="flex items-start gap-3.5">
@@ -1085,6 +1088,54 @@ export default function HalamanSkriningTamu() {
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+/**
+ * Disclaimer modul PKMK pada skrining tamu (publik).
+ *
+ * Halaman ini dapat dibuka siapa saja tanpa akun, termasuk orang tua. Angka
+ * takaran dan nama merek pada modul PKMK adalah simulasi edukatif, bukan
+ * resep, sehingga wajib didahului penjelasan ini (keputusan pemilik
+ * aplikasi, 22 November 2026).
+ */
+function DisclaimerPkmkPublik() {
+  return (
+    <div
+      role="note"
+      aria-labelledby="judul-disclaimer-pkmk"
+      className="rounded-2xl border border-amber-300 bg-amber-50 p-5 shadow-sm"
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden="true" />
+        <div className="text-sm text-amber-900">
+          <p id="judul-disclaimer-pkmk" className="font-bold">
+            Disclaimer: simulasi edukatif, bukan resep
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed sm:text-sm">
+            <li>
+              PKMK (Pangan Olahan untuk Keperluan Medis Khusus) hanya boleh diberikan atas{' '}
+              <strong>resep dan pemantauan dokter, dokter spesialis anak, atau ahli gizi</strong>{' '}
+              di fasilitas kesehatan. Jangan memulai, mengganti, atau menghentikan PKMK
+              berdasarkan halaman ini.
+            </li>
+            <li>
+              Takaran di bawah adalah hasil hitung otomatis dari satu kali pengukuran dan belum
+              mempertimbangkan pemeriksaan fisik, riwayat penyakit, alergi, maupun kondisi medis
+              anak.
+            </li>
+            <li>
+              Nama produk ditampilkan sebagai contoh perhitungan, <strong>bukan rekomendasi atau
+              promosi merek</strong>. Selalu ikuti petunjuk penyajian pada label kemasan.
+            </li>
+            <li>
+              Bila hasil skrining menunjukkan masalah pertumbuhan, bawa anak ke posyandu atau
+              puskesmas terdekat.
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   )
 }
