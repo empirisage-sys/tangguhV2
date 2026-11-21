@@ -61,6 +61,20 @@ function formatUmurKalender(tanggalLahir: string, tanggalPeriksa: string): strin
   }
 }
 
+/**
+ * Tanggal hari ini menurut jam perangkat (YYYY-MM-DD).
+ *
+ * Bentuk lama memakai `new Date().toISOString()`, yang berbasis UTC. Di
+ * Gorontalo (UTC+8) tanggal itu masih "kemarin" sampai pukul 08.00 WITA,
+ * sehingga umur anak terhitung kurang satu hari dan tanggal lahir hari ini
+ * tidak dapat dipilih.
+ */
+function tanggalHariIniLokal(): string {
+  const d = new Date()
+  const dua = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}`
+}
+
 /* ─── Komponen Utama ─────────────────────────────────────────────────────── */
 export default function HalamanSkriningTamu() {
   const [langkah, setLangkah] = useState<1 | 2 | 3>(1)
@@ -72,11 +86,16 @@ export default function HalamanSkriningTamu() {
   const [tanggalLahir, setTanggalLahir] = useState('')
   // Inisialisasi kosong untuk hindari hydration mismatch SSR vs client
   const [tanggalPeriksa, setTanggalPeriksa] = useState('')
+  // Diisi setelah mount, sama seperti tanggal periksa, agar render server dan
+  // klien tidak berselisih.
+  const [hariIni, setHariIni] = useState('')
 
   // Set tanggal hari ini hanya di client setelah mount
   useEffect(() => {
+    const sekarang = tanggalHariIniLokal()
+    setHariIni(sekarang)
     if (!tanggalPeriksa) {
-      setTanggalPeriksa(new Date().toISOString().slice(0, 10))
+      setTanggalPeriksa(sekarang)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -430,6 +449,7 @@ export default function HalamanSkriningTamu() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-tinta-700">Tanggal Periksa / Penimbangan</label>
                 <input type="date" value={tanggalPeriksa}
                   onChange={(e) => setTanggalPeriksa(e.target.value)}
+                  max={hariIni || undefined}
                   className="mt-1 h-12 w-full rounded-xl border border-kabut-200 bg-white px-4 text-sm font-semibold text-tinta-900 focus:border-laut-500 focus:outline-none"
                 />
               </div>
@@ -753,17 +773,45 @@ export default function HalamanSkriningTamu() {
                     }`}
                   >
                     <p className="font-bold">
-                      {hasil.diLuarRentang
-                        ? 'Angka hasil ukur perlu diperiksa ulang'
-                        : 'Catatan perhitungan'}
+                      {hasil.alasanDiLuarRentang.includes('belum_cukup_bulan')
+                        ? 'Standar WHO belum berlaku untuk umur ini'
+                        : hasil.diLuarRentang
+                          ? 'Angka hasil ukur perlu diperiksa ulang'
+                          : 'Catatan perhitungan'}
                     </p>
                     <p className="mt-1">{hasil.catatanDiLuarRentang}</p>
-                    {hasil.diLuarRentang && (
+                    {hasil.diLuarRentang && !hasil.alasanDiLuarRentang.includes('belum_cukup_bulan') && (
                       <p className="mt-2 font-semibold">
                         Status gizi di bawah tetap ditampilkan, tetapi jangan dipakai mengambil
                         keputusan sebelum pengukurannya dikonfirmasi.
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/*
+                Penanda rujukan dari mesin (gizi buruk, sangat pendek, berat
+                sangat kurang, edema bilateral, LILA rendah). Mesin sudah
+                menghitungnya sejak zscore-2.1.0, tetapi halaman ini belum
+                pernah menampilkannya: edema dan LILA rendah tidak terlihat
+                sama sekali karena keduanya tidak mengubah ketiga kartu Z.
+              */}
+              {hasil.isRedFlag && (
+                <div role="alert" className="mt-5 rounded-2xl border-2 border-red-400 bg-red-50 p-4 text-red-950">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
+                    <div className="text-xs leading-relaxed sm:text-sm">
+                      <p className="font-bold">Tanda bahaya: anak perlu segera diperiksa tenaga kesehatan</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                        {hasil.alasanRedFlag.map((alasan) => (
+                          <li key={alasan}>{alasan}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 font-semibold">
+                        Bawa anak ke puskesmas atau rumah sakit terdekat untuk pemeriksaan lanjutan.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -794,6 +842,19 @@ export default function HalamanSkriningTamu() {
                 <div><p className="text-laut-700">Tinggi Terkoreksi</p><p className="angka text-base font-bold text-laut-900">{hasil.panjangTerkoreksiCm} cm</p></div>
                 <div><p className="text-laut-700">Energi Pemeliharaan</p><p className="angka text-base font-bold text-laut-900">{hasil.gizi?.kaloriPemeliharaanKkal ?? '—'} kkal/hari</p></div>
                 <div><p className="text-laut-700">Target Tumbuh Kejar</p><p className="angka text-base font-bold text-amber-800">{hasil.gizi?.kaloriCatchUpKkal ?? '—'} kkal/hari</p></div>
+                {lilaCm && (
+                  <div><p className="text-laut-700">LILA</p><p className="angka text-base font-bold text-laut-900">{lilaCm.replace('.', ',')} cm</p></div>
+                )}
+                {lingkarKepalaCm && (
+                  <div>
+                    <p className="text-laut-700">Lingkar Kepala</p>
+                    <p className="angka text-base font-bold text-laut-900">{lingkarKepalaCm.replace('.', ',')} cm</p>
+                    <p className="text-[10px] text-laut-700">Dicatat, belum dinilai dengan standar WHO</p>
+                  </div>
+                )}
+                {edema && (
+                  <div><p className="text-laut-700">Edema Bilateral</p><p className="text-base font-bold text-red-700">Ada (+)</p></div>
+                )}
               </div>
             </div>
 

@@ -19,7 +19,7 @@ Dokumen ini dibaca agen Antigravity setiap sesi dan memuat aturan yang tidak bol
 
 ## 2. Aturan Klinis & Engine Z-Score
 
-1. **Tabel WHO Resmi**: Jangan mengedit berkas di `src/lib/who/`. Seluruh 842 baris tabel LMS dan velocity telah diverifikasi baris per baris terhadap sumber resmi WHO.
+1. **Tabel WHO Resmi**: Jangan mengedit berkas di `src/lib/who/`. Seluruh 842 baris tabel LMS dan velocity telah diverifikasi baris per baris terhadap sumber resmi WHO. Tabel harian BB/U dan TB/U (`lms-harian-*.ts`, 4 × 1857 baris) dihasilkan `scripts/who/hasilkan-tabel-harian.py` dari tabel diperluas WHO di cdn.who.int; ubah lewat skrip itu, bukan tangan.
 2. **Delta Velocity**: Tabel velocity WHO memiliki delta yang WAJIB dikurangkan: hitung dari LMS → kurangi delta → skalakan ke jumlah hari sebenarnya.
 3. **Penyaringan Kategori**: Jangan pernah menyaring data berdasarkan pencocokan teks status. Selalu pakai kode kategori enum (contoh: `gizi_buruk`, `pendek`).
 4. **Lapisan Logika Murni**: Fungsi di lapisan logika tidak boleh mengembalikan teks yang dibaca pengguna maupun nama kelas CSS.

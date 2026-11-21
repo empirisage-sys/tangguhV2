@@ -63,6 +63,8 @@ export type KodeRedFlag =
 export type AlasanTidakDinilai =
   | 'umur_melebihi_60_bulan'
   | 'umur_negatif'
+  /** Bayi prematur yang umur koreksinya belum mencapai umur cukup bulan. */
+  | 'belum_cukup_bulan'
   | 'panjang_di_luar_tabel'
   | 'berat_di_luar_batas_wajar'
   /** Panjang di luar 30-140 cm. Sebelumnya BATAS.panjang* tidak pernah dipakai (Z-3). */

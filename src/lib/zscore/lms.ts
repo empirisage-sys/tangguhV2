@@ -6,10 +6,14 @@
  *
  * Yang DIPERTAHANKAN dari aplikasi versi Firebase, dan tidak boleh diubah:
  *   - Interpolasi linear pada L, M, dan S secara terpisah.
- *   - Ambang `Math.abs(L) < 0.01` untuk beralih ke rumus logaritmik.
  *   - Koreksi WHO untuk |Z| > 3 memakai jarak antara SD3 dan SD2.
  *
  * Yang DIUBAH secara sengaja (lihat TELAAH_KODE_LAMA_TANGGUH.md temuan T-3):
+ *   - (zscore-2.3.0) Rumus logaritmik hanya dipakai bila L benar-benar nol.
+ *     Ambang lama `Math.abs(L) < 0.01` adalah pendekatan yang menyimpang dari
+ *     rumus WHO sampai 0,006 SD pada Z ekstrem. Dengan tabel harian, L BB/U
+ *     berada di bawah 0,01 pada puluhan hari sekitar umur 4 dan 20-24 bulan,
+ *     bukan lagi hanya 5 baris bulanan.
  *   - Nilai di luar rentang tabel TIDAK LAGI dijepit ke baris tepi. Fungsi
  *     `interpolasiLms` mengembalikan `null` dan menandai `diLuarRentang`.
  *     Penjepitan hanya tersedia pada `lmsUntukKurva`, yang dipakai khusus
@@ -130,14 +134,13 @@ export function lmsUntukKurva(x: number, tabel: TabelLms, langkah: number): Lms 
  * distribusi LMS tidak mendefinisikan nilai pada z tersebut. Versi sebelumnya
  * mengembalikan 0, dan angka 0 itu ikut dipakai menghitung jarak SD pada
  * koreksi |Z| > 3 sehingga menghasilkan Z yang salah alih-alih menyatakan
- * tidak dapat dinilai. Lihat temuan Z-9. Ambang `Math.abs(L) < 0.01` untuk
- * beralih ke rumus logaritmik dipertahankan; galat maksimalnya 0,005 SD dan
- * hanya berlaku pada 5 baris tabel (BB/U lk bulan 20-23, BB/U pr bulan 4).
+ * tidak dapat dinilai. Lihat temuan Z-9. Rumus logaritmik hanya untuk L = 0
+ * (lihat kepala berkas).
  */
 export function nilaiDariLms(lms: Lms, z: number): number | null {
   const [L, M, S] = lms
   if (!Number.isFinite(M) || !Number.isFinite(S) || M <= 0 || S <= 0) return null
-  if (Math.abs(L) < 0.01) return M * Math.exp(S * z)
+  if (Math.abs(L) < 1e-9) return M * Math.exp(S * z)
 
   const basis = 1 + L * S * z
   if (basis <= 0) return null
@@ -166,7 +169,7 @@ export function hitungZ(nilai: number, lms: Lms | null): number | null {
   if (M <= 0 || S <= 0) return null
 
   let z: number
-  if (Math.abs(L) < 0.01) {
+  if (Math.abs(L) < 1e-9) {
     z = Math.log(nilai / M) / S
   } else {
     z = (Math.pow(nilai / M, L) - 1) / (L * S)
