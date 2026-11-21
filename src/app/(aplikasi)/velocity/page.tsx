@@ -1,5 +1,5 @@
 import { ambilProfil } from '@/lib/supabase/penjaga'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { bacaDaftarBalita } from '@/lib/db/balita-server'
 import { PanelVelocity } from './PanelVelocity'
@@ -12,7 +12,7 @@ import { PanelVelocity } from './PanelVelocity'
  */
 export default async function HalamanWeightIncrement() {
   const profil = await ambilProfil()
-  const daftarRujukan = ambilSemuaRujukan()
+  const daftarRujukan = await bacaRujukanUntukAkses()
 
   const hasilBaca = await bacaDaftarBalita()
   const galatBaca = hasilBaca.ok ? null : hasilBaca.pesan

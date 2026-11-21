@@ -27,8 +27,13 @@ next-env.d.ts
 .vercel
 
 # Scratch
+# Hanya berkas .mjs coretan di akar repo. Pola lama `*.mjs` ikut
+# mengabaikan scripts/**/*.mjs dan tests/**/*.mjs sehingga skrip baru
+# diam-diam tidak masuk commit.
 scratch/
-*.mjs
+/*.mjs
+!/next.config.mjs
+!/postcss.config.mjs
 
 # Supabase temporary files
 supabase/.temp/

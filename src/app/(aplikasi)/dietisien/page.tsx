@@ -1,5 +1,5 @@
 import { ambilProfil } from '@/lib/supabase/penjaga'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { bacaDaftarBalita } from '@/lib/db/balita-server'
 import { PanelDietisien } from './PanelDietisien'
@@ -12,7 +12,7 @@ import { PanelDietisien } from './PanelDietisien'
  */
 export default async function HalamanDietisien() {
   const profil = await ambilProfil()
-  const daftarRujukan = ambilSemuaRujukan()
+  const daftarRujukan = await bacaRujukanUntukAkses()
 
   const hasilBaca = await bacaDaftarBalita()
   const galatBaca = hasilBaca.ok ? null : hasilBaca.pesan

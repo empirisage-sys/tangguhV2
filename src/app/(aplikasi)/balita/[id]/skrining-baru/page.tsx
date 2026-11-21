@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { ambilProfil } from '@/lib/supabase/penjaga'
-import { ambilSemuaRujukan } from '@/lib/db/rujukan'
+import { bacaRujukanUntukAkses } from '@/lib/db/rujukan-server'
 import { bolehLihatBalita } from '@/lib/tampilan/akses'
 import { bacaBalitaById } from '@/lib/db/balita-server'
 import { FormulirSkriningBaru } from './FormulirSkriningBaru'
@@ -41,7 +41,7 @@ export default async function HalamanSkriningBaru({
   if (!balita) notFound()
 
   const profil = await ambilProfil()
-  if (profil && !bolehLihatBalita(balita, profil, ambilSemuaRujukan())) {
+  if (profil && !bolehLihatBalita(balita, profil, await bacaRujukanUntukAkses())) {
     notFound()
   }
 
