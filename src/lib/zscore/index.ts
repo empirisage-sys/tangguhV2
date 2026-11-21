@@ -31,12 +31,23 @@
  *                 zscore-2.1.0 dengan `kalori_metode = 'pemeliharaan'` pada
  *                 anak berstatus gizi buruk patut ditinjau ulang: sebagian
  *                 kemungkinan seharusnya bertarget tumbuh kejar.
+ *   zscore-2.3.0  BB/U dan TB/U dihitung dari tabel HARIAN WHO (expanded
+ *                 tables), bukan interpolasi lurus antarbaris bulanan.
+ *                 Interpolasi lama meleset terhadap WHO sampai:
+ *                   +0,23 SD TB/U pada umur 23-24 bulan (baris bulan 23
+ *                         berbasis panjang diinterpolasi ke baris bulan 24
+ *                         berbasis tinggi), sehingga stunting terlewat;
+ *                   +0,23 SD TB/U dan -0,27 SD BB/U pada hari 5-22.
+ *                 Bayi prematur sebelum umur cukup bulan (umur koreksi
+ *                 negatif) kini diberi alasan `belum_cukup_bulan`, bukan
+ *                 "tanggal periksa mendahului tanggal lahir".
+ *                 BB/PB dan BB/TB tidak berubah. Baris berlabel versi lama
+ *                 pada umur 0-1 bulan dan 23-24 bulan patut ditinjau ulang.
  */
 import {
   LANGKAH_PANJANG_CM,
-  LANGKAH_UMUR_BULAN,
+  lmsUmurHarian,
   tabelPanjang,
-  tabelUmur,
   UMUR_MAKS_BULAN,
 } from '@/lib/who'
 import { bulatkanZ, hitungZ, interpolasiLms } from './lms'
@@ -53,7 +64,7 @@ import type {
   StandarPanjang,
 } from './tipe'
 
-export const ENGINE_VERSION = 'zscore-2.2.0'
+export const ENGINE_VERSION = 'zscore-2.3.0'
 
 /** Umur, dalam bulan, tempat standar berpindah dari panjang terlentang ke tinggi berdiri. */
 export const UMUR_PERALIHAN_BULAN = 24
@@ -202,9 +213,20 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   const catatan: string[] = []
 
   // --- Penjagaan batas sebelum menghitung apa pun ---
-  if (umur.hari < 0) {
+  if (umurKronologis.hari < 0) {
     alasan.push('umur_negatif')
     catatan.push('Tanggal periksa mendahului tanggal lahir.')
+  } else if (umur.hari < 0) {
+    // Bayi prematur yang belum mencapai umur cukup bulan (40 minggu). Bentuk
+    // lama melaporkannya sebagai "tanggal periksa mendahului tanggal lahir",
+    // padahal tanggalnya benar.
+    alasan.push('belum_cukup_bulan')
+    catatan.push(
+      `Bayi lahir pada usia gestasi ${koreksi.usiaGestasiMinggu} minggu dan baru berumur ` +
+        `${umurKronologis.hari} hari, sehingga umur koreksinya belum mencapai umur cukup bulan ` +
+        `(kurang ${-umur.hari} hari). Standar WHO 0-60 bulan berlaku mulai umur cukup bulan. ` +
+        'Untuk masa ini gunakan kurva pertumbuhan bayi prematur.',
+    )
   }
 
   if (umur.bulan > UMUR_MAKS_BULAN) {
@@ -248,12 +270,8 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   // --- BB/U ---
   let bbu: HasilIndikator = KOSONG
   if (umurValid && beratValid) {
-    const { lms, diLuarRentang } = interpolasiLms(
-      umur.bulan,
-      tabelUmur('bbu', input.jenisKelamin),
-      LANGKAH_UMUR_BULAN,
-    )
-    if (!diLuarRentang) {
+    const lms = lmsUmurHarian('bbu', input.jenisKelamin, umur.hari)
+    if (lms) {
       const z = bulatkanZ(hitungZ(input.beratKg, lms))
       bbu = { z, keterangan: `BB/U pada umur ${angkaId(umur.bulan, 2)} bulan` }
       if (zTidakMasukAkal(z, BATAS_Z_WAJAR.bbu)) {
@@ -271,12 +289,11 @@ export function hitungSkrining(input: InputSkrining): HasilSkrining {
   // --- TB/U ---
   let tbu: HasilIndikator = KOSONG
   if (umurValid && panjangValid) {
-    const { lms, diLuarRentang } = interpolasiLms(
-      umur.bulan,
-      tabelUmur('tbu', input.jenisKelamin),
-      LANGKAH_UMUR_BULAN,
-    )
-    if (!diLuarRentang) {
+    // Tabel harian: hari 0-730 berbasis panjang terlentang, hari 731 ke atas
+    // berbasis tinggi berdiri, sejalan dengan `koreksiPosisi` (umur < 24 bulan
+    // berarti hari <= 730).
+    const lms = lmsUmurHarian('tbu', input.jenisKelamin, umur.hari)
+    if (lms) {
       const label = standar === 'terlentang' ? 'PB/U' : 'TB/U'
       const z = bulatkanZ(hitungZ(panjangTerkoreksiCm, lms))
       tbu = {

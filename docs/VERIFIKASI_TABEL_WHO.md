@@ -203,3 +203,37 @@ Bila suatu hari tabel WHO diperbarui atau ada keraguan baru, unduh ulang berkas
 di bagian 2 dan bandingkan kembali. Jangan mengubah nilai di `src/lib/who/`
 tanpa mencatat alasan dan sumbernya di kepala berkas, seperti yang dilakukan
 pada koreksi baris 95,5 cm.
+
+---
+
+## Tabel harian BB/U dan TB/U (zscore-2.3.0, 21 November 2026)
+
+Mesin kini menghitung BB/U dan TB/U dari tabel z-score **diperluas (harian)** WHO,
+bukan interpolasi lurus antarbaris bulanan.
+
+**Alasan.** Audit terhadap tabel harian WHO (1.348 kasus) menemukan interpolasi bulanan
+meleset sampai:
+
+| Rentang umur | Indikator | Selisih maksimal | Akibat |
+|---|---|---|---|
+| Hari 702-730 (23-24 bulan) | TB/U | +0,23 SD | Stunting terlewat. Baris bulan 23 (panjang) diinterpolasi ke baris bulan 24 (tinggi). |
+| Hari 8-22 | TB/U | +0,23 SD | Stunting neonatus terlewat |
+| Hari 5-15 | BB/U | -0,27 SD | Berat badan kurang dilaporkan padahal normal |
+
+**Sumber.** Empat berkas xlsx dari
+`https://cdn.who.int/media/docs/default-source/child-growth/child-growth-standards/indicators/`
+(`weight-for-age/expanded-tables/wfa-{boys,girls}-zscore-expanded-tables.xlsx` dan
+`length-height-for-age/expandable-tables/lhfa-{boys,girls}-zscore-expanded-tables.xlsx`),
+kolom Day, L, M, S tanpa perubahan. Salinan mentah: `referensi/who-harian/lms-harian-bbu-tbu.json`.
+
+**Verifikasi.**
+1. 1857 baris per tabel (hari 0-1856) tanpa celah; SHA-256 tercatat di kepala tiap berkas.
+2. Cocok dengan tabel bulanan yang sudah terverifikasi pada setiap bulan 0-60
+   (selisih relatif M maksimal 1,7e-4). Diuji ulang oleh `lms-harian.test.ts`.
+3. PB/U dan TB/U identik dengan paket `cgmzscore` 3.3.1; BB/U berbeda paling besar
+   4,6e-4 relatif karena paket itu memangkas digit S.
+4. Tiga kasus klinis yang sebelumnya salah klasifikasi kini sesuai WHO (lihat
+   `lms-harian.test.ts`), dan dikonfirmasi di halaman produksi sebelum perbaikan.
+
+BB/PB dan BB/TB tidak berubah (tabel per 0,5 cm sudah akurat, selisih rata-rata 0,0004 SD).
+Kurva dan usia-tinggi tetap memakai tabel bulanan.

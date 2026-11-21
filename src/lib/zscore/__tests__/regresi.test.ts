@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { hitungSkrining } from '@/lib/zscore'
+import { hitungSkrining, hitungZ } from '@/lib/zscore'
+import { bulatkanZ } from '@/lib/zscore/lms'
+import { lmsUmurHarian } from '@/lib/who'
 import { hitungSkriningLama } from '@/../referensi/engine-lama'
 import type { JenisKelamin } from '@/lib/who'
 
@@ -18,6 +20,11 @@ import type { JenisKelamin } from '@/lib/who'
  *   4. Kebutuhan gizi menghasilkan dua angka, termasuk target tumbuh kejar.
  *   5. Usia-tinggi diinterpolasi, tidak dibulatkan ke bulan terdekat.
  *   6. Kategori dikembalikan sebagai kode, bukan teks berikut kelas CSS.
+ *   7. (zscore-2.3.0) BB/U dan TB/U dihitung dari tabel HARIAN WHO, bukan
+ *      interpolasi lurus antarbaris bulanan. Perbedaan BB/U atau TB/U hanya
+ *      dianggap disengaja bila nilai baru persis sama dengan Z dari tabel
+ *      harian pada umur hari itu, dan selisihnya terhadap engine lama tidak
+ *      lebih dari 0,3 SD (batas terbesar yang terukur saat audit).
  *
  * Perubahan 3, 4, 5, dan 6 diuji di berkas lain. Berkas ini memusatkan
  * perhatian pada nilai Z dan klasifikasi, yaitu bagian yang paling berbahaya
@@ -146,6 +153,18 @@ function bandingkan(k: Kasus): Perbedaan[] {
       continue
     }
     if (zBaru !== null && zLama !== null && Math.abs(zBaru - zLama) > 0.001) {
+      if (nama !== 'bbtb') {
+        const nilai = nama === 'bbu' ? k.beratKg : baru.panjangTerkoreksiCm
+        const zHarian = bulatkanZ(hitungZ(nilai, lmsUmurHarian(nama, k.seks, k.hari)))
+        if (zHarian !== null && Math.abs(zBaru - zHarian) <= 0.001 && Math.abs(zBaru - zLama) <= 0.3) {
+          beda.push({
+            kasus: k,
+            jenis: 'DISENGAJA_7_tabel_harian_who',
+            detail: `${nama}: baru ${zBaru.toFixed(4)} vs lama ${zLama.toFixed(4)}`,
+          })
+          continue
+        }
+      }
       beda.push({
         kasus: k,
         jenis: 'TIDAK_DIHARAPKAN_nilai_z_berbeda',
