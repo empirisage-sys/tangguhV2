@@ -39,27 +39,11 @@ import { FormulasiPKMKSection } from '@/components/dietisien/FormulasiPKMKSectio
 import { formatTanggal, formatZ, formatGramBertanda } from '@/lib/tampilan/format'
 import { Button } from '@/components/ui/Button'
 import type { KunjunganRiwayat } from '@/lib/grafik/seri'
-
-/* ─── Helper: format umur kalender ───────────────────────────────────────── */
-function formatUmurKalender(tanggalLahir: string, tanggalPeriksa: string): string {
-  try {
-    const lahir = new Date(tanggalLahir + 'T00:00:00Z')
-    const periksa = new Date(tanggalPeriksa + 'T00:00:00Z')
-    let y = periksa.getUTCFullYear() - lahir.getUTCFullYear()
-    let m = periksa.getUTCMonth() - lahir.getUTCMonth()
-    let d = periksa.getUTCDate() - lahir.getUTCDate()
-    if (d < 0) { const prev = new Date(Date.UTC(periksa.getUTCFullYear(), periksa.getUTCMonth(), 0)); d += prev.getUTCDate(); m-- }
-    if (m < 0) { m += 12; y-- }
-    const totalHari = Math.round((periksa.getTime() - lahir.getTime()) / 86_400_000)
-    const parts: string[] = []
-    if (y > 0) parts.push(`${y} Thn`)
-    if (m > 0 || y > 0) parts.push(`${m} Bln`)
-    parts.push(`${d} Hr`)
-    return `${parts.join(' ')} (${totalHari} Hari)`
-  } catch {
-    return '—'
-  }
-}
+import {
+  formatUmurKalender,
+  periksaTanggalSebelumnya,
+  periksaTanggalSkrining,
+} from '@/lib/validasi/tanggal-skrining'
 
 /**
  * Tanggal hari ini menurut jam perangkat (YYYY-MM-DD).
@@ -113,14 +97,45 @@ export default function HalamanSkriningTamu() {
   const [edema, setEdema] = useState(false)
 
   // Hasil
-  const [hasil, setHasil] = useState<HasilSkrining | null>(null)
+  const [hasilTersimpan, setHasil] = useState<HasilSkrining | null>(null)
+  /** Sidik isian pada saat hasil dihitung. Lihat `sidikMasukan` di bawah. */
+  const [sidikHasil, setSidikHasil] = useState('')
   const [riwayat, setRiwayat] = useState<KunjunganRiwayat[]>([])
 
   // Evaluasi Weight Increment (Opsional untuk Tamu)
   const [sertakanVelocity, setSertakanVelocity] = useState(false)
   const [tanggalSebelumnya, setTanggalSebelumnya] = useState('')
   const [beratSebelumnyaKg, setBeratSebelumnyaKg] = useState('')
-  const [hasilVelocity, setHasilVelocity] = useState<HasilVelocity | null>(null)
+  const [velocityTersimpan, setHasilVelocity] = useState<HasilVelocity | null>(null)
+
+  // ==========================================================================
+  // HASIL BASI (temuan uji produksi 21 November 2026)
+  //
+  // Hasil disimpan sekali saat "Hitung" ditekan. Bila petugas kembali ke
+  // langkah 1, mencentang prematur, lalu menekan tab "Hasil", layar sudah
+  // menulis "Usia Koreksi" tetapi nilai Z masih dari perhitungan lama.
+  //
+  // Sekarang hasil hanya berlaku selama isian sama persis dengan isian saat
+  // dihitung. Begitu satu isian berubah, hasil dianggap tidak ada dan petugas
+  // diminta menghitung ulang.
+  // ==========================================================================
+  const sidikMasukan = JSON.stringify([
+    tanggalLahir, tanggalPeriksa, jenisKelamin, isPrematur, usiaGestasiMinggu,
+    beratKg, panjangCm, posisiUkur, lilaCm, lingkarKepalaCm, edema,
+    sertakanVelocity, tanggalSebelumnya, beratSebelumnyaKg,
+  ])
+  const hasilMasihBerlaku = hasilTersimpan !== null && sidikHasil === sidikMasukan
+  const hasil = hasilMasihBerlaku ? hasilTersimpan : null
+  const hasilVelocity = hasilMasihBerlaku ? velocityTersimpan : null
+  /** `true` bila ada hasil, tetapi isiannya sudah diubah sesudah dihitung. */
+  const hasilBasi = hasilTersimpan !== null && !hasilMasihBerlaku
+
+  // Pesan galat di atas formulir menyangkut isian lama. Begitu isian berubah,
+  // pesan itu dihapus agar tidak bertentangan dengan keadaan terbaru (mis.
+  // "Tanggal lahir belum diisi." padahal tanggal lahir sudah diisi).
+  useEffect(() => {
+    setError(null)
+  }, [sidikMasukan])
 
   // Kalkulasi prematur realtime (hanya untuk tampilan info)
   const defisitMinggu = isPrematur ? Math.max(0, 40 - usiaGestasiMinggu) : 0
@@ -143,7 +158,11 @@ export default function HalamanSkriningTamu() {
   // Penjagaan `tanggalLahir && tanggalPeriksa` yang lama hanya memeriksa
   // string kosong, sehingga tidak menangkap keadaan ini.
   // ==========================================================================
-  const tanggalSiap = tanggalValid(tanggalLahir) && tanggalValid(tanggalPeriksa)
+  const galatTanggal = periksaTanggalSkrining({ tanggalLahir, tanggalPeriksa, hariIni })
+  const tanggalSiap = galatTanggal === null
+  /** Kedua tanggal sudah diketik lengkap, tetapi isinya tidak dapat dipakai. */
+  const tampilkanGalatTanggal =
+    tanggalValid(tanggalLahir) && tanggalValid(tanggalPeriksa) && galatTanggal !== null
 
   // Umur kronologis (untuk tampilan di step 1)
   const teksUmurKronologis = tanggalSiap
@@ -181,24 +200,31 @@ export default function HalamanSkriningTamu() {
   const koreksiKedaluwarsa = koreksiTampilan?.koreksiKedaluwarsa === true
 
   const pindahLangkah = useCallback((target: 1 | 2 | 3) => {
+    // Langkah 2 dan 3 memerlukan tanggal yang sah. Dahulu tanggal lahir kosong
+    // tetap bisa lanjut ke pengukuran.
+    if (target > 1 && galatTanggal) {
+      setError(galatTanggal)
+      setLangkah(1)
+      return
+    }
     setError(null)
     setLangkah(target)
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
+  }, [galatTanggal])
 
   const handleHitung = useCallback(() => {
     setError(null)
 
     // Validasi input
-    if (!tanggalLahir) { setError('Tanggal lahir belum diisi.'); return }
-    if (!tanggalPeriksa) { setError('Tanggal periksa belum diisi.'); return }
-    if (!tanggalValid(tanggalLahir)) {
-      setError('Tanggal lahir belum lengkap atau tidak masuk akal. Periksa kembali tahunnya.')
-      return
-    }
-    if (!tanggalValid(tanggalPeriksa)) {
-      setError('Tanggal periksa belum lengkap atau tidak masuk akal. Periksa kembali tahunnya.')
-      return
+    if (galatTanggal) { setError(galatTanggal); return }
+    if (sertakanVelocity) {
+      const galatSebelumnya = periksaTanggalSebelumnya({ tanggalSebelumnya, tanggalLahir, tanggalPeriksa })
+      if (galatSebelumnya) { setError(galatSebelumnya); return }
+      const bPrev = parseFloat(beratSebelumnyaKg.replace(',', '.'))
+      if (!beratSebelumnyaKg || isNaN(bPrev) || bPrev <= 0) {
+        setError('Masukkan berat badan sebelumnya yang valid (contoh: 6,8).')
+        return
+      }
     }
 
     const bb = parseFloat(beratKg.replace(',', '.'))
@@ -247,6 +273,7 @@ export default function HalamanSkriningTamu() {
       })
 
       setHasil(res)
+      setSidikHasil(sidikMasukan)
       setRiwayat([{
         tanggalPeriksa,
         umurBulan: res.umurBulan,
@@ -301,7 +328,35 @@ export default function HalamanSkriningTamu() {
     tanggalSebelumnya,
     beratSebelumnyaKg,
     pindahLangkah,
+    galatTanggal,
+    sidikMasukan,
   ])
+
+  /** Mengosongkan seluruh isian untuk balita berikutnya. */
+  const skriningUlang = useCallback(() => {
+    setNama('')
+    setJenisKelamin('lk')
+    setTanggalLahir('')
+    setTanggalPeriksa(hariIni)
+    setIsPrematur(false)
+    setUsiaGestasiMinggu(32)
+    setBeratKg('')
+    setPanjangCm('')
+    setPosisiUkur('otomatis')
+    setLilaCm('')
+    setLingkarKepalaCm('')
+    setEdema(false)
+    setSertakanVelocity(false)
+    setTanggalSebelumnya('')
+    setBeratSebelumnyaKg('')
+    setHasil(null)
+    setHasilVelocity(null)
+    setRiwayat([])
+    setSidikHasil('')
+    setError(null)
+    setLangkah(1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [hariIni])
 
   const statusTB = hasil ? tampilanTBU(hasil.statusTBU) : null
   const statusBB = hasil ? tampilanBBTB(hasil.statusBBTB) : null
@@ -374,7 +429,11 @@ export default function HalamanSkriningTamu() {
                 type="button"
                 onClick={() => {
                   if (step.id === 3 && !hasil) {
-                    setError('Silakan lengkapi pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi".')
+                    setError(
+                      hasilBasi
+                        ? 'Isian sudah diubah sesudah dihitung. Klik "Hitung Status Gizi" lagi agar hasilnya sesuai isian terbaru.'
+                        : 'Silakan lengkapi pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi".',
+                    )
                     return
                   }
                   pindahLangkah(step.id)
@@ -484,6 +543,12 @@ export default function HalamanSkriningTamu() {
                 )}
               </div>
             </div>
+
+            {tampilkanGalatTanggal && (
+              <div role="alert" className="rounded-xl bg-amber-50 p-4 text-xs font-semibold text-amber-900 ring-1 ring-amber-300">
+                {galatTanggal}
+              </div>
+            )}
 
             {/* Info Umur */}
             {tanggalSiap && (
@@ -698,8 +763,12 @@ export default function HalamanSkriningTamu() {
         {langkah === 3 && !hasil && (
           <div className="rounded-2xl bg-white p-8 shadow-[var(--shadow-kartu)] text-center space-y-4">
             <p className="text-lg">⚠️</p>
-            <p className="font-bold text-tinta-900">Data belum dihitung</p>
-            <p className="text-sm text-tinta-600">Silakan isi data pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi &amp; Analisis Pertumbuhan".</p>
+            <p className="font-bold text-tinta-900">{hasilBasi ? 'Isian sudah diubah' : 'Data belum dihitung'}</p>
+            <p className="text-sm text-tinta-600">
+              {hasilBasi
+                ? 'Hasil sebelumnya tidak lagi sesuai isian terbaru. Klik "Hitung Status Gizi & Analisis Pertumbuhan" lagi.'
+                : 'Silakan isi data pengukuran terlebih dahulu, lalu klik "Hitung Status Gizi & Analisis Pertumbuhan".'}
+            </p>
             <Button type="button" onClick={() => pindahLangkah(2)} varian="utama">
               Ke Form Pengukuran
             </Button>
@@ -736,7 +805,7 @@ export default function HalamanSkriningTamu() {
                     className="inline-flex items-center gap-1.5 rounded-xl border border-kabut-200 bg-white px-3.5 py-2 text-xs font-bold text-tinta-700 shadow-sm hover:bg-kabut-100">
                     <Printer className="size-4" /> Cetak
                   </button>
-                  <button type="button" onClick={() => { setHasil(null); pindahLangkah(1) }}
+                  <button type="button" onClick={skriningUlang}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-kabut-200 bg-white px-3.5 py-2 text-xs font-bold text-tinta-700 shadow-sm hover:bg-kabut-100">
                     <RotateCcw className="size-4" /> Skrining Ulang
                   </button>
